@@ -1,5 +1,5 @@
-output "IPS" {
-  value = module.deploy-weka.ip
+output "get-vms-ips-command" {
+  value = module.deploy-weka.get-vms-public-ips
 }
 
 output "SSH-KEY-PATH" {
