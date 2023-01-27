@@ -42,7 +42,8 @@ apt update -y
 apt install -y jq
 
 # attache disk
-wekaiosw_device=/dev/sdc
+disk=$(lsblk -o NAME,HCTL,SIZE,MOUNTPOINT | grep "3:0:0:0" | awk '{print $1}')
+wekaiosw_device=/dev/$disk
 mkfs.ext4 -L wekaiosw $wekaiosw_device || return 1
 mkdir -p /opt/weka || return 1
 mount $wekaiosw_device /opt/weka || return 1
@@ -65,6 +66,8 @@ weka local stop
 weka local rm default --force
 weka local setup container --name drives0 --base-port 14000 --cores ${num_drive_containers} --no-frontends --drives-dedicated-cores ${num_drive_containers}
 
-curl ${clusterization_url}?code="${function_app_default_key}" -H "Content-Type:application/json"  -d "{\"name\": \"$HOSTNAME\"}" > /tmp/clusterize.sh
+compute_name=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" | jq '.compute.name')
+compute_name=$(echo "$compute_name" | cut -c2- | rev | cut -c2- | rev)
+curl ${clusterization_url}?code="${function_app_default_key}" -H "Content-Type:application/json"  -d "{\"vm\": \"$compute_name:$HOSTNAME\"}" > /tmp/clusterize.sh
 chmod +x /tmp/clusterize.sh
 /tmp/clusterize.sh > /tmp/cluster_creation.log 2>&1

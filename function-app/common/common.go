@@ -7,15 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/rs/zerolog/log"
 	"io"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -356,61 +355,75 @@ func GetKeyVaultValue(keyVaultUri, secretName string) (secret string, err error)
 	return
 }
 
-func GetVmsPrivateIps(subscriptionId, resourceGroupName string, vmNames []string) (privateIps []string, err error) {
-	log.Info().Msg("fetching cluster vms private ips")
+type VirtualMachine struct {
+	Id string `json:"id"`
+}
+
+type IpConfigurationsProperties struct {
+	PrivateIPAddress string `json:"privateIPAddress"`
+}
+
+type IpConfiguration struct {
+	Properties IpConfigurationsProperties `json:"properties"`
+}
+
+type Properties struct {
+	IpConfigurations []IpConfiguration `json:"ipConfigurations"`
+	VirtualMachine   VirtualMachine    `json:"virtualMachine"`
+}
+
+type NetworkInterface struct {
+	Properties Properties `json:"properties"`
+}
+
+type NetworkInterfaces struct {
+	Value []NetworkInterface `json:"value"`
+}
+
+func GetVmsPrivateIps(subscriptionId, resourceGroupName, vmScaleSetName string) (vmsPrivateIps map[string]string, err error) {
+	log.Info().Msg("fetching scale set vms private ips")
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
 		log.Error().Msgf("%s", err)
 		return
 	}
 
-	vmClient, err := armcompute.NewVirtualMachinesClient(subscriptionId, credential, nil)
-	if err != nil {
-		log.Error().Msgf("%s", err)
-		return
-	}
-
-	nicClient, err := armnetwork.NewInterfacesClient(subscriptionId, credential, nil)
-	if err != nil {
-		log.Error().Msgf("%s", err)
-		return
-	}
-
 	ctx := context.Background()
-	for _, vmName := range vmNames {
-		vmResponse, err2 := vmClient.Get(ctx, resourceGroupName, vmName, nil)
-		if err2 != nil {
-			err = err2
-			log.Error().Msgf("failed fetching vm: %s", err)
-			return
-		}
 
-		privateIp := ""
-		for _, nicRef := range vmResponse.Properties.NetworkProfile.NetworkInterfaces {
-			nicID, err2 := arm.ParseResourceID(*nicRef.ID)
-			if err2 != nil {
-				err = err2
-				log.Error().Msgf("%s", err)
-				return
-			}
-			nic, err2 := nicClient.Get(ctx, nicID.ResourceGroupName, nicID.Name, nil)
-			if err2 != nil {
-				err = err2
-				log.Error().Msgf("failed fetching vm nic: %s", err)
-				return
-			}
+	accessToken, err := credential.GetToken(ctx, policy.TokenRequestOptions{
+		Scopes: []string{fmt.Sprintf("https://management.azure.com")},
+	})
+	if err != nil {
+		log.Error().Msgf("%s", err)
+		return
+	}
+	bearer := "Bearer " + accessToken.Token
+	url := fmt.Sprintf("https://management.azure.com/subscriptions/%s/resourceGroups/%s/providers/microsoft.Compute/virtualMachineScaleSets/%s/networkInterfaces?api-version=2019-03-01", subscriptionId, resourceGroupName, vmScaleSetName)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		log.Error().Msgf("%s", err)
+	}
+	req.Header.Add("Authorization", bearer)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Error().Msgf("%s", err)
+		return
+	}
+	defer resp.Body.Close()
 
-			for _, ipCfg := range nic.Properties.IPConfigurations {
-				if ipCfg.Properties.PrivateIPAddress != nil {
-					privateIp = *ipCfg.Properties.PrivateIPAddress
-					break
-				}
-			}
-			if privateIp != "" {
-				privateIps = append(privateIps, privateIp)
-				break
-			}
-		}
+	networkInterfaces := NetworkInterfaces{}
+	err = json.NewDecoder(resp.Body).Decode(&networkInterfaces)
+	if err != nil {
+		log.Error().Msgf("%s", err)
+	}
+
+	vmsPrivateIps = make(map[string]string)
+	for _, networkInterface := range networkInterfaces.Value {
+		vmNameParts := strings.Split(networkInterface.Properties.VirtualMachine.Id, "/")
+		vmNamePartsLen := len(vmNameParts)
+		vmName := fmt.Sprintf("%s_%s", vmNameParts[vmNamePartsLen-3], vmNameParts[vmNamePartsLen-1])
+		vmsPrivateIps[vmName] = networkInterface.Properties.IpConfigurations[0].Properties.PrivateIPAddress
 	}
 
 	return
