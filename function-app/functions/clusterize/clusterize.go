@@ -12,8 +12,8 @@ import (
 	"weka-deployment/common"
 )
 
-type requestBody struct {
-	Name string `json:"name"`
+type RequestBody struct {
+	Vm string `json:"vm"`
 }
 
 func generateClusterizationScript(
@@ -100,7 +100,7 @@ func generateClusterizationScript(
 	return
 }
 
-func getErrorScript(err error) string {
+func GetErrorScript(err error) string {
 	return fmt.Sprintf(`
 #!/bin/bash
 <<'###ERROR'
@@ -110,13 +110,66 @@ exit 1
 	`, err.Error())
 }
 
+func HandleLastClusterVm(state common.ClusterState, hostsNum, clusterName, computeMemory, subscriptionId,
+	resourceGroupName, setObs, obsName, obsContainerName, obsAccessKey, location, drivesContainerNum,
+	computeContainerNum, frontendContainerNum, tieringSsdPercent, prefix, keyVaultUri string) (clusterizeScript string) {
+
+	log.Info().Msg("This is the last instance in the cluster, creating obs and clusterization script")
+
+	var err error
+	if setObs == "true" && obsAccessKey == "" {
+		obsAccessKey, err = common.CreateStorageAccount(subscriptionId, resourceGroupName, obsName, location)
+		if err != nil {
+			clusterizeScript = GetErrorScript(err)
+			return
+		}
+
+		err = common.CreateContainer(obsName, obsContainerName)
+		if err != nil {
+			clusterizeScript = GetErrorScript(err)
+			return
+		}
+	}
+
+	functionAppKey, err := common.GetKeyVaultValue(keyVaultUri, "function-app-default-key")
+	if err != nil {
+		clusterizeScript = GetErrorScript(err)
+		return
+	}
+
+	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
+	vmsPrivateIps, err := common.GetVmsPrivateIps(subscriptionId, resourceGroupName, vmScaleSetName)
+	if err != nil {
+		clusterizeScript = GetErrorScript(err)
+		return
+	}
+
+	var vmNamesList []string
+	// we make the ips list compatible to vmNames
+	var ipsList []string
+	for _, instance := range state.Instances {
+		vm := strings.Split(instance, ":")
+		ipsList = append(ipsList, vmsPrivateIps[vm[0]])
+		vmNamesList = append(vmNamesList, vm[1])
+	}
+	vmNames := strings.Join(vmNamesList, " ")
+	ips := strings.Join(ipsList, ",")
+
+	clusterizeScript = generateClusterizationScript(
+		vmNames, ips, hostsNum, drivesContainerNum,
+		clusterName, computeContainerNum, computeMemory, frontendContainerNum, setObs, obsName, obsContainerName,
+		obsAccessKey, tieringSsdPercent, prefix, functionAppKey)
+
+	return
+}
+
 func Clusterize(stateContainerName, stateStorageName, vmName, hostsNum, clusterName, computeMemory, subscriptionId,
 	resourceGroupName, setObs, obsName, obsContainerName, obsAccessKey, location, drivesContainerNum,
 	computeContainerNum, frontendContainerNum, tieringSsdPercent, prefix, keyVaultUri string) (clusterizeScript string) {
 
 	state, err := common.AddInstanceToState(subscriptionId, resourceGroupName, stateStorageName, stateContainerName, vmName)
 	if err != nil {
-		clusterizeScript = getErrorScript(err)
+		clusterizeScript = GetErrorScript(err)
 		return
 	}
 
@@ -131,43 +184,9 @@ func Clusterize(stateContainerName, stateStorageName, vmName, hostsNum, clusterN
 	//}
 	//
 	if len(state.Instances) == initialSize {
-		log.Info().Msg("This is the last instance in the cluster, creating obs and clusterization script")
-
-		if setObs == "true" && obsAccessKey == "" {
-			obsAccessKey, err = common.CreateStorageAccount(subscriptionId, resourceGroupName, obsName, location)
-			if err != nil {
-				clusterizeScript = getErrorScript(err)
-				return
-			}
-
-			err = common.CreateContainer(obsName, obsContainerName)
-			if err != nil {
-				clusterizeScript = getErrorScript(err)
-				return
-			}
-		}
-
-		functionAppKey, err2 := common.GetKeyVaultValue(keyVaultUri, "function-app-default-key")
-		if err2 != nil {
-			err = err2
-			clusterizeScript = getErrorScript(err)
-			return
-		}
-
-		privateIps, err2 := common.GetVmsPrivateIps(subscriptionId, resourceGroupName, state.Instances)
-		if err2 != nil {
-			err = err2
-			clusterizeScript = getErrorScript(err)
-			return
-		}
-
-		vmNames := strings.Join(state.Instances, " ")
-		ips := strings.Join(privateIps, ",")
-
-		clusterizeScript = generateClusterizationScript(
-			vmNames, ips, hostsNum, drivesContainerNum,
-			clusterName, computeContainerNum, computeMemory, frontendContainerNum, setObs, obsName, obsContainerName,
-			obsAccessKey, tieringSsdPercent, prefix, functionAppKey)
+		clusterizeScript = HandleLastClusterVm(state, hostsNum, clusterName, computeMemory, subscriptionId,
+			resourceGroupName, setObs, obsName, obsContainerName, obsAccessKey, location, drivesContainerNum,
+			computeContainerNum, frontendContainerNum, tieringSsdPercent, prefix, keyVaultUri)
 	} else {
 		msg := fmt.Sprintf("This is instance number %d that is ready for clusterization (not last one), doing nothing.", len(state.Instances))
 		log.Info().Msgf(msg)
@@ -181,9 +200,6 @@ func Clusterize(stateContainerName, stateStorageName, vmName, hostsNum, clusterN
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	outputs := make(map[string]interface{})
-	resData := make(map[string]interface{})
-
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 	hostsNum := os.Getenv("HOSTS_NUM")
@@ -203,6 +219,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	prefix := os.Getenv("PREFIX")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 
+	outputs := make(map[string]interface{})
+	resData := make(map[string]interface{})
 	var invokeRequest common.InvokeRequest
 
 	d := json.NewDecoder(r.Body)
@@ -219,23 +237,25 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var data requestBody
+	var data RequestBody
 
 	if json.Unmarshal([]byte(reqData["Body"].(string)), &data) != nil {
 		log.Error().Msg("Bad request")
 		return
 	}
-	if data.Name == "" {
-		log.Error().Msg("Name wasn't supplied")
-		return
+	if data.Vm == "" {
+		msg := "Cluster name wasn't supplied"
+		log.Error().Msgf(msg)
+		resData["body"] = msg
+	} else {
+		clusterizeScript := Clusterize(
+			stateContainerName, stateStorageName, data.Vm, hostsNum, clusterName, computeMemory, subscriptionId,
+			resourceGroupName, setObs, obsName, obsContainerName, obsAccessKey, location, drivesContainerNum,
+			computeContainerNum, frontendContainerNum, tieringSsdPercent, prefix, keyVaultUri)
+
+		resData["body"] = clusterizeScript
 	}
 
-	clusterizeScript := Clusterize(
-		stateContainerName, stateStorageName, data.Name, hostsNum, clusterName, computeMemory, subscriptionId,
-		resourceGroupName, setObs, obsName, obsContainerName, obsAccessKey, location, drivesContainerNum,
-		computeContainerNum, frontendContainerNum, tieringSsdPercent, prefix, keyVaultUri)
-
-	resData["body"] = clusterizeScript
 	outputs["res"] = resData
 	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
 
