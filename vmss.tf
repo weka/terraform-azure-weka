@@ -39,7 +39,6 @@ locals {
   ssh_path        = "/tmp/${var.prefix}-${var.cluster_name}"
   public_ssh_key  = var.ssh_public_key == null ? tls_private_key.ssh_key[0].public_key_openssh : file(var.ssh_public_key)
   private_ssh_key = var.ssh_private_key == null ? tls_private_key.ssh_key[0].private_key_pem : file(var.ssh_private_key)
-  vm_names        = [for i in range(var.cluster_size): "${var.prefix}-${var.cluster_name}-backend-${i}"]
   disk_size       = var.default_disk_size + var.traces_per_ionode * (var.container_number_map[var.instance_type].compute + var.container_number_map[var.instance_type].drive + var.container_number_map[var.instance_type].frontend)
   private_nic_first_index = var.private_network ? 0 : 1
   alphanumeric_cluster_name =  lower(replace(var.cluster_name,"/\\W|_|\\s/",""))
@@ -85,7 +84,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
   upgrade_mode                    = "Manual"
   health_probe_id                 = azurerm_lb_probe.backend_lb_probe.id
   admin_username                  = var.vm_username
-  instances                       = var.cluster_size
+  instances                       = 0
   computer_name_prefix            = "${var.prefix}-${var.cluster_name}-backend"
   custom_data                     = base64encode(data.template_file.init.rendered)
   disable_password_authentication = true

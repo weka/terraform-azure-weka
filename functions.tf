@@ -157,3 +157,9 @@ resource "azurerm_role_assignment" "function-app-reader" {
   principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
   depends_on           = [azurerm_linux_function_app.function_app]
 }
+resource "azurerm_role_assignment" "function-app-scale-set-machine-owner" {
+  scope                = azurerm_linux_virtual_machine_scale_set.vmss.id
+  role_definition_name = "Owner"
+  principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
+  depends_on           = [azurerm_linux_function_app.function_app]
+}
