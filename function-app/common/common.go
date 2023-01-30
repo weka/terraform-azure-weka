@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/rs/zerolog/log"
@@ -428,4 +429,29 @@ func GetVmsPrivateIps(subscriptionId, resourceGroupName, vmScaleSetName string) 
 
 	return
 
+}
+
+func UpdateVmScaleSetNum(subscriptionId, resourceGroupName, vmScaleSetName string, newSize int64) (err error) {
+	log.Info().Msg("updating scale set vms num")
+	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		log.Error().Msgf("%s", err)
+		return
+	}
+	client, err := armcompute.NewVirtualMachineScaleSetsClient(subscriptionId, credential, nil)
+	if err != nil {
+		log.Error().Msgf("%s", err)
+		return
+	}
+
+	ctx := context.Background()
+	_, err = client.BeginUpdate(ctx, resourceGroupName, vmScaleSetName, armcompute.VirtualMachineScaleSetUpdate{
+		SKU: &armcompute.SKU{
+			Capacity: &newSize,
+		},
+	}, nil)
+	if err != nil {
+		log.Error().Msgf("%s", err)
+	}
+	return
 }
