@@ -83,3 +83,11 @@ resource "azurerm_key_vault_secret" "function_app_default_key" {
   tags         = merge(var.tags_map, {"weka_cluster": var.cluster_name})
   depends_on   = [azurerm_key_vault.key_vault, azurerm_key_vault_access_policy.key_vault_access_policy]
 }
+
+resource "azurerm_key_vault_secret" "get_weka_io_token" {
+  name         = "get-weka-io-token"
+  value        = var.get_weka_io_token
+  key_vault_id = azurerm_key_vault.key_vault.id
+  tags         = merge(var.tags_map, {"weka_cluster": var.cluster_name})
+  depends_on   = [azurerm_key_vault.key_vault, azurerm_key_vault_access_policy.key_vault_access_policy]
+}
