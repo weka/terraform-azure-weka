@@ -17,6 +17,10 @@ variable "get_weka_io_token" {
 variable "cluster_name" {
   type = string
   description = "Cluster name"
+  validation {
+    condition     = can(regex("^[a-zA-Z][a-zA-Z\\-\\_0-9]{1,64}$", var.cluster_name))
+    error_message = "Cluster name must start with letter, only contain letters, numbers, dashes, or underscores."
+  }
 }
 
 variable "vnet_name" {

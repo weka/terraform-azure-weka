@@ -36,6 +36,10 @@ variable "apt_repo_url" {
 variable "clusters_list" {
   type = list(string)
   description = "list of clusters name"
+  validation {
+    condition     = can(regex("^[a-zA-Z][a-zA-Z\\-\\_0-9]{1,64}$", var.clusters_list))
+    error_message = "Cluster name must start with letter, only contain letters, numbers, dashes, or underscores."
+  }
 }
 
 variable "install_ofed_url" {
