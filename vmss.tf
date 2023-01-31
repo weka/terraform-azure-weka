@@ -47,16 +47,12 @@ locals {
 data "template_file" "init" {
   template = file("${path.module}/user-data.sh")
   vars = {
-    weka_token               = var.get_weka_io_token
-    weka_version             = var.weka_version
-    install_weka_url         = var.install_weka_url
     apt_repo_url             = var.apt_repo_url
     private_ssh_key          = local.private_ssh_key
     user                     = var.vm_username
     ofed_version             = var.ofed_version
     install_ofed_url         = var.install_ofed_url
-    num_drive_containers     = var.container_number_map[var.instance_type].drive
-    clusterization_url       = "https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/clusterize"
+    deploy_url       = "https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/deploy"
     function_app_default_key = data.azurerm_function_app_host_keys.function_keys.default_function_key
   }
 }
