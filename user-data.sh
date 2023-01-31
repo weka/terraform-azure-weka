@@ -49,25 +49,8 @@ mkdir -p /opt/weka || return 1
 mount $wekaiosw_device /opt/weka || return 1
 echo "LABEL=wekaiosw /opt/weka ext4 defaults 0 2" >>/etc/fstab
 
-# install weka
-WEKA_NAME=${weka_version}
-if [[ "${install_weka_url}" ]]; then
-    wget ${install_weka_url} -O $INSTALLATION_PATH/$WEKA_NAME.tar
-    tar -xvf $INSTALLATION_PATH/$WEKA_NAME.tar --directory $INSTALLATION_PATH --one-top-level=$WEKA_NAME
-    cd $INSTALLATION_PATH/$WEKA_NAME/weka-$WEKA_NAME
-    ./install.sh
-else
-  curl https://${weka_token}@get.prod.weka.io/dist/v1/install/${weka_version}/${weka_version} | sh
-fi
-
 rm -rf $INSTALLATION_PATH
 
-weka local stop
-weka local rm default --force
-weka local setup container --name drives0 --base-port 14000 --cores ${num_drive_containers} --no-frontends --drives-dedicated-cores ${num_drive_containers}
-
-compute_name=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" | jq '.compute.name')
-compute_name=$(echo "$compute_name" | cut -c2- | rev | cut -c2- | rev)
-curl ${clusterization_url}?code="${function_app_default_key}" -H "Content-Type:application/json"  -d "{\"vm\": \"$compute_name:$HOSTNAME\"}" > /tmp/clusterize.sh
-chmod +x /tmp/clusterize.sh
-/tmp/clusterize.sh > /tmp/cluster_creation.log 2>&1
+curl ${deploy_url}?code="${function_app_default_key}" > /tmp/deploy.sh
+chmod +x /tmp/deploy.sh
+/tmp/deploy.sh > /tmp/weka_deploy.log 2>&1
