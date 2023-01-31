@@ -14,14 +14,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 
-	var invokeRequest common.InvokeRequest
-
-	d := json.NewDecoder(r.Body)
-	d.Decode(&invokeRequest)
-
-	var reqData map[string]interface{}
-	json.Unmarshal(invokeRequest.Data["req"], &reqData)
-
 	state, err := common.ReadState(stateStorageName, stateContainerName)
 	if err != nil {
 		resData["body"] = err.Error()
