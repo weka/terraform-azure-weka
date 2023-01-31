@@ -102,7 +102,7 @@ resource "azurerm_lb_backend_address_pool_address" "backend_lb_backend_address_p
 
 # ================== Private DNS  records ========================= #
 resource "azurerm_private_dns_a_record" "dns_a_record_ui_lb" {
-  name                = "${var.cluster_name}-ui-check"
+  name                = lower("${var.cluster_name}-ui-check")
   zone_name           = var.private_dns_zone_name
   resource_group_name = var.rg_name
   ttl                 = 300
@@ -112,7 +112,7 @@ resource "azurerm_private_dns_a_record" "dns_a_record_ui_lb" {
 }
 
 resource "azurerm_private_dns_a_record" "dns_a_record_backend_lb" {
-  name                = "${var.cluster_name}-backend"
+  name                = lower("${var.cluster_name}-backend")
   zone_name           = var.private_dns_zone_name
   resource_group_name = var.rg_name
   ttl                 = 300
