@@ -1,0 +1,9 @@
+prefix              = "weka"
+rg_name             = "weka-rg"
+vnet_name           = "weka-vnet"
+subnets_name_list   = ["weka-subnet-0"]
+cluster_name        = "poc"
+instance_type       = "Standard_L8s_v3"
+set_obs_integration = true
+tiering_ssd_percent = 20
+cluster_size        = 6
