@@ -57,7 +57,7 @@ variable "sg_id" {
 variable "weka_version" {
   type = string
   description = "The Weka version to deploy."
-  default = "4.1.0.69-azure"
+  default = "4.1.0.71"
 }
 
 variable "get_weka_io_token" {
