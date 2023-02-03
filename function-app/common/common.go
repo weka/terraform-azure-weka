@@ -6,18 +6,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"strings"
+	"time"
+
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/rs/zerolog/log"
-	"io"
-	"net/http"
-	"strings"
-	"time"
 )
 
 type InvokeRequest struct {
@@ -64,13 +64,13 @@ func leaseContainer(subscriptionId, resourceGroupName, storageAccountName, conta
 				buf := new(bytes.Buffer)
 				buf.ReadFrom(leaseErr.RawResponse.Body)
 				if !strings.Contains(buf.String(), "LeaseAlreadyPresent") {
-					log.Error().Msgf("%s", err)
+					log.Error().Err(err).Send()
 					return
 				}
 				log.Debug().Msg("lease in use, will retry in 1 sec")
 				time.Sleep(time.Second)
 			} else {
-				log.Error().Msgf("%s", err)
+				log.Error().Err(err).Send()
 				return
 			}
 		} else {
@@ -79,7 +79,7 @@ func leaseContainer(subscriptionId, resourceGroupName, storageAccountName, conta
 		}
 	}
 
-	log.Error().Msgf("%s", err)
+	log.Error().Err(err).Send()
 	return
 }
 
@@ -116,7 +116,7 @@ func ReadBlobObject(stateStorageName, containerName, blobName string) (state []b
 
 	state, err = io.ReadAll(downloadResponse.Body)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		log.Error().Err(err).Send()
 	}
 
 	return
@@ -130,7 +130,7 @@ func ReadState(stateStorageName, containerName string) (state ClusterState, err 
 	}
 	err = json.Unmarshal(stateAsByteArray, &state)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		log.Error().Err(err).Send()
 		return
 	}
 
@@ -142,13 +142,13 @@ func WriteBlobObject(stateStorageName, containerName, blobName string, state []b
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		log.Error().Err(err).Send()
 		return
 	}
 
 	blobClient, err := azblob.NewClient(getBlobUrl(stateStorageName), credential, nil)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		log.Error().Err(err).Send()
 		return
 	}
 
@@ -161,7 +161,7 @@ func WriteBlobObject(stateStorageName, containerName, blobName string, state []b
 func WriteState(stateStorageName, containerName string, state ClusterState) (err error) {
 	stateAsByteArray, err := json.Marshal(state)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		log.Error().Err(err).Send()
 		return
 	}
 
@@ -228,13 +228,13 @@ func CreateStorageAccount(subscriptionId, resourceGroupName, obsName, location s
 	ctx := context.Background()
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		log.Error().Err(err).Send()
 		return
 	}
 
 	client, err := armstorage.NewAccountsClient(subscriptionId, credential, nil)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		log.Error().Err(err).Send()
 		return
 	}
 	skuName := armstorage.SKUNameStandardZRS
@@ -271,11 +271,11 @@ func CreateStorageAccount(subscriptionId, resourceGroupName, obsName, location s
 					log.Debug().Msgf("new storage account is not ready will retry in 1M")
 					time.Sleep(time.Minute)
 				} else {
-					log.Error().Msgf("%s", err)
+					log.Error().Err(err).Send()
 					return
 				}
 			} else {
-				log.Error().Msgf("%s", err)
+				log.Error().Err(err).Send()
 				return
 			}
 		} else {
@@ -291,14 +291,14 @@ func getStorageAccountAccessKey(subscriptionId, resourceGroupName, obsName strin
 	ctx := context.Background()
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		log.Error().Err(err).Send()
 		return
 	}
 
 	client, err := armstorage.NewAccountsClient(subscriptionId, credential, nil)
 	keys, err := client.ListKeys(ctx, resourceGroupName, obsName, nil)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		log.Error().Err(err).Send()
 		return
 	}
 	accessKey = *keys.Keys[0].Value
@@ -311,13 +311,13 @@ func CreateContainer(storageAccountName, containerName string) (err error) {
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		log.Error().Err(err).Send()
 		return
 	}
 
 	blobClient, err := azblob.NewClient(getBlobUrl(storageAccountName), credential, nil)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		log.Error().Err(err).Send()
 		return
 	}
 
@@ -339,15 +339,19 @@ func GetKeyVaultValue(keyVaultUri, secretName string) (secret string, err error)
 	log.Info().Msgf("fetching key vault secret: %s", secretName)
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		log.Error().Err(err).Send()
 		return
 	}
 
 	ctx := context.Background()
 	client, err := azsecrets.NewClient(keyVaultUri, credential, nil)
+	if err != nil {
+		log.Error().Err(err).Send()
+		return
+	}
 	resp, err := client.GetSecret(ctx, secretName, "", nil)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		log.Error().Err(err).Send()
 		return
 	}
 
@@ -356,91 +360,63 @@ func GetKeyVaultValue(keyVaultUri, secretName string) (secret string, err error)
 	return
 }
 
-type VirtualMachine struct {
-	Id string `json:"id"`
-}
-
-type IpConfigurationsProperties struct {
-	PrivateIPAddress string `json:"privateIPAddress"`
-}
-
-type IpConfiguration struct {
-	Properties IpConfigurationsProperties `json:"properties"`
-}
-
-type Properties struct {
-	IpConfigurations []IpConfiguration `json:"ipConfigurations"`
-	VirtualMachine   VirtualMachine    `json:"virtualMachine"`
-}
-
-type NetworkInterface struct {
-	Properties Properties `json:"properties"`
-}
-
-type NetworkInterfaces struct {
-	Value []NetworkInterface `json:"value"`
-}
-
-func GetVmsPrivateIps(subscriptionId, resourceGroupName, vmScaleSetName string) (vmsPrivateIps map[string]string, err error) {
-	log.Info().Msg("fetching scale set vms private ips")
+// Gets all network interfaces in a VM scale set
+// see https://learn.microsoft.com/en-us/rest/api/virtualnetwork/network-interface-in-vm-ss/list-virtual-machine-scale-set-network-interfaces
+func GetScaleSetVmsNetworkInterfaces(subscriptionId, resourceGroupName, vmScaleSetName string) (networkInterfaces []*armnetwork.Interface, err error) {
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		log.Error().Err(err).Send()
 		return
 	}
 
 	ctx := context.Background()
-
-	accessToken, err := credential.GetToken(ctx, policy.TokenRequestOptions{
-		Scopes: []string{fmt.Sprintf("https://management.azure.com")},
-	})
+	client, err := armnetwork.NewInterfacesClient(subscriptionId, credential, nil)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		log.Error().Err(err).Send()
 		return
 	}
-	bearer := "Bearer " + accessToken.Token
-	url := fmt.Sprintf("https://management.azure.com/subscriptions/%s/resourceGroups/%s/providers/microsoft.Compute/virtualMachineScaleSets/%s/networkInterfaces?api-version=2019-03-01", subscriptionId, resourceGroupName, vmScaleSetName)
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		log.Error().Msgf("%s", err)
-	}
-	req.Header.Add("Authorization", bearer)
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Error().Msgf("%s", err)
-		return
-	}
-	defer resp.Body.Close()
 
-	networkInterfaces := NetworkInterfaces{}
-	err = json.NewDecoder(resp.Body).Decode(&networkInterfaces)
+	pager := client.NewListVirtualMachineScaleSetNetworkInterfacesPager(resourceGroupName, vmScaleSetName, nil)
+
+	for pager.More() {
+		nextResult, err := pager.NextPage(ctx)
+		if err != nil {
+			log.Error().Err(err).Send()
+			return nil, err
+		}
+		networkInterfaces = append(networkInterfaces, nextResult.Value...)
+	}
+	return
+}
+
+func GetVmsPrivateIps(subscriptionId, resourceGroupName, vmScaleSetName string) (vmsPrivateIps map[string]string, err error) {
+	log.Info().Msg("fetching scale set vms private ips")
+
+	networkInterfaces, err := GetScaleSetVmsNetworkInterfaces(subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		return
 	}
 
 	vmsPrivateIps = make(map[string]string)
-	for _, networkInterface := range networkInterfaces.Value {
-		vmNameParts := strings.Split(networkInterface.Properties.VirtualMachine.Id, "/")
+	for _, networkInterface := range networkInterfaces {
+		vmNameParts := strings.Split(*networkInterface.Properties.VirtualMachine.ID, "/")
 		vmNamePartsLen := len(vmNameParts)
 		vmName := fmt.Sprintf("%s_%s", vmNameParts[vmNamePartsLen-3], vmNameParts[vmNamePartsLen-1])
-		vmsPrivateIps[vmName] = networkInterface.Properties.IpConfigurations[0].Properties.PrivateIPAddress
+		vmsPrivateIps[vmName] = *networkInterface.Properties.IPConfigurations[0].Properties.PrivateIPAddress
 	}
-
 	return
-
 }
 
 func UpdateVmScaleSetNum(subscriptionId, resourceGroupName, vmScaleSetName string, newSize int64) (err error) {
 	log.Info().Msg("updating scale set vms num")
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		log.Error().Err(err).Send()
 		return
 	}
 	client, err := armcompute.NewVirtualMachineScaleSetsClient(subscriptionId, credential, nil)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		log.Error().Err(err).Send()
 		return
 	}
 
@@ -451,7 +427,124 @@ func UpdateVmScaleSetNum(subscriptionId, resourceGroupName, vmScaleSetName strin
 		},
 	}, nil)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		log.Error().Err(err).Send()
+	}
+	return
+}
+
+type ScaleSetInfo struct {
+	Id            string
+	Name          string
+	AdminUsername string
+	AdminPassword *string
+	Capacity      int
+	VMSize        string
+}
+
+// Gets single scale set info
+// see https://learn.microsoft.com/en-us/rest/api/compute/virtual-machine-scale-sets/get
+func GetScaleSetInfo(subscriptionId, resourceGroupName, vmScaleSetName string) (*ScaleSetInfo, error) {
+	ctx := context.Background()
+	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		log.Error().Err(err).Send()
+		return nil, err
+	}
+
+	client, err := armcompute.NewVirtualMachineScaleSetsClient(subscriptionId, credential, nil)
+	if err != nil {
+		log.Error().Err(err).Send()
+		return nil, err
+	}
+
+	scaleSet, err := client.Get(ctx, resourceGroupName, vmScaleSetName, nil)
+	if err != nil {
+		log.Error().Err(err).Send()
+		return nil, err
+	}
+
+	scaleSetInfo := ScaleSetInfo{
+		Id:            *scaleSet.ID,
+		Name:          *scaleSet.Name,
+		AdminUsername: *scaleSet.Properties.VirtualMachineProfile.OSProfile.AdminUsername,
+		AdminPassword: scaleSet.Properties.VirtualMachineProfile.OSProfile.AdminPassword,
+		Capacity:      int(*scaleSet.SKU.Capacity),
+		VMSize:        *scaleSet.SKU.Name,
+	}
+	return &scaleSetInfo, err
+}
+
+// Gets a list of all VMs in a scale set
+// see https://learn.microsoft.com/en-us/rest/api/compute/virtual-machine-scale-set-vms/list
+func GetScaleSetInstances(subscriptionId, resourceGroupName, vmScaleSetName string) (vms []*armcompute.VirtualMachineScaleSetVM, err error) {
+	ctx := context.Background()
+	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		log.Error().Err(err).Send()
+		return
+	}
+
+	client, err := armcompute.NewVirtualMachineScaleSetVMsClient(subscriptionId, credential, nil)
+	if err != nil {
+		log.Error().Err(err).Send()
+		return
+	}
+
+	pager := client.NewListPager(resourceGroupName, vmScaleSetName, nil)
+
+	for pager.More() {
+		nextResult, err := pager.NextPage(ctx)
+		if err != nil {
+			err = fmt.Errorf("failed to advance page getting images list: %v", err)
+			log.Error().Err(err).Send()
+			return nil, err
+		}
+		vms = append(vms, nextResult.Value...)
+	}
+	return
+}
+
+type ScaleSetInstanceInfo struct {
+	Id        string
+	PrivateIp string
+}
+
+func getScaleSetVmId(resourceId string) string {
+	vmNameParts := strings.Split(resourceId, "/")
+	vmNamePartsLen := len(vmNameParts)
+	vmId := vmNameParts[vmNamePartsLen-1]
+	return vmId
+}
+
+func GetScaleSetInstancesInfo(subscriptionId, resourceGroupName, vmScaleSetName string) (instances []ScaleSetInstanceInfo, err error) {
+	netInterfaces, err := GetScaleSetVmsNetworkInterfaces(subscriptionId, resourceGroupName, vmScaleSetName)
+	if err != nil {
+		return
+	}
+	instanceIdPrivateIp := map[string]string{}
+
+	for _, ni := range netInterfaces {
+		id := getScaleSetVmId(*ni.Properties.VirtualMachine.ID)
+		privateIp := *ni.Properties.IPConfigurations[0].Properties.PrivateIPAddress
+		instanceIdPrivateIp[id] = privateIp
+	}
+
+	vms, err := GetScaleSetInstances(subscriptionId, resourceGroupName, vmScaleSetName)
+	if err != nil {
+		return
+	}
+	for _, vm := range vms {
+		id := getScaleSetVmId(*vm.ID)
+		// get private ip if exists
+		var privateIp string
+		if val, ok := instanceIdPrivateIp[id]; ok {
+			privateIp = val
+		}
+		instanceInfo := ScaleSetInstanceInfo{
+			Id:        id,
+			PrivateIp: privateIp,
+		}
+		instances = append(instances, instanceInfo)
 	}
 	return
 }
