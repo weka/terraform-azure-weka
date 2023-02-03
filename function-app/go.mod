@@ -16,6 +16,7 @@ require (
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.1.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/keyvault/internal v0.7.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork v1.1.0
 	github.com/AzureAD/microsoft-authentication-library-for-go v0.8.1 // indirect
 	github.com/dnaeon/go-vcr v1.2.0 // indirect
 	github.com/golang-jwt/jwt/v4 v4.4.2 // indirect
