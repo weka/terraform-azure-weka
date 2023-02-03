@@ -42,7 +42,7 @@ No resources.
 | Name | Description |
 |------|-------------|
 | <a name="output_DOWNLOAD-SSH-KEYS-COMMAND"></a> [DOWNLOAD-SSH-KEYS-COMMAND](#output\_DOWNLOAD-SSH-KEYS-COMMAND) | n/a |
-| <a name="output_IPS"></a> [IPS](#output\_IPS) | n/a |
 | <a name="output_SSH-KEY-PATH"></a> [SSH-KEY-PATH](#output\_SSH-KEY-PATH) | n/a |
 | <a name="output_get-cluster-status"></a> [get-cluster-status](#output\_get-cluster-status) | get cluster status command |
+| <a name="output_get-vms-ips-command"></a> [get-vms-ips-command](#output\_get-vms-ips-command) | n/a |
 <!-- END_TF_DOCS -->
