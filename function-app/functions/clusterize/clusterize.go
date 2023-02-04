@@ -156,6 +156,10 @@ exit 1
 	`, err.Error())
 }
 
+func getVmScaleSetName(prefix, clusterName string) string {
+	return fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
+}
+
 func HandleLastClusterVm(state common.ClusterState, p ClusterizationParams) (clusterizeScript string) {
 	log.Info().Msg("This is the last instance in the cluster, creating obs and clusterization script")
 
@@ -182,7 +186,7 @@ func HandleLastClusterVm(state common.ClusterState, p ClusterizationParams) (clu
 		return
 	}
 
-	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", p.prefix, p.cluster.name)
+	vmScaleSetName := getVmScaleSetName(p.prefix, p.cluster.name)
 	vmsPrivateIps, err := common.GetVmsPrivateIps(p.subscriptionId, p.resourceGroupName, vmScaleSetName)
 	if err != nil {
 		clusterizeScript = GetErrorScript(err)
@@ -219,12 +223,14 @@ func Clusterize(p ClusterizationParams) (clusterizeScript string) {
 	if err != nil {
 		return
 	}
-	//
-	//err = common.SetDeletionProtection(project, zone, instanceName)
-	//if err != nil {
-	//	return
-	//}
-	//
+
+	vmScaleSetName := getVmScaleSetName(p.prefix, p.cluster.name)
+	instanceName := strings.Split(p.cluster.vmName, ":")[0]
+	err = common.SetDeletionProtection(p.subscriptionId, p.resourceGroupName, vmScaleSetName, instanceName, true)
+	if err != nil {
+		return
+	}
+
 	if len(state.Instances) == initialSize {
 		clusterizeScript = HandleLastClusterVm(state, p)
 	} else {
