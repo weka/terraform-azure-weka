@@ -10,6 +10,7 @@ import (
 	"weka-deployment/functions/debug"
 	"weka-deployment/functions/deploy"
 	"weka-deployment/functions/fetch"
+	"weka-deployment/functions/join_finalization"
 	"weka-deployment/functions/scale_up"
 	"weka-deployment/functions/status"
 )
@@ -27,6 +28,7 @@ func main() {
 	mux.HandleFunc("/scale_up", scale_up.Handler)
 	mux.HandleFunc("/fetch", fetch.Handler)
 	mux.HandleFunc("/deploy", deploy.Handler)
+	mux.HandleFunc("/join_finalization", join_finalization.Handler)
 	fmt.Println("Go server Listening on: ", customHandlerPort)
 	log.Fatal(http.ListenAndServe(":"+customHandlerPort, mux))
 }

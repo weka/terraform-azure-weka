@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/lithammer/dedent"
+	"github.com/rs/zerolog/log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -18,6 +19,7 @@ type BackendCoreCount struct {
 	frontend  int
 	drive     int
 	converged bool
+	memory    int
 }
 
 type BackendCoreCounts map[string]BackendCoreCount
@@ -29,8 +31,8 @@ func shuffleSlice(slice []string) {
 
 func getBackendCoreCountsDefaults() BackendCoreCounts {
 	backendCoreCounts := BackendCoreCounts{
-		"Standard_L8s_v3":  BackendCoreCount{total: 8, frontend: 1, drive: 1},
-		"Standard_L16s_v3": BackendCoreCount{total: 4, frontend: 1, drive: 2},
+		"Standard_L8s_v3":  BackendCoreCount{total: 4, frontend: 1, drive: 1, memory: 31},
+		"Standard_L16s_v3": BackendCoreCount{total: 8, frontend: 1, drive: 2, memory: 72},
 	}
 	return backendCoreCounts
 }
@@ -45,7 +47,8 @@ func getFunctionKey(keyVaultUri string) (functionAppKey string, err error) {
 	return
 }
 
-func GetJoinParams(subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet string) (bashScript string, err error) {
+func GetJoinParams(subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey string) (bashScript string, err error) {
+	joinFinalizationUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/join_finalization", prefix, clusterName)
 	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
 	vmsPrivateIps, err := common.GetVmsPrivateIps(subscriptionId, resourceGroupName, vmScaleSetName)
 
@@ -59,20 +62,20 @@ func GetJoinParams(subscriptionId, resourceGroupName, prefix, clusterName, insta
 		return
 	}
 	shuffleSlice(ips)
-	//creds, err := common.GetUsernameAndPassword(usernameId, passwordId)
-	//if err != nil {
-	//	log.Error().Msgf("%s", err)
-	//	return
-	//}
+	wekaPassword, err := common.GetWekaClusterPassword(keyVaultUri)
+	if err != nil {
+		log.Error().Err(err).Send()
+		return
+	}
 
 	bashScriptTemplate := `
 	#!/bin/bash
 
 	set -ex
 
-	#export WEKA_USERNAME="%s"
-	#export WEKA_PASSWORD="%s"
-	#export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
+	export WEKA_USERNAME="admin"
+	export WEKA_PASSWORD="%s"
+	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
 	declare -a backend_ips=("%s" )
 
 	random=$$
@@ -87,10 +90,10 @@ func GetJoinParams(subscriptionId, resourceGroupName, prefix, clusterName, insta
 
 	SUBNET=%s
 
-	ip=$(ifconfig eth$i | grep "inet " | awk '{ print $2}')
+	ip=$(ifconfig eth0 | grep "inet " | awk '{ print $2}')
 	while [ ! $ip ] ; do
 		sleep 1
-		ip=$(ifconfig eth$i | grep "inet " | awk '{ print $2}')
+		ip=$(ifconfig eth0 | grep "inet " | awk '{ print $2}')
 	done
 
 	curl $backend_ip:14000/dist/v1/install | sh
@@ -99,7 +102,14 @@ func GetJoinParams(subscriptionId, resourceGroupName, prefix, clusterName, insta
 	weka version prepare $VERSION
 	weka local stop && weka local rm --all -f
 
-	weka local setup host --cores %d --frontend-dedicated-cores %d --drives-dedicated-cores %d --join-ips %s --net eth$i/$ip`
+	COMPUTE=%d
+	FRONTEND=%d
+	DRIVES=%d
+	COMPUTE_MEMORY=%d
+	IPS=%s
+	weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $IPS
+	weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY"GB --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $IPS
+	weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $IPS`
 
 	isReady := `
 	while ! weka debug manhole -s 0 operational_status | grep '"is_ready": true' ; do
@@ -109,22 +119,20 @@ func GetJoinParams(subscriptionId, resourceGroupName, prefix, clusterName, insta
 	`
 
 	addDrives := `
-	#JOIN_FINALIZATION_URL=%s
-	host_id=$(weka local run $WEKA_RUN_CREDS manhole getServerInfo | grep hostIdValue: | awk '{print $2}')
+	JOIN_FINALIZATION_URL="%s"
+	FUNCTION_KEY="%s"
+	host_id=$(weka local run --container compute0 $WEKA_RUN_CREDS manhole getServerInfo | grep hostIdValue: | awk '{print $2}')
 	mkdir -p /opt/weka/tmp
 	cat >/opt/weka/tmp/find_drives.py <<EOL
 	import json
 	import sys
 	for d in json.load(sys.stdin)['disks']:
 		if d['isRotational']: continue
-		if d['type'] != 'DISK': continue
-		if d['isMounted']: continue
-		if d['model'] != 'nvme_card': continue
 		print(d['devPath'])
 	EOL
-	devices=$(weka local run $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
+	devices=$(weka local run --container compute0 $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
 	for device in $devices; do
-		weka local exec /weka/tools/weka_sign_drive $device
+		weka local exec --container compute0 /weka/tools/weka_sign_drive $device
 	done
 	ready=0
 	while [ $ready -eq 0 ] ; do
@@ -139,25 +147,29 @@ func GetJoinParams(subscriptionId, resourceGroupName, prefix, clusterName, insta
 		done
 	done
 	weka cluster drive scan $host_id
-	#curl $JOIN_FINALIZATION_URL -H "Content-Type:application/json"  -d "{\"name\": \"$HOSTNAME\"}"
+	compute_name=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" | jq '.compute.name')
+	compute_name=$(echo "$compute_name" | cut -c2- | rev | cut -c2- | rev)
+	curl $JOIN_FINALIZATION_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"name\": \"$compute_name\"}"
 	echo "completed successfully" > /tmp/weka_join_completion_validation
 	`
-	var cores, frontend, drive int
+	var compute, frontend, drive, mem int
 	backendCoreCounts := getBackendCoreCountsDefaults()
 	instanceParams, ok := backendCoreCounts[instanceType]
 	if !ok {
 		err = errors.New(fmt.Sprintf("Unsupported instance type: %s", instanceType))
 		return
 	}
-	cores = 1
 	frontend = instanceParams.frontend
 	drive = instanceParams.drive
+	compute = instanceParams.total - frontend - drive - 1
+	mem = instanceParams.memory
+
 	if !instanceParams.converged {
 		bashScriptTemplate += " --dedicate"
 	}
-	bashScriptTemplate += isReady + addDrives
+	bashScriptTemplate += isReady + fmt.Sprintf(addDrives, joinFinalizationUrl, functionKey)
 
-	bashScript = fmt.Sprintf(bashScriptTemplate, strings.Join(ips, "\" \""), subnet, cores, frontend, drive, strings.Join(ips, ","))
+	bashScript = fmt.Sprintf(bashScriptTemplate, wekaPassword, strings.Join(ips, "\" \""), subnet, compute, frontend, drive, mem, strings.Join(ips, ","))
 
 	return
 }
@@ -221,7 +233,7 @@ func GetDeployScript(
 			compute_name=$(echo "$compute_name" | cut -c2- | rev | cut -c2- | rev)
 			curl $CLUSTERIZE_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json"  -d "{\"vm\": \"$compute_name:$HOSTNAME\"}" > /tmp/clusterize.sh
 			chmod +x /tmp/clusterize.sh
-			/tmp/clusterize.sh > /tmp/cluster_creation.log 2>&1
+			/tmp/clusterize.sh 2>&1 | tee /tmp/weka_clusterization.log
 			`
 			bashScript = fmt.Sprintf(installTemplate, installUrl, tarName, packageName, clusterizeUrl, functionKey, instanceParams.drive)
 
@@ -274,7 +286,7 @@ func GetDeployScript(
 			bashScript = fmt.Sprintf(installTemplate, token, installUrl, clusterizeUrl, functionKey, instanceParams.drive)
 		}
 	} else {
-		bashScript, err = GetJoinParams(subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet)
+		bashScript, err = GetJoinParams(subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey)
 		if err != nil {
 			return
 		}
