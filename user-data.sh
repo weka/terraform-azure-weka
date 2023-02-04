@@ -35,7 +35,7 @@ fi
 
 tar xf $INSTALLATION_PATH/$OFED_NAME.tgz --directory $INSTALLATION_PATH --one-top-level=$OFED_NAME
 cd $INSTALLATION_PATH/$OFED_NAME/*/
-./mlnxofedinstall --without-fw-update --add-kernel-support --force
+./mlnxofedinstall --without-fw-update --add-kernel-support --force 2>&1 | tee /tmp/weka_ofed_installation
 /etc/init.d/openibd restart
 
 apt update -y
@@ -53,4 +53,4 @@ rm -rf $INSTALLATION_PATH
 
 curl ${deploy_url}?code="${function_app_default_key}" > /tmp/deploy.sh
 chmod +x /tmp/deploy.sh
-/tmp/deploy.sh > /tmp/weka_deploy.log 2>&1
+/tmp/deploy.sh 2>&1 | tee /tmp/weka_deploy.log

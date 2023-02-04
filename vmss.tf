@@ -80,7 +80,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
   upgrade_mode                    = "Manual"
   health_probe_id                 = azurerm_lb_probe.backend_lb_probe.id
   admin_username                  = var.vm_username
-  instances                       = 0
+  instances                       = var.cluster_size
   computer_name_prefix            = "${var.prefix}-${var.cluster_name}-backend"
   custom_data                     = base64encode(data.template_file.init.rendered)
   disable_password_authentication = true
