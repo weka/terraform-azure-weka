@@ -548,3 +548,38 @@ func GetScaleSetInstancesInfo(subscriptionId, resourceGroupName, vmScaleSetName 
 	}
 	return
 }
+
+func SetDeletionProtection(subscriptionId, resourceGroupName, vmScaleSetName, instanceName string, protect bool) (err error) {
+	instanceNameParts := strings.Split(instanceName, "_")
+	instanceId := instanceNameParts[len(instanceNameParts)-1]
+	log.Info().Msgf("Setting deletion protection: %t on instanceId %s", protect, instanceId)
+
+	ctx := context.Background()
+	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		log.Error().Err(err).Send()
+		return
+	}
+
+	client, err := armcompute.NewVirtualMachineScaleSetVMsClient(subscriptionId, credential, nil)
+	if err != nil {
+		log.Error().Err(err).Send()
+		return
+	}
+
+	_, err = client.BeginUpdate(
+		ctx,
+		resourceGroupName,
+		vmScaleSetName,
+		instanceId,
+		armcompute.VirtualMachineScaleSetVM{
+			Properties: &armcompute.VirtualMachineScaleSetVMProperties{
+				ProtectionPolicy: &armcompute.VirtualMachineScaleSetVMProtectionPolicy{
+					ProtectFromScaleSetActions: &protect,
+				},
+			},
+		},
+		nil)
+
+	return
+}
