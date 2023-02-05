@@ -211,6 +211,7 @@ func UpdateClusterized(subscriptionId, resourceGroupName, stateStorageName, stat
 		return
 	}
 
+	state.Instances = []string{}
 	state.Clusterized = true
 	err = WriteState(stateStorageName, stateContainerName, state)
 	_, err2 := UnlockContainer(subscriptionId, resourceGroupName, stateStorageName, stateContainerName, leaseId)
@@ -586,4 +587,8 @@ func SetDeletionProtection(subscriptionId, resourceGroupName, vmScaleSetName, in
 
 func GetWekaClusterPassword(keyVaultUri string) (password string, err error) {
 	return GetKeyVaultValue(keyVaultUri, "weka-password")
+}
+
+func GetVmScaleSetName(prefix, clusterName string) string {
+	return fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
 }
