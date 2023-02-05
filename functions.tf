@@ -13,6 +13,42 @@ resource "azurerm_application_insights" "application_insights" {
   workspace_id        = azurerm_log_analytics_workspace.la_workspace.id
   application_type    = "web"
 }
+resource "azurerm_monitor_diagnostic_setting" "insights_diagnostic_setting" {
+  name                       = "${var.prefix}-${var.cluster_name}-insights-diagnostic-setting"
+  target_resource_id         = azurerm_application_insights.application_insights.id
+  storage_account_id         = azurerm_storage_account.deployment_sa.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.la_workspace.id
+  enabled_log {
+    category = "AppTraces"
+
+    retention_policy {
+      enabled = false
+    }
+  }
+  lifecycle {
+    ignore_changes = [metric,log_analytics_destination_type]
+  }
+  depends_on = [azurerm_linux_function_app.function_app,azurerm_log_analytics_workspace.la_workspace]
+}
+
+resource "azurerm_monitor_diagnostic_setting" "function_diagnostic_setting" {
+  name                       = "${var.prefix}-${var.cluster_name}-function-diagnostic-setting"
+  target_resource_id         = azurerm_linux_function_app.function_app.id
+  storage_account_id         = azurerm_storage_account.deployment_sa.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.la_workspace.id
+  enabled_log {
+    category = "FunctionAppLogs"
+
+    retention_policy {
+      enabled = false
+    }
+  }
+  lifecycle {
+    ignore_changes = [metric,log_analytics_destination_type]
+  }
+  depends_on = [azurerm_linux_function_app.function_app,azurerm_log_analytics_workspace.la_workspace]
+}
+
 
 resource "azurerm_service_plan" "app_service_plan" {
   name                = "${var.prefix}-${var.cluster_name}-app-service-plan"
