@@ -47,6 +47,7 @@ locals {
   public_ssh_key  = var.ssh_public_key == null ? tls_private_key.ssh_key[0].public_key_openssh : file(var.ssh_public_key)
   private_ssh_key = var.ssh_private_key == null ? tls_private_key.ssh_key[0].private_key_pem : file(var.ssh_private_key)
   alphanumeric_cluster_name =  lower(replace(var.cluster_name,"/\\W|_|\\s/",""))
+  alphanumeric_prefix_name  = lower(replace(var.prefix,"/\\W|_|\\s/",""))
 }
 
 # ==================== Backend VMs ======================= #
@@ -57,7 +58,7 @@ resource "azurerm_public_ip" "vm-ip" {
   resource_group_name = var.rg_name
   allocation_method   = "Static"
   sku                 = "Standard"
-  domain_name_label   = "${var.prefix}-${local.alphanumeric_cluster_name}-backend-${count.index}"
+  domain_name_label   = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-backend-${count.index}"
   lifecycle {
     ignore_changes = [tags,zones,ip_tags]
   }
@@ -66,11 +67,11 @@ resource "azurerm_public_ip" "vm-ip" {
 
 resource "azurerm_network_interface" "primary-nic" {
   count                         = var.cluster_size
-  name                          = "${var.prefix}-${local.alphanumeric_cluster_name}-backend-${count.index}-nic"
+  name                          = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-backend-${count.index}-nic"
   location                      = data.azurerm_resource_group.rg.location
   resource_group_name           = var.rg_name
   enable_accelerated_networking = false
-  internal_dns_name_label       = "${var.prefix}-${local.alphanumeric_cluster_name}-backend-${count.index}"
+  internal_dns_name_label       = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-backend-${count.index}"
   tags                          = merge(var.tags_map, {"weka_cluster": var.cluster_name})
   dynamic "ip_configuration" {
     for_each = range(local.private_nic_first_index)
@@ -170,7 +171,7 @@ resource "azurerm_linux_virtual_machine" "vm" {
     type = "SystemAssigned"
   }
   custom_data                     =  base64encode(data.template_file.init.rendered)
-  computer_name                   = "${var.prefix}-${local.alphanumeric_cluster_name}-backend-${count.index}"
+  computer_name                   = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-backend-${count.index}"
   admin_username                  = var.vm_username
   disable_password_authentication = true
   tags                            = merge(var.tags_map, {"weka_cluster": var.cluster_name})

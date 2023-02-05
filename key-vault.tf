@@ -6,7 +6,7 @@ locals {
 }
 
 resource "azurerm_key_vault" "key_vault" {
-  name                        = "${var.prefix}-${local.alphanumeric_cluster_name}-key-vault"
+  name                        = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-key-vault"
   location                    = data.azurerm_resource_group.rg.location
   resource_group_name         = var.rg_name
   enabled_for_deployment      = true

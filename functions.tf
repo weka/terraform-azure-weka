@@ -51,7 +51,7 @@ resource "azurerm_storage_blob" "function_app_code" {
 }
 
 resource "azurerm_linux_function_app" "function_app" {
-  name                       = "${var.prefix}-${local.alphanumeric_cluster_name}-function-app"
+  name                       = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-function-app"
   resource_group_name        = data.azurerm_resource_group.rg.name
   location                   = data.azurerm_resource_group.rg.location
   service_plan_id            = azurerm_service_plan.app_service_plan.id

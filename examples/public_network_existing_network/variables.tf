@@ -1,6 +1,10 @@
 variable "prefix" {
   type = string
   description = "Prefix for all resources"
+  validation {
+    condition     = can(regex("^[a-zA-Z][a-zA-Z\\-\\_0-9]{1,64}$", var.prefix))
+    error_message = "Prefix name must start with letter, only contain letters, numbers, dashes, or underscores."
+  }
 }
 
 variable "rg_name" {
