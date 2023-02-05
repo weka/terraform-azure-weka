@@ -91,3 +91,25 @@ resource "azurerm_key_vault_secret" "get_weka_io_token" {
   tags         = merge(var.tags_map, {"weka_cluster": var.cluster_name})
   depends_on   = [azurerm_key_vault.key_vault, azurerm_key_vault_access_policy.key_vault_access_policy]
 }
+
+resource "random_password" "weka_password" {
+  length  = 16
+  lower   = true
+  min_lower = 1
+  upper   = true
+  min_upper = 1
+  numeric = true
+  min_numeric = 1
+  special = false
+}
+
+resource "azurerm_key_vault_secret" "weka_password_secret" {
+  name         = "weka-password"
+  value        = random_password.weka_password.result
+  key_vault_id = azurerm_key_vault.key_vault.id
+  tags         = merge(var.tags_map, {"weka_cluster": var.cluster_name})
+  lifecycle {
+    ignore_changes = [value]
+  }
+  depends_on   = [azurerm_key_vault.key_vault, random_password.weka_password,azurerm_key_vault_access_policy.key_vault_access_policy]
+}
