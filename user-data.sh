@@ -1,18 +1,12 @@
 #!/bin/bash
 set -ex
 
-# add private key to ssh config
+# add private key to ssh agent
 echo "${private_ssh_key}" > /home/${user}/.ssh/weka.pem
 chmod 600 /home/${user}/.ssh/weka.pem
-
-cat > /home/${user}/.ssh/config <<EOL
-Host *
-   User ${user}
-   IdentityFile /home/${user}/.ssh/weka.pem
-EOL
-
-cp -R /home/${user}/.ssh/* /root/.ssh/
-chown -R ${user}:${user} /home/${user}/.ssh/
+eval "$(ssh-agent -s)"
+ssh-add /home/${user}/.ssh/weka.pem
+rm -rf /home/${user}/.ssh/weka.pem
 
 apt install net-tools -y
 

@@ -41,6 +41,7 @@ func generateClusterizationScript(
 	TIERING_SSD_PERCENT=%s
 	PREFIX=%s
 	FUNCTION_APP_KEY="%s"
+	USER=weka
 
 	weka_status_ready="Containers: 1/1 running (1 weka)"
 	ssh_command="ssh -o StrictHostKeyChecking=no"
@@ -58,14 +59,14 @@ func generateClusterizationScript(
 	weka cluster update --cluster-name="$CLUSTER_NAME"
 	
 	for vm in $VMS; do
-	  $ssh_command $vm "sudo weka local setup container --name compute0 --base-port 15000 --cores $NUM_COMPUTE_CONTAINERS --no-frontends --compute-dedicated-cores $NUM_COMPUTE_CONTAINERS  --memory $COMPUTE_MEMORY --join-ips $IPS"
+	  $ssh_command $USER@$vm "sudo weka local setup container --name compute0 --base-port 15000 --cores $NUM_COMPUTE_CONTAINERS --no-frontends --compute-dedicated-cores $NUM_COMPUTE_CONTAINERS  --memory $COMPUTE_MEMORY --join-ips $IPS"
 	done
 	
 	weka cloud enable
 	weka cluster start-io
 	
 	for vm in $VMS; do
-	  $ssh_command $vm "sudo weka local setup container --name frontend0 --base-port 16000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --join-ips $IPS"
+	  $ssh_command $USER@$vm "sudo weka local setup container --name frontend0 --base-port 16000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --join-ips $IPS"
 	done
 	
 	sleep 15s
