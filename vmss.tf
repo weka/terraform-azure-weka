@@ -148,6 +148,8 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
   lifecycle {
     ignore_changes = [ instances, custom_data ]
   }
+
+  depends_on = [azurerm_lb_backend_address_pool.lb_backend_pool]
 }
 
 resource "azurerm_public_ip_prefix" "public_ip_prefix" {
