@@ -14,3 +14,8 @@ output "get-cluster-status" {
   value = module.deploy-weka.get-cluster-status
   description = "get cluster status command"
 }
+
+output "fetch-weka-cluster-password" {
+  value = module.deploy-weka.fetch-weka-cluster-password
+  description = "Fetch weka cluster password"
+}
