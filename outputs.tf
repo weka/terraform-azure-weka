@@ -42,3 +42,11 @@ output "get-vms-public-ips" {
 EOT
   description = "Get public ips of vms"
 }
+
+output "fetch-weka-cluster-password" {
+  value =<<EOT
+################################## fetch weka cluster password ######################################################
+  az keyvault secret show --vault-name ${azurerm_key_vault.key_vault.name} --name weka-password | jq .value
+EOT
+  description = "Fetch weka cluster password"
+}
