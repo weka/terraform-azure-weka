@@ -583,3 +583,7 @@ func SetDeletionProtection(subscriptionId, resourceGroupName, vmScaleSetName, in
 
 	return
 }
+
+func GetWekaClusterPassword(keyVaultUri string) (password string, err error) {
+	return GetKeyVaultValue(keyVaultUri, "weka-password")
+}

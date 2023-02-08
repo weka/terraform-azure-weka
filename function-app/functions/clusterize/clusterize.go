@@ -57,9 +57,8 @@ type RequestBody struct {
 }
 
 func generateClusterizationScript(
-	vmNames, ips, prefix, functionAppKey string, cluster WekaClusterParams, obs ObsParams,
+	vmNames, ips, prefix, functionAppKey, wekaPassword string, cluster WekaClusterParams, obs ObsParams,
 ) (clusterizeScript string) {
-
 	log.Info().Msg("Generating clusterization script")
 	clusterizeScriptTemplate := `
 	#!/bin/bash
@@ -83,11 +82,13 @@ func generateClusterizationScript(
 	STRIPE_WIDTH=%d
 	PROTECTION_LEVEL=%d
 	HOTSPARE=%d
+	WEKA_PASSWORD="%s"
 
 	weka_status_ready="Containers: 1/1 running (1 weka)"
 	ssh_command="ssh -o StrictHostKeyChecking=no"
 	
-	weka cluster create $VMS --host-ips $IPS 1> /dev/null 2>& 1 || true
+	weka cluster create $VMS --host-ips $IPS --admin-password "$WEKA_PASSWORD"
+	weka user login admin "$WEKA_PASSWORD"
 	
 	sleep 30s
 	
@@ -142,7 +143,9 @@ func generateClusterizationScript(
 		dedent.Dedent(clusterizeScriptTemplate), vmNames, ips, cluster.hostsNum, cluster.drivesContainerNum,
 		cluster.name, cluster.computeContainerNum, cluster.computeMemory, cluster.frontendContainerNum,
 		obs.SetObs, obs.Name, obs.ContainerName, obs.AccessKey, cluster.tieringSsdPercent, prefix, functionAppKey,
-		cluster.dataProtection.StripeWidth, cluster.dataProtection.ProtectionLevel, cluster.dataProtection.Hotspare)
+		cluster.dataProtection.StripeWidth, cluster.dataProtection.ProtectionLevel, cluster.dataProtection.Hotspare,
+		wekaPassword,
+	)
 	return
 }
 
@@ -186,6 +189,12 @@ func HandleLastClusterVm(state common.ClusterState, p ClusterizationParams) (clu
 		return
 	}
 
+	wekaPassword, err := common.GetWekaClusterPassword(p.keyVaultUri)
+	if err != nil {
+		clusterizeScript = GetErrorScript(err)
+		return
+	}
+
 	vmScaleSetName := getVmScaleSetName(p.prefix, p.cluster.name)
 	vmsPrivateIps, err := common.GetVmsPrivateIps(p.subscriptionId, p.resourceGroupName, vmScaleSetName)
 	if err != nil {
@@ -204,8 +213,7 @@ func HandleLastClusterVm(state common.ClusterState, p ClusterizationParams) (clu
 	vmNames := strings.Join(vmNamesList, " ")
 	ips := strings.Join(ipsList, ",")
 
-	clusterizeScript = generateClusterizationScript(vmNames, ips, p.prefix, functionAppKey, p.cluster, p.obs)
-
+	clusterizeScript = generateClusterizationScript(vmNames, ips, p.prefix, functionAppKey, wekaPassword, p.cluster, p.obs)
 	return
 }
 
