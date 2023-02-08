@@ -19,7 +19,7 @@ type RequestBody struct {
 func generateClusterizationScript(
 	vmNames, ips, hostsNum, drivesContainerNum,
 	clusterName, computeContainerNum, computeMemory, frontendContainerNum, setObs, obsName, obsContainerName,
-	obsAccessKey, tieringSsdPercent, prefix, functionAppKey string) (clusterizeScript string) {
+	obsAccessKey, tieringSsdPercent, prefix, functionAppKey, wekaPassword string) (clusterizeScript string) {
 
 	log.Info().Msg("Generating clusterization script")
 	clusterizeScriptTemplate := `
@@ -41,11 +41,13 @@ func generateClusterizationScript(
 	TIERING_SSD_PERCENT=%s
 	PREFIX=%s
 	FUNCTION_APP_KEY="%s"
+	WEKA_PASSWORD="%s"
 
 	weka_status_ready="Containers: 1/1 running (1 weka)"
 	ssh_command="ssh -o StrictHostKeyChecking=no"
 	
-	weka cluster create $VMS --host-ips $IPS 1> /dev/null 2>& 1 || true
+	weka cluster create $VMS --host-ips $IPS --admin-password "$WEKA_PASSWORD"
+	weka user login admin "$WEKA_PASSWORD"
 	
 	sleep 30s
 	
@@ -96,7 +98,7 @@ func generateClusterizationScript(
 	log.Info().Msgf("Formatting clusterization script template")
 	clusterizeScript = fmt.Sprintf(dedent.Dedent(clusterizeScriptTemplate), vmNames, ips, hostsNum, drivesContainerNum,
 		clusterName, computeContainerNum, computeMemory, frontendContainerNum, setObs, obsName, obsContainerName,
-		obsAccessKey, tieringSsdPercent, prefix, functionAppKey)
+		obsAccessKey, tieringSsdPercent, prefix, functionAppKey, wekaPassword)
 	return
 }
 
@@ -141,6 +143,12 @@ func HandleLastClusterVm(state common.ClusterState, hostsNum, clusterName, compu
 		return
 	}
 
+	wekaPassword, err := common.GetWekaClusterPassword(keyVaultUri)
+	if err != nil {
+		clusterizeScript = GetErrorScript(err)
+		return
+	}
+
 	vmScaleSetName := getVmScaleSetName(prefix, clusterName)
 	vmsPrivateIps, err := common.GetVmsPrivateIps(subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
@@ -162,7 +170,7 @@ func HandleLastClusterVm(state common.ClusterState, hostsNum, clusterName, compu
 	clusterizeScript = generateClusterizationScript(
 		vmNames, ips, hostsNum, drivesContainerNum,
 		clusterName, computeContainerNum, computeMemory, frontendContainerNum, setObs, obsName, obsContainerName,
-		obsAccessKey, tieringSsdPercent, prefix, functionAppKey)
+		obsAccessKey, tieringSsdPercent, prefix, functionAppKey, wekaPassword)
 
 	return
 }
