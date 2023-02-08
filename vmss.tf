@@ -125,8 +125,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
         subnet_id                              = data.azurerm_subnet.subnets[0].id
         load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
         public_ip_address {
-          name                = "${var.prefix}-${var.cluster_name}-public-ip"
-          public_ip_prefix_id = azurerm_public_ip_prefix.public_ip_prefix[0].id
+          name = "${var.prefix}-${var.cluster_name}-public-ip"
         }
       }
     }
@@ -151,16 +150,6 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
 
   depends_on = [azurerm_lb_backend_address_pool.lb_backend_pool]
 }
-
-resource "azurerm_public_ip_prefix" "public_ip_prefix" {
-  count               = var.private_network ? 0 : 1
-  name                = "${var.prefix}-${var.cluster_name}-public-ip-prefix"
-  location            = data.azurerm_resource_group.rg.location
-  resource_group_name = var.rg_name
-  prefix_length       = 29
-  tags                = merge(var.tags_map, {"weka_cluster": var.cluster_name})
-}
-
 
 resource "azurerm_role_assignment" "vm_role_assignment" {
   scope                = data.azurerm_resource_group.rg.id
