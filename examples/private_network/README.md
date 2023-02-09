@@ -44,8 +44,5 @@ No resources.
 
 | Name | Description |
 |------|-------------|
-| <a name="output_DOWNLOAD-SSH-KEYS-COMMAND"></a> [DOWNLOAD-SSH-KEYS-COMMAND](#output\_DOWNLOAD-SSH-KEYS-COMMAND) | n/a |
-| <a name="output_SSH-KEY-PATH"></a> [SSH-KEY-PATH](#output\_SSH-KEY-PATH) | n/a |
-| <a name="output_get-cluster-status"></a> [get-cluster-status](#output\_get-cluster-status) | get cluster status command |
-| <a name="output_get-vms-ips-command"></a> [get-vms-ips-command](#output\_get-vms-ips-command) | n/a |
+| <a name="output_get-cluster-helpers-commands"></a> [get-cluster-helpers-commands](#output\_get-cluster-helpers-commands) | n/a |
 <!-- END_TF_DOCS -->
