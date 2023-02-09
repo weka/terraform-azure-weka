@@ -10,7 +10,7 @@ import (
 
 type ScaleSetInfoResponse struct {
 	Username        string                        `json:"username"`
-	Password        *string                       `json:"password"`
+	Password        string                        `json:"password"`
 	DesiredCapacity int                           `json:"desired_capacity"`
 	Instances       []common.ScaleSetInstanceInfo `json:"instances"`
 	BackendIps      []string                      `json:"backend_ips"`
@@ -28,11 +28,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
 	prefix := os.Getenv("PREFIX")
 	clusterName := os.Getenv("CLUSTER_NAME")
+	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 
 	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
 
 	response, err := getScaleSetInfoResponse(
-		subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName,
+		subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName, keyVaultUri,
 	)
 	if err != nil {
 		resData["body"] = err.Error()
@@ -49,13 +50,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	w.Write(responseJson)
 }
 
-func getScaleSetInfoResponse(subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName string) (scaleSetInfoResponse ScaleSetInfoResponse, err error) {
+func getScaleSetInfoResponse(
+	subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName, keyVaultUri string,
+) (scaleSetInfoResponse ScaleSetInfoResponse, err error) {
 	instances, err := common.GetScaleSetInstancesInfo(subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
 		return
 	}
 
-	scaleSetInfo, err := common.GetScaleSetInfo(subscriptionId, resourceGroupName, vmScaleSetName)
+	scaleSetInfo, err := common.GetScaleSetInfo(subscriptionId, resourceGroupName, vmScaleSetName, keyVaultUri)
 	if err != nil {
 		return
 	}
