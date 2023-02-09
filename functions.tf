@@ -1,5 +1,4 @@
 resource "azurerm_application_insights" "application_insights" {
-
   name = "${var.prefix}-${var.cluster_name}-application-insights"
   location= data.azurerm_resource_group.rg.location
   resource_group_name = data.azurerm_resource_group.rg.name
@@ -7,11 +6,11 @@ resource "azurerm_application_insights" "application_insights" {
 }
 
 resource "azurerm_service_plan" "app_service_plan" {
-  name  = "${var.prefix}-${var.cluster_name}-app-service-plan"
+  name                = "${var.prefix}-${var.cluster_name}-app-service-plan"
   resource_group_name = data.azurerm_resource_group.rg.name
-  location = data.azurerm_resource_group.rg.location
+  location            = data.azurerm_resource_group.rg.location
   os_type             = "Linux"
-  sku_name            = "Y1"
+  sku_name            = "EP2"
 }
 
 locals {
@@ -65,8 +64,9 @@ resource "azurerm_linux_function_app" "function_app" {
   storage_account_name       = azurerm_storage_account.deployment_sa.name
   storage_account_access_key = azurerm_storage_account.deployment_sa.primary_access_key
   https_only                 = true
-
-  site_config {}
+  site_config {
+    vnet_route_all_enabled = true
+  }
 
   app_settings = {
     "FUNCTIONS_WORKER_RUNTIME" = "custom"
@@ -102,6 +102,7 @@ resource "azurerm_linux_function_app" "function_app" {
     FUNCTION_APP_EDIT_MODE   = "readonly"
     HASH                     = azurerm_storage_blob.function_app_code.content_md5
     WEBSITE_RUN_FROM_PACKAGE = "https://${azurerm_storage_account.deployment_sa.name}.blob.core.windows.net/${azurerm_storage_container.deployment.name}/${azurerm_storage_blob.function_app_code.name}"
+    WEBSITE_VNET_ROUTE_ALL   = true
   }
 
   identity {
@@ -149,7 +150,6 @@ resource "azurerm_role_assignment" "storage-account-contributor" {
   depends_on           = [azurerm_linux_function_app.function_app]
 }
 
-
 resource "azurerm_role_assignment" "function-app-key-vault-secrets-user" {
   scope                = data.azurerm_resource_group.rg.id
   role_definition_name = "Key Vault Secrets User"
@@ -168,4 +168,10 @@ resource "azurerm_role_assignment" "function-app-scale-set-machine-owner" {
   role_definition_name = "Owner"
   principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
   depends_on           = [azurerm_linux_function_app.function_app]
+}
+
+resource "azurerm_app_service_virtual_network_swift_connection" "swift_connection" {
+  app_service_id = azurerm_linux_function_app.function_app.id
+  subnet_id      = var.subnet_delegation_id
+  depends_on     = [azurerm_linux_function_app.function_app]
 }
