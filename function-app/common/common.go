@@ -436,14 +436,14 @@ type ScaleSetInfo struct {
 	Id            string
 	Name          string
 	AdminUsername string
-	AdminPassword *string
+	AdminPassword string
 	Capacity      int
 	VMSize        string
 }
 
 // Gets single scale set info
 // see https://learn.microsoft.com/en-us/rest/api/compute/virtual-machine-scale-sets/get
-func GetScaleSetInfo(subscriptionId, resourceGroupName, vmScaleSetName string) (*ScaleSetInfo, error) {
+func GetScaleSetInfo(subscriptionId, resourceGroupName, vmScaleSetName string, keyVaultUri string) (*ScaleSetInfo, error) {
 	ctx := context.Background()
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
@@ -463,11 +463,17 @@ func GetScaleSetInfo(subscriptionId, resourceGroupName, vmScaleSetName string) (
 		return nil, err
 	}
 
+	wekaPassword, err := GetWekaClusterPassword(keyVaultUri)
+	if err != nil {
+		log.Error().Err(err).Send()
+		return nil, err
+	}
+
 	scaleSetInfo := ScaleSetInfo{
 		Id:            *scaleSet.ID,
 		Name:          *scaleSet.Name,
-		AdminUsername: *scaleSet.Properties.VirtualMachineProfile.OSProfile.AdminUsername,
-		AdminPassword: scaleSet.Properties.VirtualMachineProfile.OSProfile.AdminPassword,
+		AdminUsername: "admin",
+		AdminPassword: wekaPassword,
 		Capacity:      int(*scaleSet.SKU.Capacity),
 		VMSize:        *scaleSet.SKU.Name,
 	}
