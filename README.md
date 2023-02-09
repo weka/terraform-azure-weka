@@ -149,10 +149,5 @@ No modules.
 
 | Name | Description |
 |------|-------------|
-| <a name="output_fetch-weka-cluster-password"></a> [fetch-weka-cluster-password](#output\_fetch-weka-cluster-password) | Fetch weka cluster password |
-| <a name="output_get-cluster-status"></a> [get-cluster-status](#output\_get-cluster-status) | A command to get the cluster status. |
-| <a name="output_get-vms-private-ips"></a> [get-vms-private-ips](#output\_get-vms-private-ips) | Get private ips of vms |
-| <a name="output_get-vms-public-ips"></a> [get-vms-public-ips](#output\_get-vms-public-ips) | Get public ips of vms |
-| <a name="output_ssh-key-download-blob"></a> [ssh-key-download-blob](#output\_ssh-key-download-blob) | Commands to download the ssh keys from the Azure Blob. |
-| <a name="output_ssh-key-files-path"></a> [ssh-key-files-path](#output\_ssh-key-files-path) | Displays the path of the ssh keys. |
+| <a name="output_cluster_helpers_commands"></a> [cluster\_helpers\_commands](#output\_cluster\_helpers\_commands) | Useful commands and script to interact with weka cluster |
 <!-- END_TF_DOCS -->
