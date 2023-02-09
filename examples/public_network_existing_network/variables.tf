@@ -38,6 +38,11 @@ variable "subnets_name_list" {
   description = "Names of existing subnets list"
 }
 
+variable "subnet_delegation" {
+  type = string
+  description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service"
+}
+
 variable "subscription_id" {
   type = string
   description = "Subscription id for deployment"
