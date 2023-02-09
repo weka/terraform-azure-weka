@@ -54,6 +54,11 @@ variable "sg_id" {
   description = "The security group id."
 }
 
+variable "subnet_delegation_id" {
+  type = string
+  description = "Subnet delegation id"
+}
+
 variable "weka_version" {
   type = string
   description = "The Weka version to deploy."
