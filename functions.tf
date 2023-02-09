@@ -108,12 +108,6 @@ resource "azurerm_linux_function_app" "function_app" {
     type = "SystemAssigned"
   }
 
-  lifecycle {
-    replace_triggered_by = [
-      azurerm_storage_blob.function_app_code.content_md5
-    ]
-  }
-
   depends_on = [azurerm_storage_account.deployment_sa, azurerm_storage_blob.function_app_code]
 }
 
