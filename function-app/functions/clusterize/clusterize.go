@@ -3,23 +3,62 @@ package clusterize
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/lithammer/dedent"
-	"github.com/rs/zerolog/log"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"weka-deployment/common"
+
+	"github.com/lithammer/dedent"
+	"github.com/rs/zerolog/log"
 )
+
+type ObsParams struct {
+	SetObs        string
+	Name          string
+	ContainerName string
+	AccessKey     string
+}
+
+type DataProtectionParams struct {
+	StripeWidth     int
+	ProtectionLevel int
+	Hotspare        int
+}
+
+type WekaClusterParams struct {
+	vmName               string
+	hostsNum             string
+	clusterName          string
+	computeMemory        string
+	drivesContainerNum   string
+	computeContainerNum  string
+	frontendContainerNum string
+	tieringSsdPercent    string
+	dataProtection       DataProtectionParams
+}
+
+type ClusterizationParams struct {
+	subscriptionId    string
+	resourceGroupName string
+	location          string
+	prefix            string
+	keyVaultUri       string
+
+	stateContainerName string
+	stateStorageName   string
+
+	cluster WekaClusterParams
+	obs     ObsParams
+}
 
 type requestBody struct {
 	Name string `json:"name"`
 }
 
 func generateClusterizationScript(
-	vmNames, ips, hostsNum, drivesContainerNum,
-	clusterName, computeContainerNum, computeMemory, frontendContainerNum, setObs, obsName, obsContainerName,
-	obsAccessKey, tieringSsdPercent, prefix, functionAppKey string) (clusterizeScript string) {
+	vmNames, ips, prefix, functionAppKey string, cluster WekaClusterParams, obs ObsParams,
+) (clusterizeScript string) {
 
 	log.Info().Msg("Generating clusterization script")
 	clusterizeScriptTemplate := `
@@ -41,6 +80,9 @@ func generateClusterizationScript(
 	TIERING_SSD_PERCENT=%s
 	PREFIX=%s
 	FUNCTION_APP_KEY="%s"
+	STRIPE_WIDTH=%d
+	PROTECTION_LEVEL=%d
+	HOTSPARE=%d
 
 	weka_status_ready="Containers: 1/1 running (1 weka)"
 	ssh_command="ssh -o StrictHostKeyChecking=no"
@@ -62,6 +104,8 @@ func generateClusterizationScript(
 	done
 	
 	weka cloud enable
+	weka cluster update --data-drives $STRIPE_WIDTH --parity-drives $PROTECTION_LEVEL
+	weka cluster hot-spare $HOTSPARE
 	weka cluster start-io
 	
 	for vm in $VMS; do
@@ -94,9 +138,11 @@ func generateClusterizationScript(
 	`
 
 	log.Info().Msgf("Formatting clusterization script template")
-	clusterizeScript = fmt.Sprintf(dedent.Dedent(clusterizeScriptTemplate), vmNames, ips, hostsNum, drivesContainerNum,
-		clusterName, computeContainerNum, computeMemory, frontendContainerNum, setObs, obsName, obsContainerName,
-		obsAccessKey, tieringSsdPercent, prefix, functionAppKey)
+	clusterizeScript = fmt.Sprintf(
+		dedent.Dedent(clusterizeScriptTemplate), vmNames, ips, cluster.hostsNum, cluster.drivesContainerNum,
+		cluster.clusterName, cluster.computeContainerNum, cluster.computeMemory, cluster.frontendContainerNum,
+		obs.SetObs, obs.Name, obs.ContainerName, obs.AccessKey, cluster.tieringSsdPercent, prefix, functionAppKey,
+		cluster.dataProtection.StripeWidth, cluster.dataProtection.ProtectionLevel, cluster.dataProtection.Hotspare)
 	return
 }
 
@@ -110,17 +156,16 @@ exit 1
 	`, err.Error())
 }
 
-func Clusterize(stateContainerName, stateStorageName, vmName, hostsNum, clusterName, computeMemory, subscriptionId,
-	resourceGroupName, setObs, obsName, obsContainerName, obsAccessKey, location, drivesContainerNum,
-	computeContainerNum, frontendContainerNum, tieringSsdPercent, prefix, keyVaultUri string) (clusterizeScript string) {
-
-	state, err := common.AddInstanceToState(subscriptionId, resourceGroupName, stateStorageName, stateContainerName, vmName)
+func Clusterize(p ClusterizationParams) (clusterizeScript string) {
+	state, err := common.AddInstanceToState(
+		p.subscriptionId, p.resourceGroupName, p.stateStorageName, p.stateContainerName, p.cluster.vmName,
+	)
 	if err != nil {
 		clusterizeScript = getErrorScript(err)
 		return
 	}
 
-	initialSize, err := strconv.Atoi(hostsNum)
+	initialSize, err := strconv.Atoi(p.cluster.hostsNum)
 	if err != nil {
 		return
 	}
@@ -133,28 +178,30 @@ func Clusterize(stateContainerName, stateStorageName, vmName, hostsNum, clusterN
 	if len(state.Instances) == initialSize {
 		log.Info().Msg("This is the last instance in the cluster, creating obs and clusterization script")
 
-		if setObs == "true" && obsAccessKey == "" {
-			obsAccessKey, err = common.CreateStorageAccount(subscriptionId, resourceGroupName, obsName, location)
+		if p.obs.SetObs == "true" && p.obs.AccessKey == "" {
+			p.obs.AccessKey, err = common.CreateStorageAccount(
+				p.subscriptionId, p.resourceGroupName, p.obs.Name, p.location,
+			)
 			if err != nil {
 				clusterizeScript = getErrorScript(err)
 				return
 			}
 
-			err = common.CreateContainer(obsName, obsContainerName)
+			err = common.CreateContainer(p.obs.Name, p.obs.ContainerName)
 			if err != nil {
 				clusterizeScript = getErrorScript(err)
 				return
 			}
 		}
 
-		functionAppKey, err2 := common.GetKeyVaultValue(keyVaultUri, "function-app-default-key")
+		functionAppKey, err2 := common.GetKeyVaultValue(p.keyVaultUri, "function-app-default-key")
 		if err2 != nil {
 			err = err2
 			clusterizeScript = getErrorScript(err)
 			return
 		}
 
-		privateIps, err2 := common.GetVmsPrivateIps(subscriptionId, resourceGroupName, state.Instances)
+		privateIps, err2 := common.GetVmsPrivateIps(p.subscriptionId, p.resourceGroupName, state.Instances)
 		if err2 != nil {
 			err = err2
 			clusterizeScript = getErrorScript(err)
@@ -164,10 +211,7 @@ func Clusterize(stateContainerName, stateStorageName, vmName, hostsNum, clusterN
 		vmNames := strings.Join(state.Instances, " ")
 		ips := strings.Join(privateIps, ",")
 
-		clusterizeScript = generateClusterizationScript(
-			vmNames, ips, hostsNum, drivesContainerNum,
-			clusterName, computeContainerNum, computeMemory, frontendContainerNum, setObs, obsName, obsContainerName,
-			obsAccessKey, tieringSsdPercent, prefix, functionAppKey)
+		clusterizeScript = generateClusterizationScript(vmNames, ips, p.prefix, functionAppKey, p.cluster, p.obs)
 	} else {
 		msg := fmt.Sprintf("This is instance number %d that is ready for clusterization (not last one), doing nothing.", len(state.Instances))
 		log.Info().Msgf(msg)
@@ -202,6 +246,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	tieringSsdPercent := os.Getenv("TIERING_SSD_PERCENT")
 	prefix := os.Getenv("PREFIX")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
+	// data protection-related vars
+	stripeWidth, _ := strconv.Atoi(os.Getenv("STRIPE_WIDTH"))
+	protectionLevel, _ := strconv.Atoi(os.Getenv("PROTECTION_LEVEL"))
+	hotspare, _ := strconv.Atoi(os.Getenv("HOTSPARE"))
 
 	var invokeRequest common.InvokeRequest
 
@@ -230,10 +278,37 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clusterizeScript := Clusterize(
-		stateContainerName, stateStorageName, data.Name, hostsNum, clusterName, computeMemory, subscriptionId,
-		resourceGroupName, setObs, obsName, obsContainerName, obsAccessKey, location, drivesContainerNum,
-		computeContainerNum, frontendContainerNum, tieringSsdPercent, prefix, keyVaultUri)
+	params := ClusterizationParams{
+		subscriptionId:     subscriptionId,
+		resourceGroupName:  resourceGroupName,
+		location:           location,
+		prefix:             prefix,
+		keyVaultUri:        keyVaultUri,
+		stateContainerName: stateContainerName,
+		stateStorageName:   stateStorageName,
+		cluster: WekaClusterParams{
+			vmName:               data.Name,
+			hostsNum:             hostsNum,
+			clusterName:          clusterName,
+			computeMemory:        computeMemory,
+			drivesContainerNum:   drivesContainerNum,
+			computeContainerNum:  computeContainerNum,
+			frontendContainerNum: frontendContainerNum,
+			tieringSsdPercent:    tieringSsdPercent,
+			dataProtection: DataProtectionParams{
+				StripeWidth:     stripeWidth,
+				ProtectionLevel: protectionLevel,
+				Hotspare:        hotspare,
+			},
+		},
+		obs: ObsParams{
+			SetObs:        setObs,
+			Name:          obsName,
+			ContainerName: obsContainerName,
+			AccessKey:     obsAccessKey,
+		},
+	}
+	clusterizeScript := Clusterize(params)
 
 	resData["body"] = clusterizeScript
 	outputs["res"] = resData
