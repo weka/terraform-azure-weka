@@ -2,6 +2,7 @@ prefix              = "weka"
 rg_name             = "weka-rg"
 address_space       = "10.0.0.0/16"
 subnet_prefixes     = ["10.0.1.0/24"]
+subnet_delegation   = "10.0.2.0/25"
 clusters_list       = ["poc","poc2"]
 private_network     = true
 apt_repo_url        = "http://11.0.0.4/ubuntu/mirror/archive.ubuntu.com/ubuntu/"

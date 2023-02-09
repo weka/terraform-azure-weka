@@ -17,3 +17,7 @@ output "private-dns-zone-name" {
   value = azurerm_private_dns_zone.dns.name
   description = "Displays the private DNS zone name."
 }
+
+output "subnet-delegation-id" {
+  value = azurerm_subnet.subnet-delegation.id
+}
