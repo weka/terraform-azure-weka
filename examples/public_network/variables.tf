@@ -18,6 +18,11 @@ variable "subnet_prefixes" {
   description = "List of address prefixes to use for the subnet"
 }
 
+variable "subnet_delegation" {
+  type = string
+  description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service"
+}
+
 variable "get_weka_io_token" {
   type = string
   sensitive = true

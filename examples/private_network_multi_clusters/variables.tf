@@ -18,6 +18,11 @@ variable "subnet_prefixes" {
   description = "List of address prefixes to use for the subnet"
 }
 
+variable "subnet_delegation" {
+  type = string
+  description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service"
+}
+
 variable "private_network" {
   type = bool
   description = "Should be true to enable private network, defaults to public networking"
