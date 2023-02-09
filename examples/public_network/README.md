@@ -48,3 +48,6 @@ No resources.
 | <a name="output_get-cluster-status"></a> [get-cluster-status](#output\_get-cluster-status) | get cluster status command |
 | <a name="output_get-vms-ips-command"></a> [get-vms-ips-command](#output\_get-vms-ips-command) | n/a |
 <!-- END_TF_DOCS -->
+=======
+| <a name="output_get-cluster-helpers-commands"></a> [get-cluster-helpers-commands](#output\_get-cluster-helpers-commands) | n/a |
+<!-- END_TF_DOCS -->
