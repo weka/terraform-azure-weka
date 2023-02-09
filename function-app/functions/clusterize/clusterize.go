@@ -65,7 +65,7 @@ func generateClusterizationScript(
 	weka cluster start-io
 	
 	for vm in $VMS; do
-	  $ssh_command $vm "sudo weka local setup container --name frontend0 --base-port 16000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --join-ips $IPS"
+	  $ssh_command $vm "sudo weka local setup container --name frontend0 --base-port 16000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --allow-protocols true --join-ips $IPS"
 	done
 	
 	sleep 15s
