@@ -50,6 +50,12 @@ resource "azurerm_storage_blob" "function_app_code" {
   depends_on = [data.archive_file.function_zip]
 }
 
+
+locals {
+  stripe_width_calculated = var.cluster_size - var.protection_level - 1
+  stripe_width = local.stripe_width_calculated < 16 ? local.stripe_width_calculated : 16
+}
+
 resource "azurerm_linux_function_app" "function_app" {
   name                       = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-function-app"
   resource_group_name        = data.azurerm_resource_group.rg.name
@@ -69,6 +75,9 @@ resource "azurerm_linux_function_app" "function_app" {
     "STATE_CONTAINER_NAME" = azurerm_storage_container.deployment.name
     "HOSTS_NUM" = var.cluster_size
     "CLUSTER_NAME" = var.cluster_name
+    "PROTECTION_LEVEL" = var.protection_level
+    "STRIPE_WIDTH" = var.stripe_width != -1 ? var.stripe_width : local.stripe_width
+    "HOTSPARE" = var.hotspare
     "VM_USERNAME" = var.vm_username
     "COMPUTE_MEMORY" = var.container_number_map[var.instance_type].memory
     "SUBSCRIPTION_ID" = data.azurerm_subscription.primary.subscription_id
