@@ -42,6 +42,7 @@ locals {
   disk_size       = var.default_disk_size + var.traces_per_ionode * (var.container_number_map[var.instance_type].compute + var.container_number_map[var.instance_type].drive + var.container_number_map[var.instance_type].frontend)
   private_nic_first_index = var.private_network ? 0 : 1
   alphanumeric_cluster_name =  lower(replace(var.cluster_name,"/\\W|_|\\s/",""))
+  alphanumeric_prefix_name  = lower(replace(var.prefix,"/\\W|_|\\s/",""))
 }
 
 data "template_file" "init" {

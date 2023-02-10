@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strconv"
 	"weka-deployment/common"
 	"weka-deployment/functions/clusterize"
 )
@@ -27,6 +28,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	tieringSsdPercent := os.Getenv("TIERING_SSD_PERCENT")
 	prefix := os.Getenv("PREFIX")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
+	// data protection-related vars
+	stripeWidth, _ := strconv.Atoi(os.Getenv("STRIPE_WIDTH"))
+	protectionLevel, _ := strconv.Atoi(os.Getenv("PROTECTION_LEVEL"))
+	hotspare, _ := strconv.Atoi(os.Getenv("HOTSPARE"))
 
 	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
@@ -36,10 +41,36 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		clusterizeScript = clusterize.GetErrorScript(err)
 	} else {
-		clusterizeScript = clusterize.HandleLastClusterVm(
-			state, hostsNum, clusterName, computeMemory, subscriptionId,
-			resourceGroupName, setObs, obsName, obsContainerName, obsAccessKey, location, drivesContainerNum,
-			computeContainerNum, frontendContainerNum, tieringSsdPercent, prefix, keyVaultUri)
+		params := clusterize.ClusterizationParams{
+			SubscriptionId:     subscriptionId,
+			ResourceGroupName:  resourceGroupName,
+			Location:           location,
+			Prefix:             prefix,
+			KeyVaultUri:        keyVaultUri,
+			StateContainerName: stateContainerName,
+			StateStorageName:   stateStorageName,
+			Cluster: clusterize.WekaClusterParams{
+				HostsNum:             hostsNum,
+				Name:                 clusterName,
+				ComputeMemory:        computeMemory,
+				DrivesContainerNum:   drivesContainerNum,
+				ComputeContainerNum:  computeContainerNum,
+				FrontendContainerNum: frontendContainerNum,
+				TieringSsdPercent:    tieringSsdPercent,
+				DataProtection: clusterize.DataProtectionParams{
+					StripeWidth:     stripeWidth,
+					ProtectionLevel: protectionLevel,
+					Hotspare:        hotspare,
+				},
+			},
+			Obs: clusterize.ObsParams{
+				SetObs:        setObs,
+				Name:          obsName,
+				ContainerName: obsContainerName,
+				AccessKey:     obsAccessKey,
+			},
+		}
+		clusterizeScript = clusterize.HandleLastClusterVm(state, params)
 	}
 
 	resData["body"] = clusterizeScript
