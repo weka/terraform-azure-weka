@@ -27,29 +27,29 @@ type DataProtectionParams struct {
 }
 
 type WekaClusterParams struct {
-	vmName               string
-	hostsNum             string
-	name                 string
-	computeMemory        string
-	drivesContainerNum   string
-	computeContainerNum  string
-	frontendContainerNum string
-	tieringSsdPercent    string
-	dataProtection       DataProtectionParams
+	VmName               string
+	HostsNum             string
+	Name                 string
+	ComputeMemory        string
+	DrivesContainerNum   string
+	ComputeContainerNum  string
+	FrontendContainerNum string
+	TieringSsdPercent    string
+	DataProtection       DataProtectionParams
 }
 
 type ClusterizationParams struct {
-	subscriptionId    string
-	resourceGroupName string
-	location          string
-	prefix            string
-	keyVaultUri       string
+	SubscriptionId    string
+	ResourceGroupName string
+	Location          string
+	Prefix            string
+	KeyVaultUri       string
 
-	stateContainerName string
-	stateStorageName   string
+	StateContainerName string
+	StateStorageName   string
 
-	cluster WekaClusterParams
-	obs     ObsParams
+	Cluster WekaClusterParams
+	Obs     ObsParams
 }
 
 type RequestBody struct {
@@ -140,10 +140,10 @@ func generateClusterizationScript(
 
 	log.Info().Msgf("Formatting clusterization script template")
 	clusterizeScript = fmt.Sprintf(
-		dedent.Dedent(clusterizeScriptTemplate), vmNames, ips, cluster.hostsNum, cluster.drivesContainerNum,
-		cluster.name, cluster.computeContainerNum, cluster.computeMemory, cluster.frontendContainerNum,
-		obs.SetObs, obs.Name, obs.ContainerName, obs.AccessKey, cluster.tieringSsdPercent, prefix, functionAppKey,
-		cluster.dataProtection.StripeWidth, cluster.dataProtection.ProtectionLevel, cluster.dataProtection.Hotspare,
+		dedent.Dedent(clusterizeScriptTemplate), vmNames, ips, cluster.HostsNum, cluster.DrivesContainerNum,
+		cluster.Name, cluster.ComputeContainerNum, cluster.ComputeMemory, cluster.FrontendContainerNum,
+		obs.SetObs, obs.Name, obs.ContainerName, obs.AccessKey, cluster.TieringSsdPercent, prefix, functionAppKey,
+		cluster.DataProtection.StripeWidth, cluster.DataProtection.ProtectionLevel, cluster.DataProtection.Hotspare,
 		wekaPassword,
 	)
 	return
@@ -163,36 +163,36 @@ func HandleLastClusterVm(state common.ClusterState, p ClusterizationParams) (clu
 	log.Info().Msg("This is the last instance in the cluster, creating obs and clusterization script")
 
 	var err error
-	if p.obs.SetObs == "true" && p.obs.AccessKey == "" {
-		p.obs.AccessKey, err = common.CreateStorageAccount(
-			p.subscriptionId, p.resourceGroupName, p.obs.Name, p.location,
+	if p.Obs.SetObs == "true" && p.Obs.AccessKey == "" {
+		p.Obs.AccessKey, err = common.CreateStorageAccount(
+			p.SubscriptionId, p.ResourceGroupName, p.Obs.Name, p.Location,
 		)
 		if err != nil {
 			clusterizeScript = GetErrorScript(err)
 			return
 		}
 
-		err = common.CreateContainer(p.obs.Name, p.obs.ContainerName)
+		err = common.CreateContainer(p.Obs.Name, p.Obs.ContainerName)
 		if err != nil {
 			clusterizeScript = GetErrorScript(err)
 			return
 		}
 	}
 
-	functionAppKey, err := common.GetKeyVaultValue(p.keyVaultUri, "function-app-default-key")
+	functionAppKey, err := common.GetKeyVaultValue(p.KeyVaultUri, "function-app-default-key")
 	if err != nil {
 		clusterizeScript = GetErrorScript(err)
 		return
 	}
 
-	wekaPassword, err := common.GetWekaClusterPassword(p.keyVaultUri)
+	wekaPassword, err := common.GetWekaClusterPassword(p.KeyVaultUri)
 	if err != nil {
 		clusterizeScript = GetErrorScript(err)
 		return
 	}
 
-	vmScaleSetName := common.GetVmScaleSetName(p.prefix, p.cluster.name)
-	vmsPrivateIps, err := common.GetVmsPrivateIps(p.subscriptionId, p.resourceGroupName, vmScaleSetName)
+	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.Name)
+	vmsPrivateIps, err := common.GetVmsPrivateIps(p.SubscriptionId, p.ResourceGroupName, vmScaleSetName)
 	if err != nil {
 		clusterizeScript = GetErrorScript(err)
 		return
@@ -209,13 +209,13 @@ func HandleLastClusterVm(state common.ClusterState, p ClusterizationParams) (clu
 	vmNames := strings.Join(vmNamesList, " ")
 	ips := strings.Join(ipsList, ",")
 
-	clusterizeScript = generateClusterizationScript(vmNames, ips, p.prefix, functionAppKey, wekaPassword, p.cluster, p.obs)
+	clusterizeScript = generateClusterizationScript(vmNames, ips, p.Prefix, functionAppKey, wekaPassword, p.Cluster, p.Obs)
 	return
 }
 
 func Clusterize(p ClusterizationParams) (clusterizeScript string) {
 	state, err := common.AddInstanceToState(
-		p.subscriptionId, p.resourceGroupName, p.stateStorageName, p.stateContainerName, p.cluster.vmName,
+		p.SubscriptionId, p.ResourceGroupName, p.StateStorageName, p.StateContainerName, p.Cluster.VmName,
 	)
 
 	if err != nil {
@@ -223,14 +223,14 @@ func Clusterize(p ClusterizationParams) (clusterizeScript string) {
 		return
 	}
 
-	initialSize, err := strconv.Atoi(p.cluster.hostsNum)
+	initialSize, err := strconv.Atoi(p.Cluster.HostsNum)
 	if err != nil {
 		return
 	}
 
-	vmScaleSetName := common.GetVmScaleSetName(p.prefix, p.cluster.name)
-	instanceName := strings.Split(p.cluster.vmName, ":")[0]
-	err = common.SetDeletionProtection(p.subscriptionId, p.resourceGroupName, vmScaleSetName, instanceName, true)
+	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.Name)
+	instanceName := strings.Split(p.Cluster.VmName, ":")[0]
+	err = common.SetDeletionProtection(p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, instanceName, true)
 	if err != nil {
 		return
 	}
@@ -299,29 +299,29 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	params := ClusterizationParams{
-		subscriptionId:     subscriptionId,
-		resourceGroupName:  resourceGroupName,
-		location:           location,
-		prefix:             prefix,
-		keyVaultUri:        keyVaultUri,
-		stateContainerName: stateContainerName,
-		stateStorageName:   stateStorageName,
-		cluster: WekaClusterParams{
-			vmName:               data.Vm,
-			hostsNum:             hostsNum,
-			name:                 clusterName,
-			computeMemory:        computeMemory,
-			drivesContainerNum:   drivesContainerNum,
-			computeContainerNum:  computeContainerNum,
-			frontendContainerNum: frontendContainerNum,
-			tieringSsdPercent:    tieringSsdPercent,
-			dataProtection: DataProtectionParams{
+		SubscriptionId:     subscriptionId,
+		ResourceGroupName:  resourceGroupName,
+		Location:           location,
+		Prefix:             prefix,
+		KeyVaultUri:        keyVaultUri,
+		StateContainerName: stateContainerName,
+		StateStorageName:   stateStorageName,
+		Cluster: WekaClusterParams{
+			VmName:               data.Vm,
+			HostsNum:             hostsNum,
+			Name:                 clusterName,
+			ComputeMemory:        computeMemory,
+			DrivesContainerNum:   drivesContainerNum,
+			ComputeContainerNum:  computeContainerNum,
+			FrontendContainerNum: frontendContainerNum,
+			TieringSsdPercent:    tieringSsdPercent,
+			DataProtection: DataProtectionParams{
 				StripeWidth:     stripeWidth,
 				ProtectionLevel: protectionLevel,
 				Hotspare:        hotspare,
 			},
 		},
-		obs: ObsParams{
+		Obs: ObsParams{
 			SetObs:        setObs,
 			Name:          obsName,
 			ContainerName: obsContainerName,
