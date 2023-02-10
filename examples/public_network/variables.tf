@@ -61,3 +61,18 @@ variable "cluster_size" {
   type = number
   description = "Weka cluster size"
 }
+
+variable "protection_level" {
+  type = number
+  description = "Cluster data protection level."
+}
+
+variable "stripe_width" {
+  type = number
+  description = "Stripe width = cluster_size - protection_level - 1 (by default)."
+}
+
+variable "hotspare" {
+  type = number
+  description = "Hot-spare value."
+}

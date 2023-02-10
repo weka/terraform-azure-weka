@@ -28,4 +28,7 @@ module "deploy-weka" {
   subscription_id       = var.subscription_id
   private_dns_zone_name = module.create-network.private-dns-zone-name
   depends_on            = [module.create-network]
+  stripe_width          = var.stripe_width
+  hotspare              = var.hotspare
+  protection_level      = var.protection_level
 }
