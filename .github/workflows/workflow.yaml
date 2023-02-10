@@ -1,0 +1,91 @@
+name: 'Terraform CI'
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency: ci
+
+env:
+  RG_NAME: weka-ci
+  PREFIX: ci
+  CLUSTER_NAME: wekacluster
+  GET_WEKA_IO_TOKEN: ${{ secrets.GET_WEKA_IO_TOKEN }}
+  SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  CLIENT_ID: ${{ secrets.CLIENT_ID }}
+  TENANT_ID: ${{ secrets.TENANT_ID }}
+  CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+
+jobs:
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./examples/public_network
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - id: auth
+        name: Authenticate to Azure Cloud
+        uses: azure/login@v1
+        with:
+          creds: ${{secrets.AZURE_CREDENTIALS}}
+
+      - name: Create Azure resource group
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az group create --name $RG_NAME --location eastus
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '>=1.19'
+
+      - name: Copy override provider to example folder
+        run: cp "../../ci/deployment/override.tf" .
+
+      - name: Add additional variables
+        run: cat ../../ci/deployment/additional_variables.tf >> variables.tf
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: terraform apply -var-file vars.auto.tfvars -var="rg_name=$RG_NAME" -var="prefix=$PREFIX" -var="cluster_name=$CLUSTER_NAME" -var="get_weka_io_token=$GET_WEKA_IO_TOKEN" -var="client_id=$CLIENT_ID" -var="tenant_id=$TENANT_ID" -var="client_secret=$CLIENT_SECRET" -var="subscription_id=$SUBSCRIPTION_ID" -auto-approve
+
+      - name: Wait for weka cluster
+        uses: azure/CLI@v1
+        with:
+          azcliversion: 2.30.0
+          inlineScript: |
+            chmod +x $GITHUB_WORKSPACE/ci/deployment/wait_for_cluster.sh
+            $GITHUB_WORKSPACE/ci/deployment/wait_for_cluster.sh $PREFIX $CLUSTER_NAME $RG_NAME $SUBSCRIPTION_ID 40
+
+      - name: Terraform Destroy
+        if: always()
+        run: terraform destroy -var-file vars.auto.tfvars -var="rg_name=$RG_NAME" -var="get_weka_io_token=$GET_WEKA_IO_TOKEN" -var="client_id=$CLIENT_ID" -var="tenant_id=$TENANT_ID" -var="client_secret=$CLIENT_SECRET" -var="subscription_id=$SUBSCRIPTION_ID" -auto-approve
+
+      - name: Delete Azure resource group
+        if: always()
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az group delete --name $RG_NAME --yes
+
+      - name: Logout from Azure Cloud
+        if: always()
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az logout
+            az cache purge
+            az account clear
