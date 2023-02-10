@@ -23,6 +23,8 @@ No modules.
 | Name | Type |
 |------|------|
 | [azuread_application.main](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/application) | resource |
+| [azuread_directory_role.main](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/directory_role) | resource |
+| [azuread_directory_role_assignment.main](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/directory_role_assignment) | resource |
 | [azuread_service_principal.main](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/service_principal) | resource |
 | [azuread_service_principal_password.main](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/service_principal_password) | resource |
 | [azurerm_role_assignment.main](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
@@ -38,7 +40,7 @@ No modules.
 | <a name="input_azure_role_name"></a> [azure\_role\_name](#input\_azure\_role\_name) | A unique UUID/GUID for this Role Assignment - one will be generated if not specified. | `any` | `null` | no |
 | <a name="input_description"></a> [description](#input\_description) | Description of the service principal | `string` | `"Github CI user"` | no |
 | <a name="input_role_definition_name"></a> [role\_definition\_name](#input\_role\_definition\_name) | built-in role for the service principal | `any` | `null` | no |
-| <a name="input_service_principal_name"></a> [service\_principal\_name](#input\_service\_principal\_name) | Name of the service principal | `string` | `"CIuser"` | no |
+| <a name="input_service_principal_name"></a> [service\_principal\_name](#input\_service\_principal\_name) | Name of the service principal | `string` | `"CIUser"` | no |
 
 ## Outputs
 
