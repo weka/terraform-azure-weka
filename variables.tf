@@ -38,7 +38,7 @@ variable "cluster_size" {
 
   validation {
     condition = var.cluster_size >= 6
-    error_message = "Cluster size should be at least 5."
+    error_message = "Cluster size should be at least 6."
   }
 }
 
