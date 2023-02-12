@@ -8,6 +8,8 @@ import (
 	"io"
 	"strings"
 	"time"
+	"weka-deployment/lib/types"
+	"weka-deployment/protocol"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -615,7 +617,7 @@ func GetScaleSetInfo(subscriptionId, resourceGroupName, vmScaleSetName, keyVault
 
 // Gets a list of all VMs in a scale set
 // see https://learn.microsoft.com/en-us/rest/api/compute/virtual-machine-scale-set-vms/list
-func GetScaleSetInstances(subscriptionId, resourceGroupName, vmScaleSetName string) (vms []*armcompute.VirtualMachineScaleSetVM, err error) {
+func GetScaleSetInstances(subscriptionId, resourceGroupName, vmScaleSetName string, expand *string) (vms []*armcompute.VirtualMachineScaleSetVM, err error) {
 	ctx := context.Background()
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
@@ -629,7 +631,10 @@ func GetScaleSetInstances(subscriptionId, resourceGroupName, vmScaleSetName stri
 		return
 	}
 
-	pager := client.NewListPager(resourceGroupName, vmScaleSetName, nil)
+	pager := client.NewListPager(
+		resourceGroupName, vmScaleSetName, &armcompute.VirtualMachineScaleSetVMsClientListOptions{
+			Expand: expand,
+		})
 
 	for pager.More() {
 		nextResult, err := pager.NextPage(ctx)
@@ -648,7 +653,7 @@ type ScaleSetInstanceInfo struct {
 	PrivateIp string
 }
 
-func getScaleSetVmId(resourceId string) string {
+func GetScaleSetVmId(resourceId string) string {
 	vmNameParts := strings.Split(resourceId, "/")
 	vmNamePartsLen := len(vmNameParts)
 	vmId := vmNameParts[vmNamePartsLen-1]
@@ -663,17 +668,17 @@ func GetScaleSetInstancesInfo(subscriptionId, resourceGroupName, vmScaleSetName 
 	instanceIdPrivateIp := map[string]string{}
 
 	for _, ni := range netInterfaces {
-		id := getScaleSetVmId(*ni.Properties.VirtualMachine.ID)
+		id := GetScaleSetVmId(*ni.Properties.VirtualMachine.ID)
 		privateIp := *ni.Properties.IPConfigurations[0].Properties.PrivateIPAddress
 		instanceIdPrivateIp[id] = privateIp
 	}
 
-	vms, err := GetScaleSetInstances(subscriptionId, resourceGroupName, vmScaleSetName)
+	vms, err := GetScaleSetInstances(subscriptionId, resourceGroupName, vmScaleSetName, nil)
 	if err != nil {
 		return
 	}
 	for _, vm := range vms {
-		id := getScaleSetVmId(*vm.ID)
+		id := GetScaleSetVmId(*vm.ID)
 		// get private ip if exists
 		var privateIp string
 		if val, ok := instanceIdPrivateIp[id]; ok {
@@ -688,8 +693,8 @@ func GetScaleSetInstancesInfo(subscriptionId, resourceGroupName, vmScaleSetName 
 	return
 }
 
-func SetDeletionProtection(subscriptionId, resourceGroupName, vmScaleSetName, instanceName string, protect bool) (err error) {
-	instanceNameParts := strings.Split(instanceName, "_")
+func SetDeletionProtection(subscriptionId, resourceGroupName, vmScaleSetName, instanceNameOrId string, protect bool) (err error) {
+	instanceNameParts := strings.Split(instanceNameOrId, "_")
 	instanceId := instanceNameParts[len(instanceNameParts)-1]
 	log.Info().Msgf("Setting deletion protection: %t on instanceId %s", protect, instanceId)
 
@@ -729,4 +734,84 @@ func GetWekaClusterPassword(keyVaultUri string) (password string, err error) {
 
 func GetVmScaleSetName(prefix, clusterName string) string {
 	return fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
+}
+
+func GetScaleSetInstanceIds(subscriptionId, resourceGroupName, vmScaleSetName string) (instanceIds []string, err error) {
+	vms, err := GetScaleSetInstances(subscriptionId, resourceGroupName, vmScaleSetName, nil)
+	if err != nil {
+		return
+	}
+
+	for _, vm := range vms {
+		instanceIds = append(instanceIds, GetScaleSetVmId(*vm.ID))
+	}
+
+	return
+}
+
+type InstanceIdsSet map[string]types.Nilt
+
+func GetInstanceIdsSet(scaleResponse protocol.ScaleResponse) InstanceIdsSet {
+	instanceIdsSet := make(InstanceIdsSet)
+	for _, instance := range scaleResponse.Hosts {
+		instanceIdsSet[instance.InstanceId] = types.Nilv
+	}
+	return instanceIdsSet
+}
+
+func GetSpecificScaleSetInstances(subscriptionId, resourceGroupName, vmScaleSetName string, instanceIds []string) (vms []*armcompute.VirtualMachineScaleSetVM, err error) {
+	allVms, err := GetScaleSetInstances(subscriptionId, resourceGroupName, vmScaleSetName, nil)
+	if err != nil {
+		return
+	}
+
+	instanceIdsSet := make(InstanceIdsSet)
+	for _, instanceId := range instanceIds {
+		instanceIdsSet[instanceId] = types.Nilv
+	}
+
+	for _, vm := range allVms {
+		if _, ok := instanceIdsSet[GetScaleSetVmId(*vm.ID)]; !ok {
+			vms = append(vms, vm)
+		}
+	}
+
+	return
+}
+
+func TerminateSclaeSetInstances(subscriptionId, resourceGroupName, vmScaleSetName string, terminateInstanceIds []string) (terminatedInstances []string, errs []error) {
+	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		log.Error().Err(err).Send()
+		return
+	}
+
+	client, err := armcompute.NewVirtualMachineScaleSetVMsClient(subscriptionId, credential, nil)
+	if err != nil {
+		log.Error().Err(err).Send()
+		return
+	}
+	ctx := context.Background()
+
+	if len(terminateInstanceIds) == 0 {
+		return
+	}
+	force := true
+	for _, instanceId := range terminateInstanceIds {
+		err = SetDeletionProtection(subscriptionId, resourceGroupName, vmScaleSetName, instanceId, false)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		_, err = client.BeginDelete(ctx, resourceGroupName, vmScaleSetName, instanceId, &armcompute.VirtualMachineScaleSetVMsClientBeginDeleteOptions{
+			ForceDeletion: &force,
+		})
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		terminatedInstances = append(terminatedInstances, instanceId)
+	}
+
+	return
 }
