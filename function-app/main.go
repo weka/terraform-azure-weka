@@ -11,8 +11,11 @@ import (
 	"weka-deployment/functions/deploy"
 	"weka-deployment/functions/fetch"
 	"weka-deployment/functions/join_finalization"
+	"weka-deployment/functions/scale_down"
 	"weka-deployment/functions/scale_up"
 	"weka-deployment/functions/status"
+	"weka-deployment/functions/terminate"
+	"weka-deployment/functions/transient"
 )
 
 func main() {
@@ -29,6 +32,9 @@ func main() {
 	mux.HandleFunc("/fetch", fetch.Handler)
 	mux.HandleFunc("/deploy", deploy.Handler)
 	mux.HandleFunc("/join_finalization", join_finalization.Handler)
+	mux.HandleFunc("/scale_down", scale_down.Handler)
+	mux.HandleFunc("/terminate", terminate.Handler)
+	mux.HandleFunc("/transient", transient.Handler)
 	fmt.Println("Go server Listening on: ", customHandlerPort)
 	log.Fatal(http.ListenAndServe(":"+customHandlerPort, mux))
 }
