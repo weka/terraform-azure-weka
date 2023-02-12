@@ -158,6 +158,13 @@ resource "azurerm_role_assignment" "vm_role_assignment" {
   depends_on           = [azurerm_linux_virtual_machine_scale_set.vmss]
 }
 
+resource "azurerm_role_assignment" "vm_role_blob_assignment" {
+  scope                = data.azurerm_resource_group.rg.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_linux_virtual_machine_scale_set.vmss.identity[0].principal_id
+  depends_on           = [azurerm_linux_virtual_machine_scale_set.vmss]
+}
+
 resource "null_resource" "force-delete-vmss" {
   triggers = {
     vmss_name       = azurerm_linux_virtual_machine_scale_set.vmss.name
