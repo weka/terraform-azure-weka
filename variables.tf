@@ -239,3 +239,14 @@ variable "hotspare" {
   default = 1
   description = "Hot-spare value."
 }
+
+variable "function_app_log_level" {
+  type = number
+  default = 1
+  description = "Log level for function app (from -1 to 5). See https://github.com/rs/zerolog#leveled-logging"
+
+  validation {
+    condition = var.function_app_log_level >= -1 && var.function_app_log_level <= 5
+    error_message = "Allowed values for log level are from -1 to 5."
+  }
+}

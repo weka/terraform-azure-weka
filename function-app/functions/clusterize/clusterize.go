@@ -11,7 +11,6 @@ import (
 	"weka-deployment/common"
 
 	"github.com/lithammer/dedent"
-	"github.com/rs/zerolog/log"
 )
 
 type ObsParams struct {
@@ -58,9 +57,11 @@ type RequestBody struct {
 }
 
 func generateClusterizationScript(
-	vmNames, ips, prefix, functionAppKey, wekaPassword string, cluster WekaClusterParams, obs ObsParams,
+	ctx context.Context, vmNames, ips, prefix, functionAppKey, wekaPassword string, cluster WekaClusterParams, obs ObsParams,
 ) (clusterizeScript string) {
-	log.Info().Msg("Generating clusterization script")
+	logger := common.LoggerFromCtx(ctx)
+	logger.Info().Msg("Generating clusterization script")
+
 	clusterizeScriptTemplate := `
 	#!/bin/bash
 	
@@ -139,7 +140,7 @@ func generateClusterizationScript(
 	curl "https://$PREFIX-$CLUSTER_NAME-function-app.azurewebsites.net/api/clusterize_finalization?code=$FUNCTION_APP_KEY"
 	`
 
-	log.Info().Msgf("Formatting clusterization script template")
+	logger.Info().Msgf("Formatting clusterization script template")
 	clusterizeScript = fmt.Sprintf(
 		dedent.Dedent(clusterizeScriptTemplate), vmNames, ips, cluster.HostsNum, cluster.DrivesContainerNum,
 		cluster.Name, cluster.ComputeContainerNum, cluster.ComputeMemory, cluster.FrontendContainerNum,
@@ -167,20 +168,21 @@ shutdown now
 `)
 }
 
-func HandleLastClusterVm(state common.ClusterState, p ClusterizationParams) (clusterizeScript string) {
-	log.Info().Msg("This is the last instance in the cluster, creating obs and clusterization script")
+func HandleLastClusterVm(ctx context.Context, state common.ClusterState, p ClusterizationParams) (clusterizeScript string) {
+	logger := common.LoggerFromCtx(ctx)
+	logger.Info().Msg("This is the last instance in the cluster, creating obs and clusterization script")
 
 	var err error
 	if p.Obs.SetObs == "true" && p.Obs.AccessKey == "" {
 		p.Obs.AccessKey, err = common.CreateStorageAccount(
-			p.SubscriptionId, p.ResourceGroupName, p.Obs.Name, p.Location,
+			ctx, p.SubscriptionId, p.ResourceGroupName, p.Obs.Name, p.Location,
 		)
 		if err != nil {
 			clusterizeScript = GetErrorScript(err)
 			return
 		}
 
-		err = common.CreateContainer(p.Obs.Name, p.Obs.ContainerName)
+		err = common.CreateContainer(ctx, p.Obs.Name, p.Obs.ContainerName)
 		if err != nil {
 			clusterizeScript = GetErrorScript(err)
 			return
@@ -189,26 +191,26 @@ func HandleLastClusterVm(state common.ClusterState, p ClusterizationParams) (clu
 
 	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.Name)
 	_, err = common.AssignStorageBlobDataContributorRoleToScaleSet(
-		context.TODO(), p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, p.Obs.Name, p.Obs.ContainerName,
+		ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, p.Obs.Name, p.Obs.ContainerName,
 	)
 	if err != nil {
 		clusterizeScript = GetErrorScript(err)
 		return
 	}
 
-	functionAppKey, err := common.GetKeyVaultValue(p.KeyVaultUri, "function-app-default-key")
+	functionAppKey, err := common.GetKeyVaultValue(ctx, p.KeyVaultUri, "function-app-default-key")
 	if err != nil {
 		clusterizeScript = GetErrorScript(err)
 		return
 	}
 
-	wekaPassword, err := common.GetWekaClusterPassword(p.KeyVaultUri)
+	wekaPassword, err := common.GetWekaClusterPassword(ctx, p.KeyVaultUri)
 	if err != nil {
 		clusterizeScript = GetErrorScript(err)
 		return
 	}
 
-	vmsPrivateIps, err := common.GetVmsPrivateIps(p.SubscriptionId, p.ResourceGroupName, vmScaleSetName)
+	vmsPrivateIps, err := common.GetVmsPrivateIps(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName)
 	if err != nil {
 		clusterizeScript = GetErrorScript(err)
 		return
@@ -225,13 +227,15 @@ func HandleLastClusterVm(state common.ClusterState, p ClusterizationParams) (clu
 	vmNames := strings.Join(vmNamesList, " ")
 	ips := strings.Join(ipsList, ",")
 
-	clusterizeScript = generateClusterizationScript(vmNames, ips, p.Prefix, functionAppKey, wekaPassword, p.Cluster, p.Obs)
+	clusterizeScript = generateClusterizationScript(ctx, vmNames, ips, p.Prefix, functionAppKey, wekaPassword, p.Cluster, p.Obs)
 	return
 }
 
-func Clusterize(p ClusterizationParams) (clusterizeScript string) {
+func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript string) {
+	logger := common.LoggerFromCtx(ctx)
+
 	state, err := common.AddInstanceToState(
-		p.SubscriptionId, p.ResourceGroupName, p.StateStorageName, p.StateContainerName, p.Cluster.VmName,
+		ctx, p.SubscriptionId, p.ResourceGroupName, p.StateStorageName, p.StateContainerName, p.Cluster.VmName,
 	)
 
 	if err != nil {
@@ -251,17 +255,17 @@ func Clusterize(p ClusterizationParams) (clusterizeScript string) {
 
 	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.Name)
 	instanceName := strings.Split(p.Cluster.VmName, ":")[0]
-	err = common.SetDeletionProtection(p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, instanceName, true)
+	err = common.SetDeletionProtection(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, instanceName, true)
 	if err != nil {
 		clusterizeScript = GetErrorScript(err)
 		return
 	}
 
 	if len(state.Instances) == initialSize {
-		clusterizeScript = HandleLastClusterVm(state, p)
+		clusterizeScript = HandleLastClusterVm(ctx, state, p)
 	} else {
 		msg := fmt.Sprintf("This is instance number %d that is ready for clusterization (not last one), doing nothing.", len(state.Instances))
-		log.Info().Msgf(msg)
+		logger.Info().Msgf(msg)
 		clusterizeScript = dedent.Dedent(fmt.Sprintf(`
 		#!/bin/bash
 		echo "%s"
@@ -299,24 +303,27 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	resData := make(map[string]interface{})
 	var invokeRequest common.InvokeRequest
 
+	ctx := r.Context()
+	logger := common.LoggerFromCtx(ctx)
+
 	d := json.NewDecoder(r.Body)
 	err := d.Decode(&invokeRequest)
 	if err != nil {
-		log.Error().Msg("Bad request")
+		logger.Error().Msg("Bad request")
 		return
 	}
 
 	var reqData map[string]interface{}
 	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
 	if err != nil {
-		log.Error().Msg("Bad request")
+		logger.Error().Msg("Bad request")
 		return
 	}
 
 	var data RequestBody
 
 	if json.Unmarshal([]byte(reqData["Body"].(string)), &data) != nil {
-		log.Error().Msg("Bad request")
+		logger.Error().Msg("Bad request")
 		return
 	}
 
@@ -353,10 +360,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	if data.Vm == "" {
 		msg := "Cluster name wasn't supplied"
-		log.Error().Msgf(msg)
+		logger.Error().Msgf(msg)
 		resData["body"] = msg
 	} else {
-		clusterizeScript := Clusterize(params)
+		clusterizeScript := Clusterize(ctx, params)
 		resData["body"] = clusterizeScript
 	}
 	outputs["res"] = resData
