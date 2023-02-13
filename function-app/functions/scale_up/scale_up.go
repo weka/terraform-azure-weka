@@ -19,13 +19,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	prefix := os.Getenv("PREFIX")
 	clusterName := os.Getenv("CLUSTER_NAME")
 
+	ctx := r.Context()
 	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
 
-	state, err := common.ReadState(stateStorageName, stateContainerName)
+	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
 	if err != nil {
 		resData["body"] = err.Error()
 	} else {
-		err = common.UpdateVmScaleSetNum(subscriptionId, resourceGroupName, vmScaleSetName, int64(state.InitialSize))
+		err = common.UpdateVmScaleSetNum(ctx, subscriptionId, resourceGroupName, vmScaleSetName, int64(state.InitialSize))
 		if err != nil {
 			resData["body"] = err.Error()
 		} else {

@@ -1,17 +1,17 @@
 package deploy
 
 import (
+	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"github.com/lithammer/dedent"
-	"github.com/rs/zerolog/log"
 	"math/rand"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 	"weka-deployment/common"
+
+	"github.com/lithammer/dedent"
 )
 
 type BackendCoreCount struct {
@@ -37,20 +37,22 @@ func getBackendCoreCountsDefaults() BackendCoreCounts {
 	return backendCoreCounts
 }
 
-func getWekaIoToken(keyVaultUri string) (token string, err error) {
-	token, err = common.GetKeyVaultValue(keyVaultUri, "get-weka-io-token")
+func getWekaIoToken(ctx context.Context, keyVaultUri string) (token string, err error) {
+	token, err = common.GetKeyVaultValue(ctx, keyVaultUri, "get-weka-io-token")
 	return
 }
 
-func getFunctionKey(keyVaultUri string) (functionAppKey string, err error) {
-	functionAppKey, err = common.GetKeyVaultValue(keyVaultUri, "function-app-default-key")
+func getFunctionKey(ctx context.Context, keyVaultUri string) (functionAppKey string, err error) {
+	functionAppKey, err = common.GetKeyVaultValue(ctx, keyVaultUri, "function-app-default-key")
 	return
 }
 
-func GetJoinParams(subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey string) (bashScript string, err error) {
+func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey string) (bashScript string, err error) {
+	logger := common.LoggerFromCtx(ctx)
+
 	joinFinalizationUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/join_finalization", prefix, clusterName)
 	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
-	vmsPrivateIps, err := common.GetVmsPrivateIps(subscriptionId, resourceGroupName, vmScaleSetName)
+	vmsPrivateIps, err := common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 
 	var ips []string
 	for _, ip := range vmsPrivateIps {
@@ -58,13 +60,13 @@ func GetJoinParams(subscriptionId, resourceGroupName, prefix, clusterName, insta
 	}
 
 	if len(ips) == 0 {
-		err = errors.New(fmt.Sprintf("No instances found for instance group %s, can't join", vmScaleSetName))
+		err = fmt.Errorf("no instances found for instance group %s, can't join", vmScaleSetName)
 		return
 	}
 	shuffleSlice(ips)
-	wekaPassword, err := common.GetWekaClusterPassword(keyVaultUri)
+	wekaPassword, err := common.GetWekaClusterPassword(ctx, keyVaultUri)
 	if err != nil {
-		log.Error().Err(err).Send()
+		logger.Error().Err(err).Send()
 		return
 	}
 
@@ -156,7 +158,7 @@ func GetJoinParams(subscriptionId, resourceGroupName, prefix, clusterName, insta
 	backendCoreCounts := getBackendCoreCountsDefaults()
 	instanceParams, ok := backendCoreCounts[instanceType]
 	if !ok {
-		err = errors.New(fmt.Sprintf("Unsupported instance type: %s", instanceType))
+		err = fmt.Errorf("unsupported instance type: %s", instanceType)
 		return
 	}
 	frontend = instanceParams.frontend
@@ -175,6 +177,7 @@ func GetJoinParams(subscriptionId, resourceGroupName, prefix, clusterName, insta
 }
 
 func GetDeployScript(
+	ctx context.Context,
 	subscriptionId,
 	resourceGroupName,
 	stateStorageName,
@@ -187,12 +190,12 @@ func GetDeployScript(
 	clusterizeUrl,
 	subnet string) (bashScript string, err error) {
 
-	state, err := common.ReadState(stateStorageName, stateContainerName)
+	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
 	if err != nil {
 		return
 	}
 
-	functionKey, err := getFunctionKey(keyVaultUri)
+	functionKey, err := getFunctionKey(ctx, keyVaultUri)
 	if err != nil {
 		return
 	}
@@ -200,7 +203,7 @@ func GetDeployScript(
 	backendCoreCounts := getBackendCoreCountsDefaults()
 	instanceParams, ok := backendCoreCounts[instanceType]
 	if !ok {
-		err = errors.New(fmt.Sprintf("Unsupported instance type: %s", instanceType))
+		err = fmt.Errorf("unsupported instance type: %s", instanceType)
 		return
 	}
 
@@ -238,7 +241,7 @@ func GetDeployScript(
 			bashScript = fmt.Sprintf(installTemplate, installUrl, tarName, packageName, clusterizeUrl, functionKey, instanceParams.drive)
 
 		} else {
-			token, err2 := getWekaIoToken(keyVaultUri)
+			token, err2 := getWekaIoToken(ctx, keyVaultUri)
 			if err2 != nil {
 				err = err2
 				return
@@ -286,7 +289,7 @@ func GetDeployScript(
 			bashScript = fmt.Sprintf(installTemplate, token, installUrl, clusterizeUrl, functionKey, instanceParams.drive)
 		}
 	} else {
-		bashScript, err = GetJoinParams(subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey)
+		bashScript, err = GetJoinParams(ctx, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey)
 		if err != nil {
 			return
 		}
@@ -313,7 +316,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	installUrl := os.Getenv("INSTALL_URL")
 	clusterizeUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/clusterize", prefix, clusterName)
 
+	ctx := r.Context()
+
 	bashScript, err := GetDeployScript(
+		ctx,
 		subscriptionId,
 		resourceGroupName,
 		stateStorageName,

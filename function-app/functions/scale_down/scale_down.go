@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/rs/zerolog/log"
 	"math/rand"
 	"net/http"
 	"sort"
@@ -19,6 +17,8 @@ import (
 	"weka-deployment/lib/types"
 	"weka-deployment/lib/weka"
 	"weka-deployment/protocol"
+
+	"github.com/google/uuid"
 )
 
 type hostState int
@@ -129,7 +129,7 @@ func remoteDownHosts(hosts []hostInfo, jpool *jrpc.Pool) {
 
 }
 
-func getNumToDeactivate(hostInfo []hostInfo, desired int) int {
+func getNumToDeactivate(ctx context.Context, hostInfo []hostInfo, desired int) int {
 	/*
 		A - Fully active, healthy
 		T - Target state
@@ -141,6 +141,7 @@ func getNumToDeactivate(hostInfo []hostInfo, desired int) int {
 
 		new_D = max(A+U+D-T, min(2-D, U), 0)
 	*/
+	logger := common.LoggerFromCtx(ctx)
 
 	nHealthy := 0
 	nUnhealthy := 0
@@ -158,7 +159,7 @@ func getNumToDeactivate(hostInfo []hostInfo, desired int) int {
 	}
 
 	toDeactivate := CalculateDeactivateTarget(nHealthy, nUnhealthy, nDeactivating, desired)
-	log.Info().Msgf("%d hosts set to deactivate. nHealthy: %d nUnhealthy:%d nDeactivating: %d desired:%d", toDeactivate, nHealthy, nUnhealthy, nDeactivating, desired)
+	logger.Info().Msgf("%d hosts set to deactivate. nHealthy: %d nUnhealthy:%d nDeactivating: %d desired:%d", toDeactivate, nHealthy, nUnhealthy, nDeactivating, desired)
 	return toDeactivate
 }
 
@@ -179,29 +180,31 @@ func isAllowedToScale(status weka.StatusResponse) error {
 	return nil
 }
 
-func deriveHostState(host *hostInfo) hostState {
+func deriveHostState(ctx context.Context, host *hostInfo) hostState {
+	logger := common.LoggerFromCtx(ctx)
+
 	if host.allDisksBeingRemoved() {
-		log.Info().Msgf("Marking %s as deactivating due to unhealthy disks", host.id.String())
+		logger.Info().Msgf("Marking %s as deactivating due to unhealthy disks", host.id.String())
 		return DEACTIVATING
 	}
 	if strings.AnyOf(host.State, "DEACTIVATING", "REMOVING", "INACTIVE") {
 		return DEACTIVATING
 	}
 	if strings.AnyOf(host.Status, "DOWN", "DEGRADED") && host.managementTimedOut(unhealthyDeactivateTimeout) {
-		log.Info().Msgf("Marking %s as unhealthy due to DOWN", host.id.String())
+		logger.Info().Msgf("Marking %s as unhealthy due to DOWN", host.id.String())
 		return UNHEALTHY
 	}
 	if host.numNotHealthyDrives() > 0 || host.anyDiskBeingRemoved() {
-		log.Info().Msgf("Marking %s as unhealthy due to unhealthy drives", host.id.String())
+		logger.Info().Msgf("Marking %s as unhealthy due to unhealthy drives", host.id.String())
 		return UNHEALTHY
 	}
 	return HEALTHY
 }
 
-func calculateHostsState(hosts []hostInfo) {
+func calculateHostsState(ctx context.Context, hosts []hostInfo) {
 	for i := range hosts {
 		host := &hosts[i]
-		host.scaleState = deriveHostState(host)
+		host.scaleState = deriveHostState(ctx, host)
 	}
 }
 
@@ -214,7 +217,9 @@ func selectInstanceByIp(ip string, instances []protocol.HgInstance) *protocol.Hg
 	return nil
 }
 
-func removeInactive(hosts []hostInfo, jpool *jrpc.Pool, instances []protocol.HgInstance, p *protocol.ScaleResponse) {
+func removeInactive(ctx context.Context, hosts []hostInfo, jpool *jrpc.Pool, instances []protocol.HgInstance, p *protocol.ScaleResponse) {
+	logger := common.LoggerFromCtx(ctx)
+
 	for _, host := range hosts {
 		jpool.Drop(host.HostIp)
 		err := jpool.Call(weka.JrpcRemoveHost, types.JsonDict{
@@ -222,7 +227,7 @@ func removeInactive(hosts []hostInfo, jpool *jrpc.Pool, instances []protocol.HgI
 			"no_wait": true,
 		}, nil)
 		if err != nil {
-			log.Error().Err(err)
+			logger.Error().Err(err)
 			p.AddTransientError(err, "removeInactive")
 			continue
 		}
@@ -232,31 +237,33 @@ func removeInactive(hosts []hostInfo, jpool *jrpc.Pool, instances []protocol.HgI
 		}
 
 		for _, drive := range host.drives {
-			removeDrive(jpool, drive, p)
+			removeDrive(ctx, jpool, drive, p)
 		}
 	}
 	return
 }
 
-func removeOldDrives(drives weka.DriveListResponse, jpool *jrpc.Pool, p *protocol.ScaleResponse) {
+func removeOldDrives(ctx context.Context, drives weka.DriveListResponse, jpool *jrpc.Pool, p *protocol.ScaleResponse) {
 	for _, drive := range drives {
 		if drive.HostId.Int() == -1 && drive.Status == "INACTIVE" {
-			removeDrive(jpool, drive, p)
+			removeDrive(ctx, jpool, drive, p)
 		}
 	}
 }
 
-func removeDrive(jpool *jrpc.Pool, drive weka.Drive, p *protocol.ScaleResponse) {
+func removeDrive(ctx context.Context, jpool *jrpc.Pool, drive weka.Drive, p *protocol.ScaleResponse) {
+	logger := common.LoggerFromCtx(ctx)
+
 	err := jpool.Call(weka.JrpcRemoveDrive, types.JsonDict{
 		"drive_uuids": []uuid.UUID{drive.Uuid},
 	}, nil)
 	if err != nil {
-		log.Error().Err(err)
+		logger.Error().Err(err)
 		p.AddTransientError(err, "removeDrive")
 	}
 }
 
-func ScaleDown(info protocol.HostGroupInfoResponse) (response protocol.ScaleResponse, err error) {
+func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (response protocol.ScaleResponse, err error) {
 	/*
 		Code in here based on following logic:
 
@@ -270,8 +277,7 @@ func ScaleDown(info protocol.HostGroupInfoResponse) (response protocol.ScaleResp
 
 		NEW_D = max(A+U+D-T, min(2-D, U), 0)
 	*/
-
-	ctx := context.Background()
+	logger := common.LoggerFromCtx(ctx)
 
 	response.Version = protocol.Version
 
@@ -350,7 +356,7 @@ func ScaleDown(info protocol.HostGroupInfoResponse) (response protocol.ScaleResp
 				continue
 			} else {
 				if info.Role == "backend" {
-					log.Info().Msgf("host %s is inactive and does not belong to HG, removing from cluster", host.id)
+					logger.Info().Msgf("host %s is inactive and does not belong to HG, removing from cluster", host.id)
 					inactiveHosts = append(inactiveHosts, host)
 					continue
 				}
@@ -364,10 +370,10 @@ func ScaleDown(info protocol.HostGroupInfoResponse) (response protocol.ScaleResp
 
 		switch host.Status {
 		case "DOWN":
-			log.Info().Msgf("found down host %s %s %s", host.id, host.Aws.InstanceId, host.HostIp)
+			logger.Info().Msgf("found down host %s %s %s", host.id, host.Aws.InstanceId, host.HostIp)
 			if info.Role == "backend" {
 				if host.State != "INACTIVE" && host.managementTimedOut(downKickOutTimeout) {
-					log.Info().Msgf("host %s is still active but down for too long, kicking out", host.id)
+					logger.Info().Msgf("host %s is still active but down for too long, kicking out", host.id)
 					downHosts = append(downHosts, host)
 					continue
 				}
@@ -376,7 +382,7 @@ func ScaleDown(info protocol.HostGroupInfoResponse) (response protocol.ScaleResp
 
 	}
 
-	calculateHostsState(hostsList)
+	calculateHostsState(ctx, hostsList)
 
 	sort.Slice(hostsList, func(i, j int) bool {
 		// Giving priority to disks to hosts with disk being removed
@@ -399,19 +405,19 @@ func ScaleDown(info protocol.HostGroupInfoResponse) (response protocol.ScaleResp
 		return a.AddedTime.Before(b.AddedTime)
 	})
 
-	removeInactive(inactiveHosts, jpool, info.Instances, &response)
-	removeOldDrives(driveApiList, jpool, &response)
-	numToDeactivate := getNumToDeactivate(hostsList, info.DesiredCapacity)
+	removeInactive(ctx, inactiveHosts, jpool, info.Instances, &response)
+	removeOldDrives(ctx, driveApiList, jpool, &response)
+	numToDeactivate := getNumToDeactivate(ctx, hostsList, info.DesiredCapacity)
 
 	deactivateHost := func(host hostInfo) {
-		log.Info().Msgf("Trying to deactivate host %s", host.id)
+		logger.Info().Msgf("Trying to deactivate host %s", host.id)
 		for _, drive := range host.drives {
 			if drive.ShouldBeActive {
 				err := jpool.Call(weka.JrpcDeactivateDrives, types.JsonDict{
 					"drive_uuids": []uuid.UUID{drive.Uuid},
 				}, nil)
 				if err != nil {
-					log.Error().Err(err)
+					logger.Error().Err(err)
 					response.AddTransientError(err, "deactivateDrive")
 				}
 			}
@@ -422,7 +428,7 @@ func ScaleDown(info protocol.HostGroupInfoResponse) (response protocol.ScaleResp
 			"skip_resource_validation": false,
 		}, nil)
 		if err != nil {
-			log.Error().Err(err)
+			logger.Error().Err(err)
 			response.AddTransientError(err, "deactivateHost")
 		} else {
 			jpool.Drop(host.HostIp)
@@ -456,28 +462,31 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	resData := make(map[string]interface{})
 	var invokeRequest common.InvokeRequest
 
+	ctx := r.Context()
+	logger := common.LoggerFromCtx(ctx)
+
 	d := json.NewDecoder(r.Body)
 	err := d.Decode(&invokeRequest)
 	if err != nil {
-		log.Error().Msg("Bad request")
+		logger.Error().Msg("Bad request")
 		return
 	}
 
 	var reqData map[string]interface{}
 	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
 	if err != nil {
-		log.Error().Msg("Bad request")
+		logger.Error().Msg("Bad request")
 		return
 	}
 
 	var info protocol.HostGroupInfoResponse
 
 	if json.Unmarshal([]byte(reqData["Body"].(string)), &info) != nil {
-		log.Error().Msg("Bad request")
+		logger.Error().Msg("Bad request")
 		return
 	}
 
-	scaleResponse, err := ScaleDown(info)
+	scaleResponse, err := ScaleDown(ctx, info)
 	if err != nil {
 		resData["body"] = err.Error()
 	} else {

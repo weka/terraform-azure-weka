@@ -3,7 +3,6 @@ package join_finalization
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"net/http"
 	"os"
 	"weka-deployment/common"
@@ -19,24 +18,27 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	var invokeRequest common.InvokeRequest
 
+	ctx := r.Context()
+	logger := common.LoggerFromCtx(ctx)
+
 	d := json.NewDecoder(r.Body)
 	err := d.Decode(&invokeRequest)
 	if err != nil {
-		log.Error().Msg("Bad request")
+		logger.Error().Msg("Bad request")
 		return
 	}
 
 	var reqData map[string]interface{}
 	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
 	if err != nil {
-		log.Error().Msg("Bad request")
+		logger.Error().Msg("Bad request")
 		return
 	}
 
 	var data RequestBody
 
 	if json.Unmarshal([]byte(reqData["Body"].(string)), &data) != nil {
-		log.Error().Msg("Bad request")
+		logger.Error().Msg("Bad request")
 		return
 	}
 
@@ -46,7 +48,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	clusterName := os.Getenv("CLUSTER_NAME")
 	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
 
-	err = common.SetDeletionProtection(subscriptionId, resourceGroupName, vmScaleSetName, data.Name, true)
+	err = common.SetDeletionProtection(ctx, subscriptionId, resourceGroupName, vmScaleSetName, data.Name, true)
 	if err != nil {
 		resData["body"] = err.Error()
 	} else {

@@ -1,16 +1,17 @@
 package terminate
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute"
-	"github.com/rs/zerolog/log"
 	"net/http"
 	"os"
 	"time"
 	"weka-deployment/common"
 	"weka-deployment/protocol"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute"
 )
 
 type instancesMap map[string]*armcompute.VirtualMachineScaleSetVM
@@ -23,9 +24,10 @@ func instancesToMap(instances []*armcompute.VirtualMachineScaleSetVM) instancesM
 	return im
 }
 
-func getDeltaInstancesIds(subscriptionId, resourceGroupName, vmScaleSetName string, asgInstanceIds []string, scaleResponse protocol.ScaleResponse) (deltaInstanceIDs []string, err error) {
-	log.Info().Msg("Getting delta instances")
-	netInterfaces, err := common.GetScaleSetVmsNetworkInterfaces(subscriptionId, resourceGroupName, vmScaleSetName)
+func getDeltaInstancesIds(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, asgInstanceIds []string, scaleResponse protocol.ScaleResponse) (deltaInstanceIDs []string, err error) {
+	logger := common.LoggerFromCtx(ctx)
+	logger.Info().Msg("Getting delta instances")
+	netInterfaces, err := common.GetScaleSetVmsNetworkInterfaces(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
 		return
 	}
@@ -40,12 +42,12 @@ func getDeltaInstancesIds(subscriptionId, resourceGroupName, vmScaleSetName stri
 	instanceIdsSet := common.GetInstanceIdsSet(scaleResponse)
 
 	for _, id := range asgInstanceIds {
-		log.Info().Msgf("Checking machine id:%s", id)
+		logger.Info().Msgf("Checking machine id:%s", id)
 		if _, ok := instanceIdsSet[id]; !ok {
 			deltaInstanceIDs = append(deltaInstanceIDs, id)
 		}
 	}
-	log.Info().Msgf("Delta instances%s", deltaInstanceIDs)
+	logger.Info().Msgf("Delta instances%s", deltaInstanceIDs)
 	return
 }
 
@@ -58,7 +60,7 @@ func setForExplicitRemoval(instance *armcompute.VirtualMachineScaleSetVM, toRemo
 	return false
 }
 
-func terminateUnneededInstances(subscriptionId, resourceGroupName, vmScaleSetName string, instances []*armcompute.VirtualMachineScaleSetVM, explicitRemoval []protocol.HgInstance) (terminated []*armcompute.VirtualMachineScaleSetVM, errs []error) {
+func terminateUnneededInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, instances []*armcompute.VirtualMachineScaleSetVM, explicitRemoval []protocol.HgInstance) (terminated []*armcompute.VirtualMachineScaleSetVM, errs []error) {
 	terminateInstanceIds := make([]string, 0, 0)
 	imap := instancesToMap(instances)
 
@@ -77,7 +79,7 @@ func terminateUnneededInstances(subscriptionId, resourceGroupName, vmScaleSetNam
 		}
 	}
 
-	terminatedInstances, errs := common.TerminateSclaeSetInstances(subscriptionId, resourceGroupName, vmScaleSetName, terminateInstanceIds)
+	terminatedInstances, errs := common.TerminateSclaeSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, terminateInstanceIds)
 
 	for _, id := range terminatedInstances {
 		terminated = append(terminated, imap[id])
@@ -85,11 +87,12 @@ func terminateUnneededInstances(subscriptionId, resourceGroupName, vmScaleSetNam
 	return
 }
 
-func terminateUnhealthyInstances(subscriptionId, resourceGroupName, vmScaleSetName string) (errs []error) {
+func terminateUnhealthyInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (errs []error) {
+	logger := common.LoggerFromCtx(ctx)
 	var toTerminate []string
 
 	expand := "instanceView"
-	vms, err := common.GetScaleSetInstances(subscriptionId, resourceGroupName, vmScaleSetName, &expand)
+	vms, err := common.GetScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, &expand)
 	if err != nil {
 		errs = append(errs, err)
 		return
@@ -97,11 +100,11 @@ func terminateUnhealthyInstances(subscriptionId, resourceGroupName, vmScaleSetNa
 
 	for _, vm := range vms {
 		healthStatus := *vm.Properties.InstanceView.VMHealth.Status.Code
-		log.Info().Msgf("handling instance %s(%s)", *vm.Name, healthStatus)
+		logger.Info().Msgf("handling instance %s(%s)", *vm.Name, healthStatus)
 		if healthStatus == "UNHEALTHY" {
 			statuses := vm.Properties.InstanceView.Statuses
 			status := *statuses[len(statuses)-1].Code
-			log.Debug().Msgf("instance state: %s", status)
+			logger.Debug().Msgf("instance state: %s", status)
 			if status == "STOPPED" {
 				toTerminate = append(toTerminate, common.GetScaleSetVmId(*vm.ID))
 			}
@@ -109,14 +112,16 @@ func terminateUnhealthyInstances(subscriptionId, resourceGroupName, vmScaleSetNa
 		}
 	}
 
-	log.Debug().Msgf("found %d stopped instances", len(toTerminate))
-	_, terminateErrors := common.TerminateSclaeSetInstances(subscriptionId, resourceGroupName, vmScaleSetName, toTerminate)
+	logger.Debug().Msgf("found %d stopped instances", len(toTerminate))
+	_, terminateErrors := common.TerminateSclaeSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, toTerminate)
 	errs = append(errs, terminateErrors...)
 
 	return
 }
 
-func Terminate(scaleResponse protocol.ScaleResponse, subscriptionId, resourceGroupName, vmScaleSetName string) (response protocol.TerminatedInstancesResponse, err error) {
+func Terminate(ctx context.Context, scaleResponse protocol.ScaleResponse, subscriptionId, resourceGroupName, vmScaleSetName string) (response protocol.TerminatedInstancesResponse, err error) {
+	logger := common.LoggerFromCtx(ctx)
+
 	response.Version = protocol.Version
 
 	if scaleResponse.Version != protocol.Version {
@@ -135,36 +140,36 @@ func Terminate(scaleResponse protocol.ScaleResponse, subscriptionId, resourceGro
 
 	response.TransientErrors = scaleResponse.TransientErrors[0:len(scaleResponse.TransientErrors):len(scaleResponse.TransientErrors)]
 
-	asgInstanceIds, err := common.GetScaleSetInstanceIds(subscriptionId, resourceGroupName, vmScaleSetName)
-	log.Info().Msgf("Found %d instances on ASG", len(asgInstanceIds))
+	asgInstanceIds, err := common.GetScaleSetInstanceIds(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	logger.Info().Msgf("Found %d instances on ASG", len(asgInstanceIds))
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		logger.Error().Msgf("%s", err)
 		return
 	}
 
-	errs := terminateUnhealthyInstances(subscriptionId, resourceGroupName, vmScaleSetName)
+	errs := terminateUnhealthyInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 	if len(errs) != 0 {
 		response.AddTransientErrors(errs)
 	}
 
-	deltaInstanceIds, err := getDeltaInstancesIds(subscriptionId, resourceGroupName, vmScaleSetName, asgInstanceIds, scaleResponse)
+	deltaInstanceIds, err := getDeltaInstancesIds(ctx, subscriptionId, resourceGroupName, vmScaleSetName, asgInstanceIds, scaleResponse)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		logger.Error().Msgf("%s", err)
 		return
 	}
 
 	if len(deltaInstanceIds) == 0 {
-		log.Info().Msgf("No delta instances ids")
+		logger.Info().Msgf("No delta instances ids")
 		return
 	}
 
-	candidatesToTerminate, err := common.GetSpecificScaleSetInstances(subscriptionId, resourceGroupName, vmScaleSetName, deltaInstanceIds)
+	candidatesToTerminate, err := common.GetSpecificScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, deltaInstanceIds)
 	if err != nil {
-		log.Error().Msgf("%s", err)
+		logger.Error().Msgf("%s", err)
 		return
 	}
 
-	terminatedInstances, errs := terminateUnneededInstances(subscriptionId, resourceGroupName, vmScaleSetName, candidatesToTerminate, scaleResponse.ToTerminate)
+	terminatedInstances, errs := terminateUnneededInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, candidatesToTerminate, scaleResponse.ToTerminate)
 	response.AddTransientErrors(errs)
 
 	for _, instance := range terminatedInstances {
@@ -183,6 +188,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	prefix := os.Getenv("PREFIX")
 	clusterName := os.Getenv("CLUSTER_NAME")
 
+	ctx := r.Context()
+	logger := common.LoggerFromCtx(ctx)
+
 	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
 
 	outputs := make(map[string]interface{})
@@ -192,25 +200,25 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	d := json.NewDecoder(r.Body)
 	err := d.Decode(&invokeRequest)
 	if err != nil {
-		log.Error().Msg("Bad request")
+		logger.Error().Msg("Bad request")
 		return
 	}
 
 	var reqData map[string]interface{}
 	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
 	if err != nil {
-		log.Error().Msg("Bad request")
+		logger.Error().Msg("Bad request")
 		return
 	}
 
 	var scaleResponse protocol.ScaleResponse
 
 	if json.Unmarshal([]byte(reqData["Body"].(string)), &scaleResponse) != nil {
-		log.Error().Msg("Bad request")
+		logger.Error().Msg("Bad request")
 		return
 	}
 
-	terminateResponse, err := Terminate(scaleResponse, subscriptionId, resourceGroupName, vmScaleSetName)
+	terminateResponse, err := Terminate(ctx, scaleResponse, subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
 		resData["body"] = err.Error()
 	} else {
