@@ -3,7 +3,6 @@ package status
 import (
 	"context"
 	"encoding/json"
-	"github.com/rs/zerolog/log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -74,9 +73,11 @@ type WekaStatus struct {
 	Licensing              ClusterLicensing  `json:"licensing"`
 }
 
-func GetClusterStatus(subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, keyVaultUri string) (clusterStatus ClusterStatus, err error) {
-	log.Info().Msg("fetching cluster status...")
-	state, err := common.ReadState(stateStorageName, stateContainerName)
+func GetClusterStatus(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, keyVaultUri string) (clusterStatus ClusterStatus, err error) {
+	logger := common.LoggerFromCtx(ctx)
+	logger.Info().Msg("fetching cluster status...")
+
+	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
 	if err != nil {
 		return
 	}
@@ -88,17 +89,16 @@ func GetClusterStatus(subscriptionId, resourceGroupName, vmScaleSetName, stateSt
 		return
 	}
 
-	wekaPassword, err := common.GetWekaClusterPassword(keyVaultUri)
+	wekaPassword, err := common.GetWekaClusterPassword(ctx, keyVaultUri)
 	if err != nil {
 		return
 	}
 
-	ctx := context.Background()
 	jrpcBuilder := func(ip string) *jrpc.BaseClient {
 		return connectors.NewJrpcClient(ctx, ip, weka.ManagementJrpcPort, "admin", wekaPassword)
 	}
 
-	vmIps, err := common.GetVmsPrivateIps(subscriptionId, resourceGroupName, vmScaleSetName)
+	vmIps, err := common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
 		return
 	}
@@ -108,7 +108,7 @@ func GetClusterStatus(subscriptionId, resourceGroupName, vmScaleSetName, stateSt
 	}
 	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(ips), func(i, j int) { ips[i], ips[j] = ips[j], ips[i] })
-	log.Info().Msgf("ips: %s", ips)
+	logger.Info().Msgf("ips: %s", ips)
 	jpool := &jrpc.Pool{
 		Ips:     ips,
 		Clients: map[string]*jrpc.BaseClient{},
@@ -145,8 +145,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	clusterName := os.Getenv("CLUSTER_NAME")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 
+	ctx := r.Context()
+
 	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName)
-	clusterStatus, err := GetClusterStatus(subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, keyVaultUri)
+	clusterStatus, err := GetClusterStatus(ctx, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, keyVaultUri)
 
 	if err != nil {
 		resData["body"] = err.Error()

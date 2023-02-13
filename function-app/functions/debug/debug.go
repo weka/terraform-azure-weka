@@ -36,7 +36,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
 
-	state, err := common.ReadState(stateStorageName, stateContainerName)
+	ctx := r.Context()
+
+	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
 	var clusterizeScript string
 	if err != nil {
 		clusterizeScript = clusterize.GetErrorScript(err)
@@ -70,7 +72,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 				AccessKey:     obsAccessKey,
 			},
 		}
-		clusterizeScript = clusterize.HandleLastClusterVm(state, params)
+		clusterizeScript = clusterize.HandleLastClusterVm(ctx, state, params)
 	}
 
 	resData["body"] = clusterizeScript

@@ -1,6 +1,7 @@
 package fetch
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -32,8 +33,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
 
+	ctx := r.Context()
+
 	response, err := getScaleSetInfoResponse(
-		subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName, keyVaultUri,
+		ctx, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName, keyVaultUri,
 	)
 	if err != nil {
 		resData["body"] = err.Error()
@@ -51,19 +54,19 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getScaleSetInfoResponse(
-	subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName, keyVaultUri string,
+	ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName, keyVaultUri string,
 ) (scaleSetInfoResponse ScaleSetInfoResponse, err error) {
-	instances, err := common.GetScaleSetInstancesInfo(subscriptionId, resourceGroupName, vmScaleSetName)
+	instances, err := common.GetScaleSetInstancesInfo(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
 		return
 	}
 
-	scaleSetInfo, err := common.GetScaleSetInfo(subscriptionId, resourceGroupName, vmScaleSetName, keyVaultUri)
+	scaleSetInfo, err := common.GetScaleSetInfo(ctx, subscriptionId, resourceGroupName, vmScaleSetName, keyVaultUri)
 	if err != nil {
 		return
 	}
 
-	desiredCapacity, err := getCapacity(stateStorageName, stateContainerName)
+	desiredCapacity, err := getCapacity(ctx, stateStorageName, stateContainerName)
 	if err != nil {
 		return
 	}
@@ -87,8 +90,8 @@ func getBackendIps(instances []common.ScaleSetInstanceInfo) (ips []string) {
 	return
 }
 
-func getCapacity(stateStorageName string, stateContainerName string) (desired int, err error) {
-	state, err := common.ReadState(stateStorageName, stateContainerName)
+func getCapacity(ctx context.Context, stateStorageName string, stateContainerName string) (desired int, err error) {
+	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
 	if err != nil {
 		return
 	}
