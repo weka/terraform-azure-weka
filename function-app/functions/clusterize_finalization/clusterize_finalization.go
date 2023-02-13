@@ -16,7 +16,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 
-	state, err := common.UpdateClusterized(subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
+	ctx := r.Context()
+
+	state, err := common.UpdateClusterized(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
 	if err != nil {
 		resData["body"] = err.Error()
 	} else {

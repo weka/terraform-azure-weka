@@ -1,8 +1,17 @@
-resource "azurerm_application_insights" "application_insights" {
-  name = "${var.prefix}-${var.cluster_name}-application-insights"
-  location= data.azurerm_resource_group.rg.location
+resource "azurerm_log_analytics_workspace" "la_workspace" {
+  name                = "${var.prefix}-${var.cluster_name}-workspace"
+  location            = data.azurerm_resource_group.rg.location
   resource_group_name = data.azurerm_resource_group.rg.name
-  application_type = "web"
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+}
+
+resource "azurerm_application_insights" "application_insights" {
+  name                = "${var.prefix}-${var.cluster_name}-application-insights"
+  location            = data.azurerm_resource_group.rg.location
+  resource_group_name = data.azurerm_resource_group.rg.name
+  workspace_id        = azurerm_log_analytics_workspace.la_workspace.id
+  application_type    = "web"
 }
 
 resource "azurerm_service_plan" "app_service_plan" {
@@ -96,6 +105,7 @@ resource "azurerm_linux_function_app" "function_app" {
     "SUBNET" = var.subnets[0]
     "INSTANCE_TYPE" = var.instance_type
     "INSTALL_URL" =  var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.weka.io/dist/v1/install/${var.weka_version}/${var.weka_version}"
+    "LOG_LEVEL" = var.function_app_log_level
 
     https_only = true
     FUNCTIONS_WORKER_RUNTIME = "custom"
