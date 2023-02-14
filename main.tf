@@ -98,15 +98,6 @@ resource "azurerm_network_interface" "primary-nic" {
   depends_on = [azurerm_public_ip.vm-ip]
 }
 
-resource "azurerm_availability_set" "availability_set" {
-  name                         = "${var.prefix}-${var.cluster_name}-backend-availability-set"
-  location                     = data.azurerm_resource_group.rg.location
-  resource_group_name          = var.rg_name
-  proximity_placement_group_id = azurerm_proximity_placement_group.ppg.id
-  tags                         = merge(var.tags_map, {"weka_cluster": var.cluster_name})
-  depends_on                   = [azurerm_proximity_placement_group.ppg]
-}
-
 resource "azurerm_network_interface_security_group_association" "sg-association" {
   count                     = var.cluster_size
   network_interface_id      = azurerm_network_interface.primary-nic[count.index].id
@@ -154,7 +145,6 @@ resource "azurerm_linux_virtual_machine" "vm" {
   resource_group_name              = var.rg_name
   network_interface_ids            = [azurerm_network_interface.primary-nic[count.index].id]
   size                             = var.instance_type
-  availability_set_id              = azurerm_availability_set.availability_set.id
   proximity_placement_group_id     = azurerm_proximity_placement_group.ppg.id
   source_image_reference {
     offer     = lookup(var.linux_vm_image, "offer", null)
