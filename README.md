@@ -10,7 +10,7 @@ Applying the Terraform variables file performs the following:
 ## Usage
 ```hcl
 module "deploy-weka" {
-   source                = "../.."
+   source                = "weka/weka/azure"
    prefix                = "weka"
    rg_name               = "myResourceGroup"
    vnet_name             = "weka-vpc-0"
