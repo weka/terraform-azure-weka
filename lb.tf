@@ -101,16 +101,6 @@ resource "azurerm_lb_backend_address_pool_address" "backend_lb_backend_address_p
 }
 
 # ================== Private DNS  records ========================= #
-resource "azurerm_private_dns_a_record" "dns_a_record_ui_lb" {
-  name                = lower("${var.cluster_name}-ui-check")
-  zone_name           = var.private_dns_zone_name
-  resource_group_name = var.rg_name
-  ttl                 = 300
-  records             = local.private_ips_list
-  tags                = merge(var.tags_map, {"weka_cluster": var.cluster_name})
-  depends_on          = [azurerm_lb.ui_lb]
-}
-
 resource "azurerm_private_dns_a_record" "dns_a_record_backend_lb" {
   name                = lower("${var.cluster_name}-backend")
   zone_name           = var.private_dns_zone_name
