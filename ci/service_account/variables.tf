@@ -23,6 +23,12 @@ variable "azure_role_description" {
   default     = null
 }
 
+variable "subscription_id" {
+  description = "Subscription ID from Azure"
+  default     = null
+}
+
+
 variable "assignments" {
   description = "The list of role assignments to this service principal"
   type        = list(object({
@@ -31,7 +37,7 @@ variable "assignments" {
   }))
   default = [
     {
-      scope                = "/subscriptions/d2f248b9-d054-477f-b7e8-413921532c2a"
+      scope                = "/subscriptions/subscription_id"
       role_definition_name = "Owner"
     },
   ]
