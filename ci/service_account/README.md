@@ -35,12 +35,13 @@ No modules.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_assignments"></a> [assignments](#input\_assignments) | The list of role assignments to this service principal | <pre>list(object({<br>    scope                = string<br>    role_definition_name = string<br>  }))</pre> | <pre>[<br>  {<br>    "role_definition_name": "Owner",<br>    "scope": "/subscriptions/d2f248b9-d054-477f-b7e8-413921532c2a"<br>  }<br>]</pre> | no |
+| <a name="input_assignments"></a> [assignments](#input\_assignments) | The list of role assignments to this service principal | <pre>list(object({<br>    scope                = string<br>    role_definition_name = string<br>  }))</pre> | <pre>[<br>  {<br>    "role_definition_name": "Owner",<br>    "scope": "/subscriptions/subscription_id"<br>  }<br>]</pre> | no |
 | <a name="input_azure_role_description"></a> [azure\_role\_description](#input\_azure\_role\_description) | The description for this Role Assignment | `any` | `null` | no |
 | <a name="input_azure_role_name"></a> [azure\_role\_name](#input\_azure\_role\_name) | A unique UUID/GUID for this Role Assignment - one will be generated if not specified. | `any` | `null` | no |
 | <a name="input_description"></a> [description](#input\_description) | Description of the service principal | `string` | `"Github CI user"` | no |
 | <a name="input_role_definition_name"></a> [role\_definition\_name](#input\_role\_definition\_name) | built-in role for the service principal | `any` | `null` | no |
 | <a name="input_service_principal_name"></a> [service\_principal\_name](#input\_service\_principal\_name) | Name of the service principal | `string` | `"CIUser"` | no |
+| <a name="input_subscription_id"></a> [subscription\_id](#input\_subscription\_id) | Subscription ID from Azure | `any` | `null` | no |
 
 ## Outputs
 
