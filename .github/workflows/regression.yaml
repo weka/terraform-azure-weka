@@ -1,0 +1,81 @@
+name: 'QA workflow'
+
+on: [workflow_dispatch]
+
+env:
+  RG_NAME: weka-qa
+  PREFIX: at
+  CLUSTER_NAME: wekacluster
+  GET_WEKA_IO_TOKEN: ${{ secrets.GET_WEKA_IO_TOKEN }}
+  SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
+  CLIENT_ID: ${{ secrets.CLIENT_ID }}
+  TENANT_ID: ${{ secrets.TENANT_ID }}
+  CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+
+jobs:
+  build:
+    name: Regression test run
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./qa
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - id: auth
+        name: Authenticate to Azure Cloud
+        uses: azure/login@v1
+        with:
+          creds: ${{secrets.AZURE_CREDENTIALS}}
+
+      - name: Create Azure resource group
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az group create --name $RG_NAME --location eastus
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '>=1.19'
+
+      - name: Copy override provider to example folder
+        run: cp "../ci/deployment/override.tf" ../examples/public_network
+
+      - name: Add additional variables
+        run: cat ../ci/deployment/additional_variables.tf >> ../examples/public_network/variables.tf
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Test with pytest
+        run: |
+            pytest -m regression -o log_cli=true --rg_name=$RG_NAME --prefix=$PREFIX --cluster_name=$CLUSTER_NAME --get_weka_io_token=$GET_WEKA_IO_TOKEN --subscription_id=$SUBSCRIPTION_ID --client_id=$CLIENT_ID --tenant_id=$TENANT_ID --client_secret=$CLIENT_SECRET
+
+      - name: Delete Azure resource group
+        if: always()
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az group delete --name $RG_NAME --yes
+
+      - name: Logout from Azure Cloud
+        if: always()
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az logout
+            az cache purge
+            az account clear
