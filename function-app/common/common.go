@@ -13,10 +13,12 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
 
@@ -433,6 +435,111 @@ func UpdateVmScaleSetNum(subscriptionId, resourceGroupName, vmScaleSetName strin
 	return
 }
 
+func GetRoleDefinitionByRoleName(ctx context.Context, roleName, scope string) (*armauthorization.RoleDefinition, error) {
+	cred, err := azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		log.Error().Err(err).Send()
+		return nil, err
+	}
+
+	client, err := armauthorization.NewRoleDefinitionsClient(cred, nil)
+	if err != nil {
+		log.Error().Err(err).Send()
+		return nil, err
+	}
+
+	var results []*armauthorization.RoleDefinition
+	filter := fmt.Sprintf("roleName eq '%s'", roleName)
+
+	pager := client.NewListPager("/", &armauthorization.RoleDefinitionsClientListOptions{Filter: &filter})
+	for pager.More() {
+		nextResult, err := pager.NextPage(ctx)
+		if err != nil {
+			log.Error().Err(err).Send()
+			return nil, err
+		}
+		results = append(results, nextResult.Value...)
+	}
+
+	// filter the needed role out of all built-in ones
+	var roleDefs []*armauthorization.RoleDefinition
+	for _, res := range results {
+		if *res.Properties.RoleName == roleName {
+			roleDefs = append(roleDefs, res)
+		}
+	}
+
+	if len(roleDefs) < 1 {
+		err := fmt.Errorf("cannot find az role definition with name '%s'", roleName)
+		log.Error().Err(err).Send()
+		return nil, err
+	}
+	if len(roleDefs) > 1 {
+		err := fmt.Errorf("found several az role definitions with name '%s', check the name", roleName)
+		log.Error().Err(err).Send()
+		return nil, err
+	}
+	return roleDefs[0], nil
+}
+
+func AssignStorageBlobDataContributorRoleToScaleSet(
+	ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, storageAccountName, containerName string,
+) (*armauthorization.RoleAssignment, error) {
+	cred, err := azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		log.Error().Err(err).Send()
+		return nil, err
+	}
+
+	client, err := armauthorization.NewRoleAssignmentsClient(subscriptionId, cred, nil)
+	if err != nil {
+		log.Error().Err(err).Send()
+		return nil, err
+	}
+
+	scaleSet, err := getScaleSet(subscriptionId, resourceGroupName, vmScaleSetName)
+	if err != nil {
+		log.Error().Err(err).Send()
+		return nil, err
+	}
+
+	scope := fmt.Sprintf(
+		"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s/blobServices/default/containers/%s",
+		subscriptionId,
+		resourceGroupName,
+		storageAccountName,
+		containerName,
+	)
+
+	roleDefinition, err := GetRoleDefinitionByRoleName(ctx, "Storage Blob Data Contributor", scope)
+	if err != nil {
+		err = fmt.Errorf("cannot get the role definition: %v", err)
+		log.Error().Err(err).Send()
+		return nil, err
+	}
+
+	// see https://learn.microsoft.com/en-us/rest/api/authorization/role-assignments/create
+	res, err := client.Create(
+		ctx,
+		scope,
+		uuid.New().String(), // az docs say it should be GUID
+		armauthorization.RoleAssignmentCreateParameters{
+			Properties: &armauthorization.RoleAssignmentProperties{
+				RoleDefinitionID: roleDefinition.ID,
+				PrincipalID:      scaleSet.Identity.PrincipalID,
+			},
+		},
+		nil,
+	)
+	if err != nil {
+		err = fmt.Errorf("cannot create the role assignment: %v", err)
+		log.Error().Err(err).Send()
+		return nil, err
+	}
+
+	return &res.RoleAssignment, nil
+}
+
 type ScaleSetInfo struct {
 	Id            string
 	Name          string
@@ -442,9 +549,7 @@ type ScaleSetInfo struct {
 	VMSize        string
 }
 
-// Gets single scale set info
-// see https://learn.microsoft.com/en-us/rest/api/compute/virtual-machine-scale-sets/get
-func GetScaleSetInfo(subscriptionId, resourceGroupName, vmScaleSetName string, keyVaultUri string) (*ScaleSetInfo, error) {
+func getScaleSet(subscriptionId, resourceGroupName, vmScaleSetName string) (*armcompute.VirtualMachineScaleSet, error) {
 	ctx := context.Background()
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
@@ -459,6 +564,17 @@ func GetScaleSetInfo(subscriptionId, resourceGroupName, vmScaleSetName string, k
 	}
 
 	scaleSet, err := client.Get(ctx, resourceGroupName, vmScaleSetName, nil)
+	if err != nil {
+		log.Error().Err(err).Send()
+		return nil, err
+	}
+	return &scaleSet.VirtualMachineScaleSet, nil
+}
+
+// Gets single scale set info
+// see https://learn.microsoft.com/en-us/rest/api/compute/virtual-machine-scale-sets/get
+func GetScaleSetInfo(subscriptionId, resourceGroupName, vmScaleSetName, keyVaultUri string) (*ScaleSetInfo, error) {
+	scaleSet, err := getScaleSet(subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
 		log.Error().Err(err).Send()
 		return nil, err
