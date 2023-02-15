@@ -1,6 +1,7 @@
 package clusterize
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -179,6 +180,15 @@ func HandleLastClusterVm(state common.ClusterState, p ClusterizationParams) (clu
 		}
 	}
 
+	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.Name)
+	_, err = common.AssignStorageBlobDataContributorRoleToScaleSet(
+		context.TODO(), p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, p.Obs.Name, p.Obs.ContainerName,
+	)
+	if err != nil {
+		clusterizeScript = GetErrorScript(err)
+		return
+	}
+
 	functionAppKey, err := common.GetKeyVaultValue(p.KeyVaultUri, "function-app-default-key")
 	if err != nil {
 		clusterizeScript = GetErrorScript(err)
@@ -191,7 +201,6 @@ func HandleLastClusterVm(state common.ClusterState, p ClusterizationParams) (clu
 		return
 	}
 
-	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.Name)
 	vmsPrivateIps, err := common.GetVmsPrivateIps(p.SubscriptionId, p.ResourceGroupName, vmScaleSetName)
 	if err != nil {
 		clusterizeScript = GetErrorScript(err)

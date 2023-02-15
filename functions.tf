@@ -157,6 +157,13 @@ resource "azurerm_role_assignment" "function-app-key-vault-secrets-user" {
   depends_on           = [azurerm_linux_function_app.function_app]
 }
 
+resource "azurerm_role_assignment" "function-app-key-user-access-admin" {
+  scope                = data.azurerm_resource_group.rg.id
+  role_definition_name = "User Access Administrator"
+  principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
+  depends_on           = [azurerm_linux_function_app.function_app]
+}
+
 resource "azurerm_role_assignment" "function-app-reader" {
   scope                = data.azurerm_resource_group.rg.id
   role_definition_name = "Reader"
