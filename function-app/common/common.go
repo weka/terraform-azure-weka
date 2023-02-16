@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -173,6 +172,14 @@ func getBlobUrl(storageName string) string {
 	return fmt.Sprintf("https://%s.blob.core.windows.net/", storageName)
 }
 
+type ShutdownRequired struct {
+	Message string
+}
+
+func (e *ShutdownRequired) Error() string {
+	return e.Message
+}
+
 func AddInstanceToState(subscriptionId, resourceGroupName, stateStorageName, stateContainerName, newInstance string) (state ClusterState, err error) {
 	leaseId, err := LockContainer(subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
 	if err != nil {
@@ -185,7 +192,16 @@ func AddInstanceToState(subscriptionId, resourceGroupName, stateStorageName, sta
 	}
 
 	if len(state.Instances) >= state.InitialSize {
-		err = errors.New("cluster size is already satisfied")
+		message := "cluster size is already satisfied"
+		err = &ShutdownRequired{
+			Message: message,
+		}
+		log.Error().Err(err).Send()
+	} else if state.Clusterized {
+		err = &ShutdownRequired{
+			Message: "cluster is already clusterized",
+		}
+		log.Error().Err(err).Send()
 	} else {
 		state.Instances = append(state.Instances, newInstance)
 		err = WriteState(stateStorageName, stateContainerName, state)
