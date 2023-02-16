@@ -160,6 +160,13 @@ exit 1
 	`, err.Error())
 }
 
+func GetShutdownScript() string {
+	return fmt.Sprintf(`
+#!/bin/bash
+shutdown now
+`)
+}
+
 func HandleLastClusterVm(state common.ClusterState, p ClusterizationParams) (clusterizeScript string) {
 	log.Info().Msg("This is the last instance in the cluster, creating obs and clusterization script")
 
@@ -228,12 +235,17 @@ func Clusterize(p ClusterizationParams) (clusterizeScript string) {
 	)
 
 	if err != nil {
-		clusterizeScript = GetErrorScript(err)
+		if _, ok := err.(*common.ShutdownRequired); ok {
+			clusterizeScript = GetShutdownScript()
+		} else {
+			clusterizeScript = GetErrorScript(err)
+		}
 		return
 	}
 
 	initialSize, err := strconv.Atoi(p.Cluster.HostsNum)
 	if err != nil {
+		clusterizeScript = GetErrorScript(err)
 		return
 	}
 
@@ -241,6 +253,7 @@ func Clusterize(p ClusterizationParams) (clusterizeScript string) {
 	instanceName := strings.Split(p.Cluster.VmName, ":")[0]
 	err = common.SetDeletionProtection(p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, instanceName, true)
 	if err != nil {
+		clusterizeScript = GetErrorScript(err)
 		return
 	}
 
