@@ -60,10 +60,10 @@ resource "azurerm_linux_function_app" "function_app" {
   resource_group_name        = data.azurerm_resource_group.rg.name
   location                   = data.azurerm_resource_group.rg.location
   service_plan_id            = azurerm_service_plan.app_service_plan.id
-
   storage_account_name       = azurerm_storage_account.deployment_sa.name
   storage_account_access_key = azurerm_storage_account.deployment_sa.primary_access_key
   https_only                 = true
+  virtual_network_subnet_id  = var.subnet_delegation_id
   site_config {
     vnet_route_all_enabled = true
   }
@@ -175,10 +175,4 @@ resource "azurerm_role_assignment" "function-app-scale-set-machine-owner" {
   role_definition_name = "Owner"
   principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
   depends_on           = [azurerm_linux_function_app.function_app]
-}
-
-resource "azurerm_app_service_virtual_network_swift_connection" "swift_connection" {
-  app_service_id = azurerm_linux_function_app.function_app.id
-  subnet_id      = var.subnet_delegation_id
-  depends_on     = [azurerm_linux_function_app.function_app]
 }
