@@ -3,7 +3,7 @@ name: 'Terraform CI'
 on:
   push:
     branches:
-      - main
+      - add-autoscaling-support
   pull_request:
 
 concurrency: ci
@@ -17,6 +17,10 @@ env:
   CLIENT_ID: ${{ secrets.CLIENT_ID }}
   TENANT_ID: ${{ secrets.TENANT_ID }}
   CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+  INITIAL_CAPACITY: 6
+  INITIALIZATION_TIMEOUT: 30
+  NEW_CAPACITY: 7
+  SCALE_UP_TIMEOUT: 17
 
 jobs:
   terraform:
@@ -60,15 +64,27 @@ jobs:
         run: terraform init
 
       - name: Terraform Apply
-        run: terraform apply -var-file vars.auto.tfvars -var="rg_name=$RG_NAME" -var="prefix=$PREFIX" -var="cluster_name=$CLUSTER_NAME" -var="get_weka_io_token=$GET_WEKA_IO_TOKEN" -var="client_id=$CLIENT_ID" -var="tenant_id=$TENANT_ID" -var="client_secret=$CLIENT_SECRET" -var="subscription_id=$SUBSCRIPTION_ID" -auto-approve
+        run: terraform apply -var-file vars.auto.tfvars -var="rg_name=$RG_NAME" -var="prefix=$PREFIX" -var="cluster_name=$CLUSTER_NAME" -var="get_weka_io_token=$GET_WEKA_IO_TOKEN" -var="client_id=$CLIENT_ID" -var="tenant_id=$TENANT_ID" -var="client_secret=$CLIENT_SECRET" -var="subscription_id=$SUBSCRIPTION_ID" -var="cluster_size=$INITIAL_CAPACITY" -auto-approve
 
       - name: Wait for weka cluster
         uses: azure/CLI@v1
         with:
-          azcliversion: 2.30.0
           inlineScript: |
             chmod +x $GITHUB_WORKSPACE/ci/deployment/wait_for_cluster.sh
-            $GITHUB_WORKSPACE/ci/deployment/wait_for_cluster.sh $PREFIX $CLUSTER_NAME $RG_NAME $SUBSCRIPTION_ID 40
+            $GITHUB_WORKSPACE/ci/deployment/wait_for_cluster.sh $PREFIX $CLUSTER_NAME $RG_NAME $SUBSCRIPTION_ID $INITIAL_CAPACITY $INITIALIZATION_TIMEOUT
+
+      - name: Scale up. Increase cluster capacity by 1
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az vmss scale --resource-group $RG_NAME --name $PREFIX-$CLUSTER_NAME-vmss --new-capacity $NEW_CAPACITY
+
+      - name: Wait for scaled up weka cluster
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            chmod +x $GITHUB_WORKSPACE/ci/deployment/wait_for_cluster.sh
+            $GITHUB_WORKSPACE/ci/deployment/wait_for_cluster.sh $PREFIX $CLUSTER_NAME $RG_NAME $SUBSCRIPTION_ID $NEW_CAPACITY $SCALE_UP_TIMEOUT
 
       - name: Terraform Destroy
         if: always()
