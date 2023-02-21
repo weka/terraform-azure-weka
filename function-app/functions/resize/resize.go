@@ -26,40 +26,47 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	var invokeRequest common.InvokeRequest
 
 	var size struct {
-		NewSize *int `json:"new_size"`
+		Value *int `json:"value"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&invokeRequest); err != nil {
-		logger.Error().Msg("Bad request")
+		err = fmt.Errorf("cannot decode the request: %v", err)
+		logger.Error().Err(err).Send()
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	var reqData map[string]interface{}
 	err := json.Unmarshal(invokeRequest.Data["req"], &reqData)
 	if err != nil {
-		logger.Error().Msg("Bad request")
+		err = fmt.Errorf("cannot unmarshal the request data: %v", err)
+		logger.Error().Err(err).Send()
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	if json.Unmarshal([]byte(reqData["Body"].(string)), &size) != nil {
-		logger.Error().Msg("Bad request")
+		err = fmt.Errorf("cannot unmarshal the request body: %v", err)
+		logger.Error().Err(err).Send()
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if size.NewSize == nil {
+	if size.Value == nil {
 		err := fmt.Errorf("wrong request format. 'new_size' is required")
 		logger.Error().Err(err).Send()
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	logger.Info().Msgf("The requested new size is %d", *size.NewSize)
+	logger.Info().Msgf("The requested new size is %d", *size.Value)
 
 	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
 
-	err = updateDesiredClusterSize(ctx, *size.NewSize, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName)
+	err = updateDesiredClusterSize(ctx, *size.Value, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName)
 	if err != nil {
 		resData["body"] = err.Error()
 	} else {
-		resData["body"] = fmt.Sprintf("New cluster size: %d", size.NewSize)
+		resData["body"] = fmt.Sprintf("New cluster size: %d", *size.Value)
 	}
 
 	outputs["res"] = resData
