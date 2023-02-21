@@ -47,7 +47,7 @@ jobs:
             az group create --name $RG_NAME --location eastus
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v1
+        uses: hashicorp/setup-terraform@v2
 
       - name: Setup Go
         uses: actions/setup-go@v3
