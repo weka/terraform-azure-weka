@@ -122,28 +122,13 @@ resource "azurerm_linux_function_app" "function_app" {
   depends_on = [azurerm_storage_account.deployment_sa, azurerm_storage_blob.function_app_code]
 }
 
-# service principal
-
-data "azuread_client_config" "function-app-client-config" {}
-
 data "azurerm_subscription" "primary" {}
 
-resource "azuread_application" "function_app" {
-  display_name = "${var.prefix}-${var.cluster_name}-function-app-sp"
-  owners       = [data.azuread_client_config.function-app-client-config.object_id]
-}
-
-resource "azuread_service_principal" "function-app-principal" {
-  application_id               = azuread_application.function_app.application_id
-  app_role_assignment_required = false
-  owners                       = [data.azuread_client_config.function-app-client-config.object_id]
-}
-
 resource "azurerm_role_assignment" "function-assignment" {
-  scope                = data.azurerm_subscription.primary.id
+  scope                = data.azurerm_resource_group.rg.id
   role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azuread_service_principal.function-app-principal.id
-  depends_on           = [azuread_service_principal.function-app-principal, azuread_application.function_app]
+  principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
+  depends_on           = [azurerm_linux_function_app.function_app]
 }
 
 resource "azurerm_role_assignment" "storage-blob-data-owner" {
