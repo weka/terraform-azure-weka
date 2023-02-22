@@ -5,7 +5,7 @@ cluster_name="$2"
 rg_name="$3"
 subscription_id="$4"
 expected_capacity="$5"
-timeout="$6"
+timeout="$6" # in minutes
 
 # Get the function key
 app_name="${prefix}-${cluster_name}-function-app"
@@ -13,7 +13,7 @@ function_key=$(az functionapp keys list --name $app_name --resource-group $rg_na
 
 
 function validate_status () {
-  response=$(curl https://$app_name.azurewebsites.net/api/status\?code\=$function_key)
+  response=$(curl https://$app_name.azurewebsites.net/api/status\?code\=$function_key --no-progress-meter)
   actual_total=$(echo $response | jq -r '.weka_status.drives.total')
   actual_active=$(echo $response | jq -r '.weka_status.drives.active')
   actual_clusterized=$(echo $response | jq -r '.clusterized')
@@ -26,16 +26,20 @@ function validate_status () {
 }
 
 count=1
-
-while [ "$(validate_status)" != true ] && [ $count -le "$timeout" ]
+sleep 60
+last_status="$(validate_status)"
+while [ "$last_status" != true ] && [ $count -lt "$timeout" ]
 do
-  echo "weka cluster isn't ready yet, going to sleep for 60 s"
+  echo "weka cluster didn't reach expected state after $count minutes, going to sleep for 1 minute"
   sleep 60
-  validate_status
   count=$((count + 1 ))
+  last_status="$(validate_status)"
 done
-if [ $count -gt "$timeout" ]; then
-  echo "weka cluster wasn't ready during $timeout minutes!"
-	exit 1
+
+if [ "$last_status" == true ]; then
+  echo "weka cluster reached expected state after $count minutes!"
+else
+  echo "weka cluster didn't reach expected state during $timeout minutes!"
+  exit 1
 fi
 
