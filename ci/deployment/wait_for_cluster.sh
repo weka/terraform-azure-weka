@@ -13,27 +13,34 @@ function_key=$(az functionapp keys list --name $app_name --resource-group $rg_na
 
 
 function validate_status () {
+  local  __result=$1
   response=$(curl https://$app_name.azurewebsites.net/api/status\?code\=$function_key --no-progress-meter)
-  actual_total=$(echo $response | jq -r '.weka_status.drives.total')
-  actual_active=$(echo $response | jq -r '.weka_status.drives.active')
-  actual_clusterized=$(echo $response | jq -r '.clusterized')
-  if [ "$actual_total" = $expected_capacity ] && [ "$actual_active" = $expected_capacity ] && [ "$actual_clusterized" = true ]
-  then
-    echo true
+  actual_total=$(echo "$response" | jq -r '.weka_status.drives.total')
+  actual_active=$(echo "$response" | jq -r '.weka_status.drives.active')
+  actual_clusterized=$(echo "$response" | jq -r '.clusterized')
+  if [ "$actual_clusterized" != true ]; then
+    echo "Weka clusterization didn't finish"
+    eval "$__result"=false
+  elif [ "$actual_total" != "$expected_capacity" ]; then
+    echo "Weka drive containers total capacity isn't satisfied. actual:$actual_total  expected:$expected_capacity"
+    eval "$__result"=false
+  elif [ "$actual_active" != "$expected_capacity" ]; then
+    echo "Weka drive containers active capacity isn't satisfied. actual:$actual_total  expected:$expected_capacity"
+    eval "$__result"=false
   else
-    echo false
+    eval "$__result"=true
   fi
 }
 
 count=1
 sleep 60
-last_status="$(validate_status)"
+validate_status last_status
 while [ "$last_status" != true ] && [ $count -lt "$timeout" ]
 do
-  echo "weka cluster didn't reach expected state after $count minutes, going to sleep for 1 minute"
+  echo "going to sleep for 1 minute ($count out of $timeout minutes passed)"
   sleep 60
   count=$((count + 1 ))
-  last_status="$(validate_status)"
+  validate_status last_status
 done
 
 if [ "$last_status" == true ]; then
