@@ -129,7 +129,7 @@ data "azuread_client_config" "function-app-client-config" {}
 data "azurerm_subscription" "primary" {}
 
 resource "azuread_application" "function_app" {
-  display_name = "function-app"
+  display_name = "${var.prefix}-${var.cluster_name}-function-app-sp"
   owners       = [data.azuread_client_config.function-app-client-config.object_id]
 }
 
