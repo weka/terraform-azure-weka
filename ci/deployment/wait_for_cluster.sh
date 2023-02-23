@@ -25,7 +25,7 @@ function validate_status () {
     echo "Weka drive containers total capacity isn't satisfied. actual:$actual_total  expected:$expected_capacity"
     eval "$__result"=false
   elif [ "$actual_active" != "$expected_capacity" ]; then
-    echo "Weka drive containers active capacity isn't satisfied. actual:$actual_total  expected:$expected_capacity"
+    echo "Weka drive containers active capacity isn't satisfied. actual:$actual_active  expected:$expected_capacity"
     eval "$__result"=false
   else
     eval "$__result"=true
