@@ -60,9 +60,17 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	logger.Info().Msgf("The requested new size is %d", *size.Value)
 
-	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
+	minCusterSize := 6
+	if *size.Value < minCusterSize {
+		err = fmt.Errorf("invalid size, minimal cluster size is %d", minCusterSize)
+		logger.Error().Err(err).Send()
+	}
 
-	err = updateDesiredClusterSize(ctx, *size.Value, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName)
+	if err == nil {
+		vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
+		err = updateDesiredClusterSize(ctx, *size.Value, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName)
+	}
+
 	if err != nil {
 		resData["body"] = err.Error()
 	} else {
@@ -81,6 +89,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 func updateDesiredClusterSize(ctx context.Context, newSize int, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName string) error {
 	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
 	if err != nil {
+		return err
+	}
+
+	if !state.Clusterized {
+		err = fmt.Errorf("weka cluster is not ready")
+		logger := common.LoggerFromCtx(ctx)
+		logger.Error().Err(err).Send()
 		return err
 	}
 	oldSize := state.DesiredSize
