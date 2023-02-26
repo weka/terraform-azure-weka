@@ -1,0 +1,6 @@
+prefix            = "weka-image"
+location          = "East US"
+subscription_id   = "d2f248b9-d054-477f-b7e8-413921532c2a"
+rg_name           = "weka-tf"
+custom_vm_version = "1.0.1"
+custom_image_name = "weka-custom-image"

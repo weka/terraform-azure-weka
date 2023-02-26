@@ -22,6 +22,9 @@ EOL
 cp -R /home/${user}/.ssh/* /root/.ssh/
 chown -R ${user}:${user} /home/${user}/.ssh/
 
+while fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; do
+   sleep 2
+done
 apt install net-tools -y
 
 # set apt private repo
@@ -34,26 +37,31 @@ INSTALLATION_PATH="/tmp/weka"
 mkdir -p $INSTALLATION_PATH
 
 # install ofed
-curl ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"installing ofed\"}"
-OFED_NAME=ofed-${ofed_version}
-if [[ "${install_ofed_url}" ]]; then
-  wget ${install_ofed_url} -O $INSTALLATION_PATH/$OFED_NAME.tgz
+if [[ "${skip_ofed_installation}" == false ]]; then
+  curl ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"installing ofed\"}"
+  OFED_NAME=ofed-${ofed_version}
+  if [[ "${install_ofed_url}" ]]; then
+    wget ${install_ofed_url} -O $INSTALLATION_PATH/$OFED_NAME.tgz
+  else
+    wget http://content.mellanox.com/ofed/MLNX_OFED-${ofed_version}/MLNX_OFED_LINUX-${ofed_version}-ubuntu18.04-x86_64.tgz -O $INSTALLATION_PATH/$OFED_NAME.tgz
+  fi
+
+  tar xf $INSTALLATION_PATH/$OFED_NAME.tgz --directory $INSTALLATION_PATH --one-top-level=$OFED_NAME
+  cd $INSTALLATION_PATH/$OFED_NAME/*/
+  ./mlnxofedinstall --without-fw-update --add-kernel-support --force 2>&1 | tee /tmp/weka_ofed_installation
+  /etc/init.d/openibd restart
+
+  disk=$(lsblk -o NAME,HCTL,SIZE,MOUNTPOINT | grep "3:0:0:0" | awk '{print $1}')
+  curl ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"ofed installation completed\"}"
 else
-  wget http://content.mellanox.com/ofed/MLNX_OFED-${ofed_version}/MLNX_OFED_LINUX-${ofed_version}-ubuntu18.04-x86_64.tgz -O $INSTALLATION_PATH/$OFED_NAME.tgz
+  curl ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Using custom image no need to install ofed\"}"
+  disk=$(lsblk -o NAME,HCTL,SIZE,MOUNTPOINT | grep "1:0:0:0" | awk '{print $1}')
 fi
-
-tar xf $INSTALLATION_PATH/$OFED_NAME.tgz --directory $INSTALLATION_PATH --one-top-level=$OFED_NAME
-cd $INSTALLATION_PATH/$OFED_NAME/*/
-./mlnxofedinstall --without-fw-update --add-kernel-support --force 2>&1 | tee /tmp/weka_ofed_installation
-/etc/init.d/openibd restart
-
-curl ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"ofed installation completed\"}"
 
 apt update -y
 apt install -y jq
 
 # attache disk
-disk=$(lsblk -o NAME,HCTL,SIZE,MOUNTPOINT | grep "3:0:0:0" | awk '{print $1}')
 wekaiosw_device=/dev/$disk
 
 output=$(mkfs.ext4 -L wekaiosw $wekaiosw_device 2>&1)
