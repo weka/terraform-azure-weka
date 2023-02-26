@@ -173,29 +173,32 @@ func HandleLastClusterVm(ctx context.Context, state common.ClusterState, p Clust
 	logger.Info().Msg("This is the last instance in the cluster, creating obs and clusterization script")
 
 	var err error
-	if p.Obs.SetObs == "true" && p.Obs.AccessKey == "" {
-		p.Obs.AccessKey, err = common.CreateStorageAccount(
-			ctx, p.SubscriptionId, p.ResourceGroupName, p.Obs.Name, p.Location,
+	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.Name)
+
+	if p.Obs.SetObs == "true" {
+		if p.Obs.AccessKey == "" {
+			p.Obs.AccessKey, err = common.CreateStorageAccount(
+				ctx, p.SubscriptionId, p.ResourceGroupName, p.Obs.Name, p.Location,
+			)
+			if err != nil {
+				clusterizeScript = GetErrorScript(err)
+				return
+			}
+
+			err = common.CreateContainer(ctx, p.Obs.Name, p.Obs.ContainerName)
+			if err != nil {
+				clusterizeScript = GetErrorScript(err)
+				return
+			}
+		}
+
+		_, err = common.AssignStorageBlobDataContributorRoleToScaleSet(
+			ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, p.Obs.Name, p.Obs.ContainerName,
 		)
 		if err != nil {
 			clusterizeScript = GetErrorScript(err)
 			return
 		}
-
-		err = common.CreateContainer(ctx, p.Obs.Name, p.Obs.ContainerName)
-		if err != nil {
-			clusterizeScript = GetErrorScript(err)
-			return
-		}
-	}
-
-	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.Name)
-	_, err = common.AssignStorageBlobDataContributorRoleToScaleSet(
-		ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, p.Obs.Name, p.Obs.ContainerName,
-	)
-	if err != nil {
-		clusterizeScript = GetErrorScript(err)
-		return
 	}
 
 	functionAppKey, err := common.GetKeyVaultValue(ctx, p.KeyVaultUri, "function-app-default-key")
