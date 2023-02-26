@@ -55,7 +55,7 @@ resource "azurerm_resource_group_template_deployment" "api_connections_template_
     }
 }
 TEMPLATE
-  depends_on = [azurerm_key_vault.key_vault, azurerm_linux_virtual_machine_scale_set.vmss]
+  depends_on = [azurerm_key_vault.key_vault, azurerm_linux_virtual_machine_scale_set.custom_image_vmss, azurerm_linux_virtual_machine_scale_set.default_image_vmss]
   lifecycle {
     ignore_changes = [template_content]
   }
@@ -147,7 +147,7 @@ resource "azurerm_resource_group_template_deployment" "workflow_template_deploym
 }
 
 TEMPLATE
-  depends_on = [azurerm_resource_group_template_deployment.api_connections_template_deployment, azurerm_linux_virtual_machine_scale_set.vmss]
+  depends_on = [azurerm_resource_group_template_deployment.api_connections_template_deployment, azurerm_linux_virtual_machine_scale_set.custom_image_vmss, azurerm_linux_virtual_machine_scale_set.default_image_vmss]
   lifecycle {
     ignore_changes = [template_content]
   }

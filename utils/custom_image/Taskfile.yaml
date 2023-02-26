@@ -1,0 +1,20 @@
+version: '3'
+tasks:
+  create-azure-weka-image:
+    desc: Create weka custom images for Azure
+    dir: packer
+    cmds:
+      - packer build ubuntu18.json
+    env:
+      subscription_id: "d2f248b9-d054-477f-b7e8-413921532c2a"
+      managed_image_resource_group: "weka-tf"
+      managed_image_name: "weka-custom-image"
+      location: "East US"
+      ofed_version: "5.7-1.0.2.0"
+      ssh_user: "weka"
+
+  create-shared-gallery:
+    dir: ./
+    cmds:
+      - terraform init
+      - terraform apply -auto-approve

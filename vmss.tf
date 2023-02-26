@@ -52,6 +52,7 @@ data "template_file" "init" {
     private_ssh_key          = local.private_ssh_key
     user                     = var.vm_username
     ofed_version             = var.ofed_version
+    skip_ofed_installation   = var.custom_image_id != null ? true : false
     install_ofed_url         = var.install_ofed_url
     deploy_url               = "https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/deploy"
     report_url               = "https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/report"
@@ -74,7 +75,84 @@ resource "azurerm_proximity_placement_group" "ppg" {
   tags                = merge(var.tags_map, {"weka_cluster": var.cluster_name})
 }
 
-resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
+resource "azurerm_linux_virtual_machine_scale_set" "custom_image_vmss" {
+  count                           = var.custom_image_id != null ? 1 : 0
+  name                            = "${var.prefix}-${var.cluster_name}-vmss"
+  location                        = data.azurerm_resource_group.rg.location
+  resource_group_name             = var.rg_name
+  sku                             = var.instance_type
+  upgrade_mode                    = "Manual"
+  health_probe_id                 = azurerm_lb_probe.backend_lb_probe.id
+  admin_username                  = var.vm_username
+  instances                       = var.cluster_size
+  computer_name_prefix            = "${var.prefix}-${var.cluster_name}-backend"
+  custom_data                     = base64encode(data.template_file.init.rendered)
+  disable_password_authentication = true
+  proximity_placement_group_id    = azurerm_proximity_placement_group.ppg.id
+  tags                            = merge(var.tags_map, {"weka_cluster": var.cluster_name})
+  source_image_id                 = var.custom_image_id
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "StandardSSD_LRS"
+  }
+  data_disk {
+    lun                  = 0
+    caching              = "ReadWrite"
+    create_option        = "Empty"
+    disk_size_gb         = local.disk_size
+    storage_account_type = "StandardSSD_LRS"
+  }
+
+  admin_ssh_key {
+    username   = var.vm_username
+    public_key = local.public_ssh_key
+  }
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  dynamic "network_interface" {
+    for_each = range(local.private_nic_first_index)
+    content {
+      name                      = "${var.prefix}-${var.cluster_name}-backend-nic"
+      network_security_group_id = var.sg_id
+      primary                   = true
+      ip_configuration {
+        primary                                = true
+        name                                   = "ipconfig1"
+        subnet_id                              = data.azurerm_subnet.subnets[0].id
+        load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
+        public_ip_address {
+          name = "${var.prefix}-${var.cluster_name}-public-ip"
+        }
+      }
+    }
+  }
+  dynamic "network_interface" {
+    for_each = range(local.private_nic_first_index, 1)
+    content {
+      name                      = "${var.prefix}-${var.cluster_name}-backend-nic"
+      network_security_group_id = var.sg_id
+      primary                   = true
+      ip_configuration {
+        primary                                = true
+        name                                   = "ipconfig1"
+        subnet_id                              = data.azurerm_subnet.subnets[0].id
+        load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
+      }
+    }
+  }
+  lifecycle {
+    ignore_changes = [ instances, custom_data ]
+  }
+  depends_on = [azurerm_lb_backend_address_pool.lb_backend_pool,azurerm_lb_probe.backend_lb_probe,azurerm_proximity_placement_group.ppg, azurerm_lb_rule.backend_lb_rule, azurerm_lb_rule.ui_lb_rule]
+}
+
+
+resource "azurerm_linux_virtual_machine_scale_set" "default_image_vmss" {
+  count                           = var.custom_image_id == null ? 1 : 0
   name                            = "${var.prefix}-${var.cluster_name}-vmss"
   location                        = data.azurerm_resource_group.rg.location
   resource_group_name             = var.rg_name
@@ -99,10 +177,10 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
     storage_account_type = "StandardSSD_LRS"
   }
   data_disk {
-    lun               = 0
-    caching           = "ReadWrite"
-    create_option     = "Empty"
-    disk_size_gb      = local.disk_size
+    lun                  = 0
+    caching              = "ReadWrite"
+    create_option        = "Empty"
+    disk_size_gb         = local.disk_size
     storage_account_type = "StandardSSD_LRS"
   }
 
@@ -155,13 +233,13 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
 resource "azurerm_role_assignment" "vm_role_assignment" {
   scope                = data.azurerm_resource_group.rg.id
   role_definition_name = "Contributor"
-  principal_id         = azurerm_linux_virtual_machine_scale_set.vmss.identity[0].principal_id
-  depends_on           = [azurerm_linux_virtual_machine_scale_set.vmss]
+  principal_id         = var.custom_image_id != null ? azurerm_linux_virtual_machine_scale_set.custom_image_vmss[0].identity[0].principal_id : azurerm_linux_virtual_machine_scale_set.default_image_vmss[0].identity[0].principal_id
+  depends_on           = [azurerm_linux_virtual_machine_scale_set.custom_image_vmss, azurerm_linux_virtual_machine_scale_set.default_image_vmss]
 }
 
 resource "null_resource" "force-delete-vmss" {
   triggers = {
-    vmss_name       = azurerm_linux_virtual_machine_scale_set.vmss.name
+    vmss_name       = var.custom_image_id != null ? azurerm_linux_virtual_machine_scale_set.custom_image_vmss[0].name : azurerm_linux_virtual_machine_scale_set.default_image_vmss[0].name
     rg_name         = data.azurerm_resource_group.rg.name
     subscription_id = var.subscription_id
   }
@@ -169,5 +247,5 @@ resource "null_resource" "force-delete-vmss" {
     when = destroy
     command = "az vmss delete --name ${self.triggers.vmss_name} --resource-group ${self.triggers.rg_name} --force-deletion true --subscription ${self.triggers.subscription_id}"
   }
-  depends_on = [azurerm_linux_virtual_machine_scale_set.vmss]
+  depends_on = [azurerm_linux_virtual_machine_scale_set.default_image_vmss, azurerm_linux_virtual_machine_scale_set.custom_image_vmss]
 }

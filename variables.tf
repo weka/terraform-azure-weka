@@ -42,10 +42,15 @@ variable "cluster_size" {
   }
 }
 
+variable "custom_image_id" {
+  type        = string
+  description = "Custom image id"
+  default     = null
+}
 
 variable "linux_vm_image" {
-  type = map(string)
-  description = "The source image reference."
+  type        = map(string)
+  description = "The default azure vm image reference."
   default     = {
     publisher = "Canonical"
     offer     = "UbuntuServer"
