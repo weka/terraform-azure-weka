@@ -100,6 +100,19 @@ resource "azurerm_resource_group_template_deployment" "workflow_template_deploym
                             "type": "Object"
                         }
                     },
+                    "triggers": {
+                        "scale-down-run-every-1-minute": {
+                            "recurrence": {
+                                "frequency": "Minute",
+                                "interval": 1
+                            },
+                            "evaluatedRecurrence": {
+                                "frequency": "Minute",
+                                "interval": 1
+                            },
+                            "type": "Recurrence"
+                        }
+                    },
                     "actions": {}
                 },
                 "parameters": {
