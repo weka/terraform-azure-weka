@@ -783,16 +783,16 @@ func GetScaleSetInstanceIds(ctx context.Context, subscriptionId, resourceGroupNa
 
 type InstanceIdsSet map[string]types.Nilt
 
-func GetInstanceIdsSet(scaleResponse protocol.ScaleResponse) InstanceIdsSet {
-	instanceIdsSet := make(InstanceIdsSet)
+func GetInstanceIpsSet(scaleResponse protocol.ScaleResponse) InstanceIdsSet {
+	instanceIpsSet := make(InstanceIdsSet)
 	for _, instance := range scaleResponse.Hosts {
-		instanceIdsSet[instance.InstanceId] = types.Nilv
+		instanceIpsSet[instance.PrivateIp] = types.Nilv
 	}
-	return instanceIdsSet
+	return instanceIpsSet
 }
 
-func GetSpecificScaleSetInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, instanceIds []string) (vms []*armcompute.VirtualMachineScaleSetVM, err error) {
-	allVms, err := GetScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, nil)
+func GetSpecificScaleSetInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, instanceIds []string, expand *string) (vms []*armcompute.VirtualMachineScaleSetVM, err error) {
+	allVms, err := GetScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, expand)
 	if err != nil {
 		return
 	}
@@ -803,7 +803,7 @@ func GetSpecificScaleSetInstances(ctx context.Context, subscriptionId, resourceG
 	}
 
 	for _, vm := range allVms {
-		if _, ok := instanceIdsSet[GetScaleSetVmId(*vm.ID)]; !ok {
+		if _, ok := instanceIdsSet[GetScaleSetVmId(*vm.ID)]; ok {
 			vms = append(vms, vm)
 		}
 	}
@@ -811,7 +811,7 @@ func GetSpecificScaleSetInstances(ctx context.Context, subscriptionId, resourceG
 	return
 }
 
-func TerminateSclaeSetInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, terminateInstanceIds []string) (terminatedInstances []string, errs []error) {
+func TerminateScaleSetInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, terminateInstanceIds []string) (terminatedInstances []string, errs []error) {
 	logger := LoggerFromCtx(ctx)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
@@ -836,10 +836,12 @@ func TerminateSclaeSetInstances(ctx context.Context, subscriptionId, resourceGro
 			errs = append(errs, err)
 			continue
 		}
+		logger.Info().Msgf("Deleting instanceId %s", instanceId)
 		_, err = client.BeginDelete(ctx, resourceGroupName, vmScaleSetName, instanceId, &armcompute.VirtualMachineScaleSetVMsClientBeginDeleteOptions{
 			ForceDeletion: &force,
 		})
 		if err != nil {
+			logger.Error().Err(err).Send()
 			errs = append(errs, err)
 			continue
 		}
