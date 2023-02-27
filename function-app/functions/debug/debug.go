@@ -2,6 +2,7 @@ package debug
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -37,45 +38,94 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	resData := make(map[string]interface{})
 
 	ctx := r.Context()
+	logger := common.LoggerFromCtx(ctx)
 
-	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
-	var clusterizeScript string
-	if err != nil {
-		clusterizeScript = clusterize.GetErrorScript(err)
-	} else {
-		params := clusterize.ClusterizationParams{
-			SubscriptionId:     subscriptionId,
-			ResourceGroupName:  resourceGroupName,
-			Location:           location,
-			Prefix:             prefix,
-			KeyVaultUri:        keyVaultUri,
-			StateContainerName: stateContainerName,
-			StateStorageName:   stateStorageName,
-			Cluster: clusterize.WekaClusterParams{
-				HostsNum:             hostsNum,
-				Name:                 clusterName,
-				ComputeMemory:        computeMemory,
-				DrivesContainerNum:   drivesContainerNum,
-				ComputeContainerNum:  computeContainerNum,
-				FrontendContainerNum: frontendContainerNum,
-				TieringSsdPercent:    tieringSsdPercent,
-				DataProtection: clusterize.DataProtectionParams{
-					StripeWidth:     stripeWidth,
-					ProtectionLevel: protectionLevel,
-					Hotspare:        hotspare,
-				},
-			},
-			Obs: clusterize.ObsParams{
-				SetObs:        setObs,
-				Name:          obsName,
-				ContainerName: obsContainerName,
-				AccessKey:     obsAccessKey,
-			},
-		}
-		clusterizeScript = clusterize.HandleLastClusterVm(ctx, state, params)
+	var invokeRequest common.InvokeRequest
+
+	var function struct {
+		Function *string `json:"function"`
 	}
 
-	resData["body"] = clusterizeScript
+	if err := json.NewDecoder(r.Body).Decode(&invokeRequest); err != nil {
+		err = fmt.Errorf("cannot decode the request: %v", err)
+		logger.Error().Err(err).Send()
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var reqData map[string]interface{}
+	err := json.Unmarshal(invokeRequest.Data["req"], &reqData)
+	if err != nil {
+		err = fmt.Errorf("cannot unmarshal the request data: %v", err)
+		logger.Error().Err(err).Send()
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if json.Unmarshal([]byte(reqData["Body"].(string)), &function) != nil {
+		err = fmt.Errorf("cannot unmarshal the request body: %v", err)
+		logger.Error().Err(err).Send()
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if function.Function == nil {
+		err := fmt.Errorf("wrong request format. 'function' is required")
+		logger.Error().Err(err).Send()
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	logger.Info().Msgf("The requested function is %s", *function.Function)
+	var result interface{}
+
+	if *function.Function == "clusterize" {
+		state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
+		if err != nil {
+			result = clusterize.GetErrorScript(err)
+		} else {
+			params := clusterize.ClusterizationParams{
+				SubscriptionId:     subscriptionId,
+				ResourceGroupName:  resourceGroupName,
+				Location:           location,
+				Prefix:             prefix,
+				KeyVaultUri:        keyVaultUri,
+				StateContainerName: stateContainerName,
+				StateStorageName:   stateStorageName,
+				Cluster: clusterize.WekaClusterParams{
+					HostsNum:             hostsNum,
+					Name:                 clusterName,
+					ComputeMemory:        computeMemory,
+					DrivesContainerNum:   drivesContainerNum,
+					ComputeContainerNum:  computeContainerNum,
+					FrontendContainerNum: frontendContainerNum,
+					TieringSsdPercent:    tieringSsdPercent,
+					DataProtection: clusterize.DataProtectionParams{
+						StripeWidth:     stripeWidth,
+						ProtectionLevel: protectionLevel,
+						Hotspare:        hotspare,
+					},
+				},
+				Obs: clusterize.ObsParams{
+					SetObs:        setObs,
+					Name:          obsName,
+					ContainerName: obsContainerName,
+					AccessKey:     obsAccessKey,
+				},
+			}
+			result = clusterize.HandleLastClusterVm(ctx, state, params)
+		}
+	} else if *function.Function == "instances" {
+		vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
+		expand := "instanceView"
+		instances, err1 := common.GetScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, &expand)
+		if err1 != nil {
+			result = err1.Error()
+		} else {
+			result = instances
+		}
+	}
+
+	resData["body"] = result
 	outputs["res"] = resData
 	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
 
