@@ -9,6 +9,7 @@ type JrpcMethod string
 
 const (
 	JrpcHostList         JrpcMethod = "hosts_list"
+	JrpcMachinesList     JrpcMethod = "machines_list"
 	JrpcNodeList         JrpcMethod = "nodes_list"
 	JrpcDrivesList       JrpcMethod = "disks_list"
 	JrpcRemoveDrive      JrpcMethod = "cluster_remove_drives"
@@ -19,6 +20,7 @@ const (
 )
 
 type HostListResponse map[HostId]Host
+type MachineListResponse []Machine
 type DriveListResponse map[DriveId]Drive
 type NodeListResponse map[NodeId]Node
 
@@ -40,7 +42,7 @@ type ClusterCount struct {
 	ActiveCount int        `json:"active_count"`
 	Backends    HostsCount `json:"backends"`
 	Clients     HostsCount `json:"clients"`
-	TotalCount  int        `json:"totalCount"`
+	TotalCount  int        `json:"total_count"`
 }
 type StatusResponse struct {
 	IoStatus string       `json:"io_status"`
@@ -58,6 +60,11 @@ type Host struct {
 	Aws              struct {
 		InstanceId string `json:"instance_id"`
 	} `json:"aws"`
+	ContainerName string `json:"container_name"`
+}
+
+type Machine struct {
+	Hosts map[HostId]Host `json:"hosts"`
 }
 
 type Drive struct {

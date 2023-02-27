@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/http"
 	"sort"
+	strings2 "strings"
 	"time"
 	"weka-deployment/common"
 	"weka-deployment/connectors"
@@ -163,6 +164,17 @@ func getNumToDeactivate(ctx context.Context, hostInfo []hostInfo, desired int) i
 	return toDeactivate
 }
 
+func getContainersDeactivationOrder(hostInfo []hostInfo) (deactivationOrderedContainer []hostInfo) {
+	hostsIpsSet := make(map[string]types.Nilt)
+	for _, host := range hostInfo {
+		if _, ok := hostsIpsSet[host.HostIp]; !ok {
+			hostsIpsSet[host.HostIp] = types.Nilv
+			deactivationOrderedContainer = append(deactivationOrderedContainer, host)
+		}
+	}
+	return
+}
+
 func CalculateDeactivateTarget(nHealthy int, nUnhealthy int, nDeactivating int, desired int) int {
 	ret := math.Max(nHealthy+nUnhealthy+nDeactivating-desired, math.Min(2-nDeactivating, nUnhealthy))
 	ret = math.Max(nDeactivating, ret)
@@ -183,7 +195,7 @@ func isAllowedToScale(status weka.StatusResponse) error {
 func deriveHostState(ctx context.Context, host *hostInfo) hostState {
 	logger := common.LoggerFromCtx(ctx)
 
-	if host.allDisksBeingRemoved() {
+	if strings2.Contains(host.ContainerName, "drive") && host.allDisksBeingRemoved() {
 		logger.Info().Msgf("Marking %s as deactivating due to unhealthy disks", host.id.String())
 		return DEACTIVATING
 	}
@@ -217,20 +229,30 @@ func selectInstanceByIp(ip string, instances []protocol.HgInstance) *protocol.Hg
 	return nil
 }
 
-func removeInactive(ctx context.Context, hosts []hostInfo, jpool *jrpc.Pool, instances []protocol.HgInstance, p *protocol.ScaleResponse) {
+func removeContainer(ctx context.Context, jpool *jrpc.Pool, hostId int, p *protocol.ScaleResponse) (err error) {
 	logger := common.LoggerFromCtx(ctx)
+	err = jpool.Call(weka.JrpcRemoveHost, types.JsonDict{
+		"host_id": hostId,
+		"no_wait": true,
+	}, nil)
+	if err != nil {
+		logger.Error().Err(err)
+		p.AddTransientError(err, "removeInactive")
+	}
+	return
+}
 
+func removeInactive(ctx context.Context, hostsApiList weka.HostListResponse, hosts []hostInfo, jpool *jrpc.Pool, instances []protocol.HgInstance, p *protocol.ScaleResponse) {
 	for _, host := range hosts {
 		jpool.Drop(host.HostIp)
-		err := jpool.Call(weka.JrpcRemoveHost, types.JsonDict{
-			"host_id": host.id.Int(),
-			"no_wait": true,
-		}, nil)
-		if err != nil {
-			logger.Error().Err(err)
-			p.AddTransientError(err, "removeInactive")
+		containers := getMachineContainers(hostsApiList, host)
+		err1 := removeContainer(ctx, jpool, containers.Drive.Int(), p)
+		err2 := removeContainer(ctx, jpool, containers.Compute.Int(), p)
+		err3 := removeContainer(ctx, jpool, containers.Frontend.Int(), p)
+		if err1 != nil || err2 != nil || err3 != nil {
 			continue
 		}
+
 		instance := selectInstanceByIp(host.HostIp, instances)
 		if instance != nil {
 			p.ToTerminate = append(p.ToTerminate, *instance)
@@ -261,6 +283,27 @@ func removeDrive(ctx context.Context, jpool *jrpc.Pool, drive weka.Drive, p *pro
 		logger.Error().Err(err)
 		p.AddTransientError(err, "removeDrive")
 	}
+}
+
+type machineContainers struct {
+	Compute  weka.HostId `json:"compute"`
+	Frontend weka.HostId `json:"frontend"`
+	Drive    weka.HostId `json:"drive"`
+}
+
+func getMachineContainers(hostsApiList weka.HostListResponse, host hostInfo) (containers machineContainers) {
+	for hostId, _ := range hostsApiList {
+		if hostId.Int() == host.id.Int() {
+			if strings2.Contains(host.ContainerName, "compute") {
+				containers.Compute = hostId
+			} else if strings2.Contains(host.ContainerName, "frontend") {
+				containers.Frontend = hostId
+			} else {
+				containers.Drive = hostId
+			}
+		}
+	}
+	return
 }
 
 func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (response protocol.ScaleResponse, err error) {
@@ -296,6 +339,7 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 	}
 
 	systemStatus := weka.StatusResponse{}
+	machinesApiList := weka.MachineListResponse{}
 	hostsApiList := weka.HostListResponse{}
 	driveApiList := weka.DriveListResponse{}
 	nodeApiList := weka.NodeListResponse{}
@@ -348,16 +392,23 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 	var inactiveHosts []hostInfo
 	var downHosts []hostInfo
 
+	inactiveOrDownHostsIps := make(map[string]types.Nilt)
 	for _, host := range hosts {
+		if _, ok := inactiveOrDownHostsIps[host.HostIp]; ok {
+			continue
+		}
+
 		switch host.State {
 		case "INACTIVE":
 			if host.belongsToHgIpBased(info.Instances) {
 				inactiveHosts = append(inactiveHosts, host)
+				inactiveOrDownHostsIps[host.HostIp] = types.Nilv
 				continue
 			} else {
 				if info.Role == "backend" {
 					logger.Info().Msgf("host %s is inactive and does not belong to HG, removing from cluster", host.id)
 					inactiveHosts = append(inactiveHosts, host)
+					inactiveOrDownHostsIps[host.HostIp] = types.Nilv
 					continue
 				}
 			}
@@ -375,6 +426,7 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 				if host.State != "INACTIVE" && host.managementTimedOut(downKickOutTimeout) {
 					logger.Info().Msgf("host %s is still active but down for too long, kicking out", host.id)
 					downHosts = append(downHosts, host)
+					inactiveOrDownHostsIps[host.HostIp] = types.Nilv
 					continue
 				}
 			}
@@ -405,9 +457,15 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 		return a.AddedTime.Before(b.AddedTime)
 	})
 
-	removeInactive(ctx, inactiveHosts, jpool, info.Instances, &response)
+	removeInactive(ctx, hostsApiList, inactiveHosts, jpool, info.Instances, &response)
 	removeOldDrives(ctx, driveApiList, jpool, &response)
-	numToDeactivate := getNumToDeactivate(ctx, hostsList, info.DesiredCapacity)
+
+	err = jpool.Call(weka.JrpcMachinesList, struct{}{}, &machinesApiList)
+	if err != nil {
+		return
+	}
+	deactivationOrderedContainer := getContainersDeactivationOrder(hostsList)
+	numToDeactivate := len(deactivationOrderedContainer) - info.DesiredCapacity
 
 	deactivateHost := func(host hostInfo) {
 		logger.Info().Msgf("Trying to deactivate host %s", host.id)
@@ -423,8 +481,13 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 			}
 		}
 
+		containers := getMachineContainers(hostsApiList, host)
 		err := jpool.Call(weka.JrpcDeactivateHosts, types.JsonDict{
-			"host_ids":                 []weka.HostId{host.id},
+			"host_ids": []weka.HostId{
+				containers.Drive,
+				containers.Compute,
+				containers.Frontend,
+			},
 			"skip_resource_validation": false,
 		}, nil)
 		if err != nil {
@@ -436,7 +499,7 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 
 	}
 
-	for _, host := range hostsList[:numToDeactivate] {
+	for _, host := range deactivationOrderedContainer[:numToDeactivate] {
 		deactivateHost(host)
 	}
 
