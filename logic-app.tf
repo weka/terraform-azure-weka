@@ -1,5 +1,5 @@
 resource "azurerm_resource_group_template_deployment" "api_connections_template_deployment" {
-  name                = "keyvault-api-connection-deploy"
+  name                = "${var.prefix}-${var.cluster_name}-keyvault-api-connection-deploy"
   resource_group_name = data.azurerm_resource_group.rg.name
   deployment_mode     = "Incremental"
   template_content    = <<TEMPLATE
@@ -62,7 +62,7 @@ TEMPLATE
 }
 
 resource "azurerm_resource_group_template_deployment" "workflow_template_deployment" {
-  name                = "workflow-deploy"
+  name                = "${var.prefix}-${var.cluster_name}-workflow-deploy"
   resource_group_name = data.azurerm_resource_group.rg.name
   deployment_mode     = "Incremental"
   template_content    = <<TEMPLATE
