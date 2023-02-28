@@ -161,11 +161,12 @@ resource "azurerm_role_assignment" "vm_role_assignment" {
 resource "null_resource" "force-delete-vmss" {
   triggers = {
     vmss_name       = azurerm_linux_virtual_machine_scale_set.vmss.name
-    rg_name         = var.rg_name
+    rg_name         = data.azurerm_resource_group.rg.name
     subscription_id = var.subscription_id
   }
   provisioner "local-exec" {
     when = destroy
     command = "az vmss delete --name ${self.triggers.vmss_name} --resource-group ${self.triggers.rg_name} --force-deletion true --subscription ${self.triggers.subscription_id}"
   }
+  depends_on = [azurerm_linux_virtual_machine_scale_set.vmss]
 }
