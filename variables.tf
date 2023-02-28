@@ -193,6 +193,30 @@ variable "container_number_map" {
       nvme     = 2
       nics     = 8
       memory   = "72GB"
+    },
+    Standard_L32s_v3 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 4
+      nics     = 8
+      memory   = "189GB"
+    },
+    Standard_L48s_v3 = {
+      compute  = 3
+      drive    = 3
+      frontend = 1
+      nvme     = 6
+      nics     = 8
+      memory   = "306GB"
+    },
+    Standard_L64s_v3 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 8
+      nics     = 8
+      memory   = "418GB"
     }
   }
 }
