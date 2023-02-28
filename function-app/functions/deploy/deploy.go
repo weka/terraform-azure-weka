@@ -33,6 +33,9 @@ func getBackendCoreCountsDefaults() BackendCoreCounts {
 	backendCoreCounts := BackendCoreCounts{
 		"Standard_L8s_v3":  BackendCoreCount{total: 4, frontend: 1, drive: 1, memory: 31},
 		"Standard_L16s_v3": BackendCoreCount{total: 8, frontend: 1, drive: 2, memory: 72},
+		"Standard_L32s_v3": BackendCoreCount{total: 8, frontend: 1, drive: 2, memory: 189},
+		"Standard_L48s_v3": BackendCoreCount{total: 8, frontend: 1, drive: 3, memory: 306},
+		"Standard_L64s_v3": BackendCoreCount{total: 8, frontend: 1, drive: 2, memory: 418},
 	}
 	return backendCoreCounts
 }
