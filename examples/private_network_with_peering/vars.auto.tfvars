@@ -17,3 +17,4 @@ vnet_to_peering = [{
  }
 ]
 install_ofed_url = "https://wekadeploytars.blob.core.windows.net/tars/MLNX_OFED_LINUX-5.7-1.0.2.0-ubuntu18.04-x86_64.tgz"
+single_placement_group = false
