@@ -237,8 +237,21 @@ func HandleLastClusterVm(ctx context.Context, state common.ClusterState, p Clust
 func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript string) {
 	logger := common.LoggerFromCtx(ctx)
 
+	instanceName := strings.Split(p.Cluster.VmName, ":")[0]
+	instanceId := common.GetScaleSetVmIndex(instanceName)
+	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.Name)
+
+	ip, err := common.GetPublicIp(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, p.Prefix, p.Cluster.Name, instanceId)
+
+	vmName := p.Cluster.VmName
+	if err != nil {
+		logger.Error().Msg("Failed to fetch public ip")
+	} else {
+		vmName = fmt.Sprintf("%s:%s", vmName, ip)
+	}
+
 	state, err := common.AddInstanceToState(
-		ctx, p.SubscriptionId, p.ResourceGroupName, p.StateStorageName, p.StateContainerName, p.Cluster.VmName,
+		ctx, p.SubscriptionId, p.ResourceGroupName, p.StateStorageName, p.StateContainerName, vmName,
 	)
 
 	if err != nil {
@@ -256,9 +269,7 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 		return
 	}
 
-	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.Name)
-	instanceName := strings.Split(p.Cluster.VmName, ":")[0]
-	err = common.SetDeletionProtection(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, instanceName, true)
+	err = common.SetDeletionProtection(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, instanceId, true)
 	if err != nil {
 		clusterizeScript = GetErrorScript(err)
 		return
