@@ -48,7 +48,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	clusterName := os.Getenv("CLUSTER_NAME")
 	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
 
-	err = common.SetDeletionProtection(ctx, subscriptionId, resourceGroupName, vmScaleSetName, data.Name, true)
+	err = common.SetDeletionProtection(ctx, subscriptionId, resourceGroupName, vmScaleSetName, common.GetScaleSetVmIndex(data.Name), true)
 	if err != nil {
 		resData["body"] = err.Error()
 	} else {

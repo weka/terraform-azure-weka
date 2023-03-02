@@ -426,6 +426,35 @@ func GetScaleSetVmsNetworkInterfaces(ctx context.Context, subscriptionId, resour
 	return
 }
 
+func GetPublicIp(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, prefix, clusterName, instanceIndex string) (publicIp string, err error) {
+	logger := LoggerFromCtx(ctx)
+
+	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	client, err := armnetwork.NewPublicIPAddressesClient(subscriptionId, credential, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+	interfaceName := fmt.Sprintf("%s-%s-backend-nic", prefix, clusterName)
+	pager := client.NewListVirtualMachineScaleSetVMPublicIPAddressesPager(resourceGroupName, vmScaleSetName, instanceIndex, interfaceName, "ipconfig1", nil)
+
+	for pager.More() {
+		nextResult, err1 := pager.NextPage(ctx)
+		if err1 != nil {
+			logger.Error().Err(err1).Send()
+			return "", err1
+		}
+		publicIp = *nextResult.Value[0].Properties.IPAddress
+		return
+	}
+	return
+}
+
 func GetVmsPrivateIps(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (vmsPrivateIps map[string]string, err error) {
 	logger := LoggerFromCtx(ctx)
 	logger.Info().Msg("fetching scale set vms private ips")
@@ -724,11 +753,13 @@ func GetScaleSetInstancesInfo(ctx context.Context, subscriptionId, resourceGroup
 	return
 }
 
-func SetDeletionProtection(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, instanceNameOrId string, protect bool) (err error) {
-	logger := LoggerFromCtx(ctx)
+func GetScaleSetVmIndex(vmName string) string {
+	instanceNameParts := strings.Split(vmName, "_")
+	return instanceNameParts[len(instanceNameParts)-1]
+}
 
-	instanceNameParts := strings.Split(instanceNameOrId, "_")
-	instanceId := instanceNameParts[len(instanceNameParts)-1]
+func SetDeletionProtection(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, instanceId string, protect bool) (err error) {
+	logger := LoggerFromCtx(ctx)
 	logger.Info().Msgf("Setting deletion protection: %t on instanceId %s", protect, instanceId)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
