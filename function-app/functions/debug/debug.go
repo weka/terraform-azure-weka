@@ -34,6 +34,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	protectionLevel, _ := strconv.Atoi(os.Getenv("PROTECTION_LEVEL"))
 	hotspare, _ := strconv.Atoi(os.Getenv("HOTSPARE"))
 
+	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
+
 	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
 
@@ -44,6 +46,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	var function struct {
 		Function *string `json:"function"`
+		IpIndex  *string `json:"ip_index"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&invokeRequest); err != nil {
@@ -115,7 +118,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			result = clusterize.HandleLastClusterVm(ctx, state, params)
 		}
 	} else if *function.Function == "instances" {
-		vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
 		expand := "instanceView"
 		instances, err1 := common.GetScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, &expand)
 		if err1 != nil {
@@ -123,6 +125,28 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			result = instances
 		}
+	} else if *function.Function == "interfaces" {
+		interfaces, err1 := common.GetScaleSetVmsNetworkInterfaces(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+		if err1 != nil {
+			result = err1.Error()
+		} else {
+			result = interfaces
+		}
+	} else if *function.Function == "ip" {
+		if function.Function == nil {
+			err := fmt.Errorf("wrong request format. 'ip_index' is required for fucntion 'ip'")
+			logger.Error().Err(err).Send()
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		ips, err1 := common.GetPublicIp(ctx, subscriptionId, resourceGroupName, vmScaleSetName, prefix, clusterName, *function.IpIndex)
+		if err1 != nil {
+			result = err1.Error()
+		} else {
+			result = ips
+		}
+	} else {
+		result = "unsupported function"
 	}
 
 	resData["body"] = result
