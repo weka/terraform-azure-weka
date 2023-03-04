@@ -14,11 +14,13 @@ import (
 )
 
 type ClusterStatus struct {
-	InitialSize            int        `json:"initial_size"`
-	DesiredSize            int        `json:"desired_size"`
-	Clusterized            bool       `json:"clusterized"`
-	ReadyForClusterization []string   `json:"ready_for_clusterization"`
-	WekaStatus             WekaStatus `json:"weka_status"`
+	InitialSize            int                 `json:"initial_size"`
+	DesiredSize            int                 `json:"desired_size"`
+	Progress               map[string][]string `json:"progress"`
+	Errors                 map[string][]string `json:"errors"`
+	Clusterized            bool                `json:"clusterized"`
+	ReadyForClusterization []string            `json:"ready_for_clusterization"`
+	WekaStatus             WekaStatus          `json:"weka_status"`
 }
 
 type ClusterCloud struct {
@@ -83,6 +85,8 @@ func GetClusterStatus(ctx context.Context, subscriptionId, resourceGroupName, vm
 	}
 	clusterStatus.InitialSize = state.InitialSize
 	clusterStatus.DesiredSize = state.DesiredSize
+	clusterStatus.Progress = state.Progress
+	clusterStatus.Errors = state.Errors
 	clusterStatus.Clusterized = state.Clusterized
 	clusterStatus.ReadyForClusterization = state.Instances
 	if !state.Clusterized {

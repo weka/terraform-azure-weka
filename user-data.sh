@@ -1,6 +1,14 @@
 #!/bin/bash
 set -ex
 
+handle_error () {
+  echo $2
+  if [ "$1" -ne 0 ]; then
+    curl ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"$2\"}"
+    exit 1
+  fi
+}
+
 # add private key to ssh config
 echo "${private_ssh_key}" > /home/${user}/.ssh/weka.pem
 chmod 600 /home/${user}/.ssh/weka.pem
@@ -26,6 +34,7 @@ INSTALLATION_PATH="/tmp/weka"
 mkdir -p $INSTALLATION_PATH
 
 # install ofed
+curl ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"installing ofed\"}"
 OFED_NAME=ofed-${ofed_version}
 if [[ "${install_ofed_url}" ]]; then
   wget ${install_ofed_url} -O $INSTALLATION_PATH/$OFED_NAME.tgz
@@ -38,15 +47,22 @@ cd $INSTALLATION_PATH/$OFED_NAME/*/
 ./mlnxofedinstall --without-fw-update --add-kernel-support --force 2>&1 | tee /tmp/weka_ofed_installation
 /etc/init.d/openibd restart
 
+curl ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"ofed installation completed\"}"
+
 apt update -y
 apt install -y jq
 
 # attache disk
 disk=$(lsblk -o NAME,HCTL,SIZE,MOUNTPOINT | grep "3:0:0:0" | awk '{print $1}')
 wekaiosw_device=/dev/$disk
-mkfs.ext4 -L wekaiosw $wekaiosw_device || return 1
-mkdir -p /opt/weka || return 1
-mount $wekaiosw_device /opt/weka || return 1
+
+output=$(mkfs.ext4 -L wekaiosw $wekaiosw_device 2>&1)
+handle_error $? $output
+errormessage=$(mkdir -p /opt/weka)
+handle_error $? $output
+errormessage=$(mount $wekaiosw_device /opt/weka)
+handle_error $? $output
+
 echo "LABEL=wekaiosw /opt/weka ext4 defaults 0 2" >>/etc/fstab
 
 rm -rf $INSTALLATION_PATH
