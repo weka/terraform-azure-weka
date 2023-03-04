@@ -53,7 +53,8 @@ data "template_file" "init" {
     user                     = var.vm_username
     ofed_version             = var.ofed_version
     install_ofed_url         = var.install_ofed_url
-    deploy_url       = "https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/deploy"
+    deploy_url               = "https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/deploy"
+    report_url               = "https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/report"
     function_app_default_key = data.azurerm_function_app_host_keys.function_keys.default_function_key
   }
 }
