@@ -190,8 +190,10 @@ func GetDeployScript(
 	instanceType,
 	installUrl,
 	keyVaultUri,
-	clusterizeUrl,
 	subnet string) (bashScript string, err error) {
+
+	clusterizeUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/clusterize", prefix, clusterName)
+	reportUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/report", prefix, clusterName)
 
 	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
 	if err != nil {
@@ -222,6 +224,7 @@ func GetDeployScript(
 			TAR_NAME=%s
 			PACKAGE_NAME=%s
 			CLUSTERIZE_URL=%s
+			REPORT_URL=%s
 			FUNCTION_KEY=%s
 			DRIVE_CONTAINERS_NUM=%d
 
@@ -229,7 +232,9 @@ func GetDeployScript(
 			cd /tmp
 			tar -xvf $TAR_NAME
 			cd $PACKAGE_NAME
+			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"installing weka\"}"
 			./install.sh
+			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"weka installation completed\"}"
 
 			weka local stop
 			weka local rm default --force
@@ -241,7 +246,7 @@ func GetDeployScript(
 			chmod +x /tmp/clusterize.sh
 			/tmp/clusterize.sh 2>&1 | tee /tmp/weka_clusterization.log
 			`
-			bashScript = fmt.Sprintf(installTemplate, installUrl, tarName, packageName, clusterizeUrl, functionKey, instanceParams.drive)
+			bashScript = fmt.Sprintf(installTemplate, installUrl, tarName, packageName, clusterizeUrl, reportUrl, functionKey, instanceParams.drive)
 
 		} else {
 			token, err2 := getWekaIoToken(ctx, keyVaultUri)
@@ -256,6 +261,7 @@ func GetDeployScript(
 			TOKEN=%s
 			INSTALL_URL=%s
 			CLUSTERIZE_URL=%s
+			REPORT_URL=%s
 			FUNCTION_KEY=%s
 			DRIVE_CONTAINERS_NUM=%d
 
@@ -277,7 +283,9 @@ func GetDeployScript(
 					return 0
 			}
 
+			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"installing weka\"}"
 			retry 300 2 curl --fail --max-time 10 $INSTALL_URL | sh
+			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"weka installation completed\"}"
 
 			weka local stop
 			weka local rm default --force
@@ -289,7 +297,7 @@ func GetDeployScript(
 			chmod +x /tmp/clusterize.sh
 			/tmp/clusterize.sh > /tmp/cluster_creation.log 2>&1
 			`
-			bashScript = fmt.Sprintf(installTemplate, token, installUrl, clusterizeUrl, functionKey, instanceParams.drive)
+			bashScript = fmt.Sprintf(installTemplate, token, installUrl, clusterizeUrl, reportUrl, functionKey, instanceParams.drive)
 		}
 	} else {
 		bashScript, err = GetJoinParams(ctx, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey)
@@ -317,7 +325,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	subnet := os.Getenv("SUBNET")
 	instanceType := os.Getenv("INSTANCE_TYPE")
 	installUrl := os.Getenv("INSTALL_URL")
-	clusterizeUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/clusterize", prefix, clusterName)
 
 	ctx := r.Context()
 
@@ -332,7 +339,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		instanceType,
 		installUrl,
 		keyVaultUri,
-		clusterizeUrl,
 		subnet)
 
 	if err != nil {

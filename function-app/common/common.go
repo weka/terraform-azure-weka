@@ -34,10 +34,12 @@ type InvokeResponse struct {
 }
 
 type ClusterState struct {
-	InitialSize int      `json:"initial_size"`
-	DesiredSize int      `json:"desired_size"`
-	Instances   []string `json:"instances"`
-	Clusterized bool     `json:"clusterized"`
+	InitialSize int                 `json:"initial_size"`
+	DesiredSize int                 `json:"desired_size"`
+	Progress    map[string][]string `json:"progress"`
+	Errors      map[string][]string `json:"errors"`
+	Instances   []string            `json:"instances"`
+	Clusterized bool                `json:"clusterized"`
 }
 
 func leaseContainer(ctx context.Context, subscriptionId, resourceGroupName, storageAccountName, containerName string, leaseIdIn *string, action armstorage.LeaseContainerRequestAction) (leaseIdOut *string, err error) {
@@ -241,6 +243,8 @@ func UpdateClusterized(ctx context.Context, subscriptionId, resourceGroupName, s
 
 	state.Instances = []string{}
 	state.Clusterized = true
+	state.Progress = nil
+	state.Errors = nil
 	err = WriteState(ctx, stateStorageName, stateContainerName, state)
 	_, err2 := UnlockContainer(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName, leaseId)
 	if err2 != nil {

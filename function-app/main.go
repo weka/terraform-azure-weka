@@ -10,6 +10,7 @@ import (
 	"weka-deployment/functions/deploy"
 	"weka-deployment/functions/fetch"
 	"weka-deployment/functions/join_finalization"
+	"weka-deployment/functions/report"
 	"weka-deployment/functions/resize"
 	"weka-deployment/functions/scale_down"
 	"weka-deployment/functions/scale_up"
@@ -44,6 +45,7 @@ func main() {
 	mux.Handle("/terminate", common.LoggingMiddleware(terminate.Handler))
 	mux.Handle("/transient", common.LoggingMiddleware(transient.Handler))
 	mux.Handle("/resize", common.LoggingMiddleware(resize.Handler))
+	mux.Handle("/report", common.LoggingMiddleware(report.Handler))
 	logger.Info().Msgf("Go server Listening on: %v", customHandlerPort)
 	logger.Fatal().Err(http.ListenAndServe(":"+customHandlerPort, mux)).Send()
 }
