@@ -20,13 +20,13 @@
 | Name | Version |
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.3.7 |
-| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~>3.38.0 |
+| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~>3.44.0 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | ~>3.38.0 |
+| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | ~>3.44.0 |
 
 ## Modules
 
@@ -36,30 +36,33 @@ No modules.
 
 | Name | Type |
 |------|------|
-| [azurerm_network_interface.vm-interface](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/network_interface) | resource |
-| [azurerm_network_interface_security_group_association.sg-association](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/network_interface_security_group_association) | resource |
-| [azurerm_network_security_group.nsg](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/network_security_group) | resource |
-| [azurerm_public_ip.public_ip](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/public_ip) | resource |
 | [azurerm_resource_group.rg](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) | resource |
-| [azurerm_subnet.subnets](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet) | resource |
-| [azurerm_virtual_machine.apt-repo-vm-linux](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/virtual_machine) | resource |
-| [azurerm_virtual_network.vnet](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/virtual_network) | resource |
+| [azurerm_shared_image.shared_image](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/shared_image) | resource |
+| [azurerm_shared_image_gallery.shared_image_gallery](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/shared_image_gallery) | resource |
+| [azurerm_shared_image_version.shared_image_version](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/shared_image_version) | resource |
+| [azurerm_images.image](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/images) | data source |
+| [azurerm_resource_group.get-rg](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/resource_group) | data source |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_address_prefixes"></a> [address\_prefixes](#input\_address\_prefixes) | n/a | `list(string)` | <pre>[<br>  "11.0.0.0/16"<br>]</pre> | no |
-| <a name="input_address_space"></a> [address\_space](#input\_address\_space) | n/a | `list(string)` | <pre>[<br>  "11.0.0.0/16"<br>]</pre> | no |
-| <a name="input_admin_username"></a> [admin\_username](#input\_admin\_username) | n/a | `string` | `"azureuser"` | no |
+| <a name="input_custom_image_name"></a> [custom\_image\_name](#input\_custom\_image\_name) | Name of created custom image | `string` | `"weka-custom-image"` | no |
+| <a name="input_custom_vm_version"></a> [custom\_vm\_version](#input\_custom\_vm\_version) | n/a | `string` | `"1.0.0"` | no |
 | <a name="input_location"></a> [location](#input\_location) | n/a | `string` | `"East US"` | no |
-| <a name="input_prefix"></a> [prefix](#input\_prefix) | n/a | `string` | `"weka"` | no |
-| <a name="input_ssh_public_key"></a> [ssh\_public\_key](#input\_ssh\_public\_key) | n/a | `string` | `"~/.ssh/weka_dev_ssh_key.pub"` | no |
-| <a name="input_vm_size"></a> [vm\_size](#input\_vm\_size) | n/a | `string` | `"Standard_D2s_v3"` | no |
+| <a name="input_ofed_version"></a> [ofed\_version](#input\_ofed\_version) | The OFED driver version to for ubuntu 18. | `string` | `"5.7-1.0.2.0"` | no |
+| <a name="input_prefix"></a> [prefix](#input\_prefix) | n/a | `string` | `"weka-image"` | no |
+| <a name="input_rg_name"></a> [rg\_name](#input\_rg\_name) | n/a | `string` | n/a | yes |
+| <a name="input_subscription_id"></a> [subscription\_id](#input\_subscription\_id) | n/a | `string` | n/a | yes |
+| <a name="input_tags"></a> [tags](#input\_tags) | n/a | `map(string)` | <pre>{<br>  "creator": "tf"<br>}</pre> | no |
 
 ## Outputs
 
 | Name | Description |
 |------|-------------|
-| <a name="output_public_ip_address"></a> [public\_ip\_address](#output\_public\_ip\_address) | The actual ip address allocated for the resource. |
+| <a name="output_custom-vm-id"></a> [custom-vm-id](#output\_custom-vm-id) | n/a |
+| <a name="output_gallery-name"></a> [gallery-name](#output\_gallery-name) | n/a |
+| <a name="output_image-identifier"></a> [image-identifier](#output\_image-identifier) | n/a |
+| <a name="output_image-name"></a> [image-name](#output\_image-name) | n/a |
+| <a name="output_managed_image_id"></a> [managed\_image\_id](#output\_managed\_image\_id) | n/a |
 <!-- END_TF_DOCS -->
