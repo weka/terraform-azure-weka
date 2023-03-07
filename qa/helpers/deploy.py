@@ -5,7 +5,7 @@ from qa.helpers.core import ShellClient, BASE_DIR, logger
 from qa.helpers.endpoints import get_cluster_status
 
 
-class TerraformAction:
+class WekaTF:
 
     def __init__(self, worker_id, client_id, client_secret, tenant_id, get_weka_io_token, subscription_id):
         self.__sc = ShellClient()

@@ -1,21 +1,33 @@
+import dataclasses
+
 import pytest
 from contextlib import contextmanager
-from qa.helpers.deploy import TerraformAction
+from qa.helpers.deploy import WekaTF
 from qa.helpers.azure_helper import AzureHelper
-from qa.helpers.core import logger
+from qa.helpers.core import logger, CloudHelper
+from dataclasses import dataclass
+from typing import ContextManager
 
+
+@dataclass
+class TFDeployment:
+    tf: WekaTF
+    key: str
+    cloud_helper: CloudHelper
 
 @contextmanager
-def setup_env(command_line_args, worker_id, **kwargs):
+def setup_env(command_line_args, worker_id, **kwargs) -> ContextManager[TFDeployment]:
     if command_line_args.get('cloud') == 'Azure':
         cloud_helper = AzureHelper(**command_line_args)
-    tf = TerraformAction(worker_id, **command_line_args)
+    else:
+        raise NotImplementedError("only azure supported atm")
+    tf = WekaTF(worker_id, **command_line_args)
     tf.create_tf_configuration_file(**kwargs)
     try:
         tf.apply()
         key = cloud_helper.get_function_key(rg=tf.rg, prefix=tf.prefix, cluster_name=tf.cluster_name)
         tf.waiting_for_the_cluster(key, tf.cluster_size)
-        yield tf, key, cloud_helper
+        yield TFDeployment(tf=tf, key=key, cloud_helper=cloud_helper)
     except Exception as deploy_exception:
         logger.error(f'Deploy is failed. Exception occurs: {deploy_exception}!')
         try:

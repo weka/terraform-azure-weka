@@ -4,8 +4,8 @@ from qa.helpers.endpoints import get_cluster_status
 
 @pytest.mark.regression
 def test_data_protection_with_default_values(deploy_env_function):
-    tf, key, cloud_helper = deploy_env_function
-    response = get_cluster_status(tf.prefix, tf.cluster_name, key)
+    tf, cloud_helper = deploy_env_function.tf, deploy_env_function.cloud_helper
+    response = get_cluster_status(tf.prefix, tf.cluster_name, deploy_env_function.key)
     assert response.json()['weka_status']['hot_spare'] == 1, "Unexpected hot_spare value"
     assert response.json()['weka_status']["stripe_data_drives"] == 3, "Unexpected stripe_data_drives value"
     assert response.json()['weka_status']["stripe_protection_drives"] == 2, "Unexpected stripe_protection_drives value"
@@ -16,8 +16,8 @@ def test_data_protection_with_default_values(deploy_env_function):
                          [({"cluster_size": 10, "protection_level": 4, "hotspare": 1}, (7, 2, 1)),
                           ({"cluster_size": 19, "protection_level": 2, "hotspare": 1}, (16, 2, 1))])
 def test_data_protection_with_custom_values(deploy_env_with_data_protection_values, data_protection_args):
-    tf, key, cloud_helper = deploy_env_with_data_protection_values
-    response = get_cluster_status(tf.prefix, tf.cluster_name, key)
+    tf, cloud_helper = deploy_env_with_data_protection_values.tf, deploy_env_with_data_protection_values.cloud_helper
+    response = get_cluster_status(tf.prefix, tf.cluster_name, deploy_env_with_data_protection_values.key)
     expected_stripe_data_drives, expected_stripe_protection_drives, expected_hot_spare = data_protection_args[1]
     assert response.json()['weka_status']['hot_spare'] == expected_hot_spare, \
         "Unexpected hot_spare value"
