@@ -10,6 +10,7 @@ def pytest_addoption(parser):
     parser.addoption('--tenant_id', action='store', default=None,
                      help='Tenant ID.')
     parser.addoption('--subscription_id', action='store', default=None, help='Subscription ID from Azure cloud')
+    parser.addoption('--cloud', action='store', default='Azure', help='Specify cloud provider name (default=Azure)')
 
 
 @pytest.fixture(scope="session", autouse=True)

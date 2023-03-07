@@ -7,14 +7,15 @@ from qa.helpers.core import logger
 
 @contextmanager
 def setup_env(command_line_args, worker_id, **kwargs):
-    azure_helper = AzureHelper(**command_line_args)
+    if command_line_args.get('cloud') == 'Azure':
+        cloud_helper = AzureHelper(**command_line_args)
     tf = TerraformAction(worker_id, **command_line_args)
     tf.create_tf_configuration_file(**kwargs)
     try:
         tf.apply()
-        key = azure_helper.get_function_key(rg=tf.rg, prefix=tf.prefix, cluster_name=tf.cluster_name)
+        key = cloud_helper.get_function_key(rg=tf.rg, prefix=tf.prefix, cluster_name=tf.cluster_name)
         tf.waiting_for_the_cluster(key, tf.cluster_size)
-        yield tf, key
+        yield tf, key, cloud_helper
     except Exception as deploy_exception:
         logger.error(f'Deploy is failed. Exception occurs: {deploy_exception}!')
         try:
@@ -22,7 +23,7 @@ def setup_env(command_line_args, worker_id, **kwargs):
         except Exception as destroy_exception:
             logger.error(f'Destroy is failed. Exception occurs: {destroy_exception}!')
         finally:
-            azure_helper.delete_resource_group(tf.rg)
+            cloud_helper.delete_resource_group(tf.rg)
             tf.delete_working_dir()
         raise deploy_exception
 

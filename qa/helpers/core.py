@@ -2,12 +2,27 @@ import logging
 import paramiko
 from pathlib import Path
 from subprocess import Popen, PIPE, CalledProcessError
+from abc import ABC, abstractmethod
 
 BASE_DIR = Path(__file__).parent.parent.parent
 
 logger = logging.getLogger('qa-test')
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.DEBUG)
+
+
+class CloudHelper(ABC):
+    @abstractmethod
+    def delete_resource_group(self, **args):
+        pass
+
+    @abstractmethod
+    def get_function_key(self, **args):
+        pass
+
+    @abstractmethod
+    def reboot_instance(self, **args):
+        pass
 
 
 class ShellClient:
