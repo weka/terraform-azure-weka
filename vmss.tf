@@ -178,7 +178,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "default_image_vmss" {
   }
   data_disk {
     lun                  = 0
-    caching              = "ReadWrite"
+    caching              = "None"
     create_option        = "Empty"
     disk_size_gb         = local.disk_size
     storage_account_type = "StandardSSD_LRS"
