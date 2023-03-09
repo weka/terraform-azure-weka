@@ -1,0 +1,68 @@
+name: 'QA workflow'
+
+on:
+  workflow_dispatch:
+    inputs:
+      marker:
+        description: "Enter pytest marker name"
+        type: string
+      test_case_name:
+        description: "Enter specific test case name"
+        type: string
+      number_of_workers:
+        description: "Select number of workers (-1 - for run without parallelization)"
+        default: 3
+        required: true
+        type: string
+
+env:
+  GET_WEKA_IO_TOKEN: ${{ secrets.GET_WEKA_IO_TOKEN }}
+  SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
+  CLIENT_ID: ${{ secrets.CLIENT_ID }}
+  TENANT_ID: ${{ secrets.TENANT_ID }}
+  CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+
+jobs:
+  build:
+    name: Regression test run
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./qa
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Authenticate to Azure Cloud
+        uses: azure/login@v1
+        with:
+          creds: ${{secrets.AZURE_CREDENTIALS}}
+
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '>=1.19'
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Create working directory
+        run: mkdir working_directory
+
+      - name: Run tests by pytest marker
+        if: ${{ inputs.marker}}
+        run: pytest -n ${{ inputs.number_of_workers }} --dist loadgroup -o log_cli=true --full-trace -m ${{ inputs.marker}} --get_weka_io_token=$GET_WEKA_IO_TOKEN --subscription_id=$SUBSCRIPTION_ID --client_id=$CLIENT_ID --tenant_id=$TENANT_ID --client_secret=$CLIENT_SECRET
+
+      - name: Run specific test
+        if: ${{ inputs.test_case_name}}
+        run: pytest -n ${{ inputs.number_of_workers }} --dist loadgroup -o log_cli=true --full-trace -k ${{ inputs.test_case_name}} --get_weka_io_token=$GET_WEKA_IO_TOKEN --subscription_id=$SUBSCRIPTION_ID --client_id=$CLIENT_ID --tenant_id=$TENANT_ID --client_secret=$CLIENT_SECRET
