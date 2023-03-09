@@ -135,6 +135,7 @@ resource "azurerm_linux_function_app" "function_app" {
     "NUM_DRIVE_CONTAINERS" = var.container_number_map[var.instance_type].drive
     "NUM_COMPUTE_CONTAINERS" = var.container_number_map[var.instance_type].compute
     "NUM_FRONTEND_CONTAINERS" = var.container_number_map[var.instance_type].frontend
+    "NVMES_NUM" = var.container_number_map[var.instance_type].nvme
     "TIERING_SSD_PERCENT" = var.tiering_ssd_percent
     "PREFIX" = var.prefix
     "KEY_VAULT_URI" = azurerm_key_vault.key_vault.vault_uri
