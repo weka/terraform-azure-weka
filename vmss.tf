@@ -52,7 +52,7 @@ data "template_file" "init" {
     private_ssh_key          = local.private_ssh_key
     user                     = var.vm_username
     ofed_version             = var.ofed_version
-    skip_ofed_installation   = var.custom_image_id != null ? true : false
+    skip_ofed_installation   = true
     install_ofed_url         = var.install_ofed_url
     deploy_url               = "https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/deploy"
     report_url               = "https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/report"
