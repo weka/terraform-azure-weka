@@ -137,7 +137,7 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	EOL
 	devices=$(weka local run --container compute0 $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
 	for device in $devices; do
-		weka local exec --container compute0 /weka/tools/weka_sign_drive $device
+		weka local run --container drive0 /weka/tools/weka_sign_drive $device
 	done
 	ready=0
 	while [ $ready -eq 0 ] ; do
