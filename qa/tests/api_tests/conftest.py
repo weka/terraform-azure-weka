@@ -49,14 +49,14 @@ def destroy_env(tf):
 def deploy_env_module(command_line_args, worker_id):
     with setup_env(command_line_args, worker_id) as result:
         yield result
-    destroy_env(result[0])
+    destroy_env(result.tf)
 
 
 @pytest.fixture(scope='function')
 def deploy_env_function(command_line_args, worker_id):
     with setup_env(command_line_args, worker_id) as result:
         yield result
-    destroy_env(result[0])
+    destroy_env(result.tf)
 
 
 @pytest.fixture(scope='function')
@@ -64,4 +64,4 @@ def deploy_env_with_data_protection_values(command_line_args, worker_id, data_pr
     kwargs = data_protection_args[0]
     with setup_env(command_line_args, worker_id, **kwargs) as result:
         yield result
-    destroy_env(result[0])
+    destroy_env(result.tf)

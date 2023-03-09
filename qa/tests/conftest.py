@@ -19,6 +19,7 @@ def command_line_args(request):
               'client_secret': request.config.getoption('--client_secret'),
               'tenant_id': request.config.getoption('--tenant_id'),
               'get_weka_io_token': request.config.getoption('--get_weka_io_token'),
-              'subscription_id': request.config.getoption('--subscription_id')
+              'subscription_id': request.config.getoption('--subscription_id'),
+              'cloud': request.config.getoption('--cloud')
               }
     return kwargs

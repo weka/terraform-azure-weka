@@ -7,7 +7,7 @@ from qa.helpers.endpoints import get_cluster_status
 
 class WekaTF:
 
-    def __init__(self, worker_id, client_id, client_secret, tenant_id, get_weka_io_token, subscription_id):
+    def __init__(self, worker_id, client_id, client_secret, tenant_id, get_weka_io_token, subscription_id, **kwargs):
         self.__sc = ShellClient()
         self.__client_id = client_id
         self.__client_secret = client_secret
