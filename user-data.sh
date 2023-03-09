@@ -25,19 +25,6 @@ fi
 INSTALLATION_PATH="/tmp/weka"
 mkdir -p $INSTALLATION_PATH
 
-# install ofed
-OFED_NAME=ofed-${ofed_version}
-if [[ "${install_ofed_url}" ]]; then
-  wget ${install_ofed_url} -O $INSTALLATION_PATH/$OFED_NAME.tgz
-else
-  wget http://content.mellanox.com/ofed/MLNX_OFED-${ofed_version}/MLNX_OFED_LINUX-${ofed_version}-ubuntu18.04-x86_64.tgz -O $INSTALLATION_PATH/$OFED_NAME.tgz
-fi
-
-tar xf $INSTALLATION_PATH/$OFED_NAME.tgz --directory $INSTALLATION_PATH --one-top-level=$OFED_NAME
-cd $INSTALLATION_PATH/$OFED_NAME/*/
-./mlnxofedinstall --without-fw-update --add-kernel-support --force
-/etc/init.d/openibd restart
-
 apt update -y
 apt install -y jq
 
