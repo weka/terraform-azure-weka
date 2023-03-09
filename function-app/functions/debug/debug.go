@@ -23,7 +23,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	obsContainerName := os.Getenv("OBS_CONTAINER_NAME")
 	obsAccessKey := os.Getenv("OBS_ACCESS_KEY")
 	location := os.Getenv("LOCATION")
-	drivesContainerNum := os.Getenv("NUM_DRIVE_CONTAINERS")
+	nvmesNum := os.Getenv("NVMES_NUM")
 	computeContainerNum := os.Getenv("NUM_COMPUTE_CONTAINERS")
 	frontendContainerNum := os.Getenv("NUM_FRONTEND_CONTAINERS")
 	tieringSsdPercent := os.Getenv("TIERING_SSD_PERCENT")
@@ -98,7 +98,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 					HostsNum:             hostsNum,
 					Name:                 clusterName,
 					ComputeMemory:        computeMemory,
-					DrivesContainerNum:   drivesContainerNum,
+					NvmesNum:             nvmesNum,
 					ComputeContainerNum:  computeContainerNum,
 					FrontendContainerNum: frontendContainerNum,
 					TieringSsdPercent:    tieringSsdPercent,
