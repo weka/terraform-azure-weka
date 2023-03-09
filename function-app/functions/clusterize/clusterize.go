@@ -31,7 +31,7 @@ type WekaClusterParams struct {
 	HostsNum             string
 	Name                 string
 	ComputeMemory        string
-	DrivesContainerNum   string
+	NvmesNum             string
 	ComputeContainerNum  string
 	FrontendContainerNum string
 	TieringSsdPercent    string
@@ -69,7 +69,7 @@ func generateClusterizationScript(
 	VMS="%s"
 	IPS=%s
 	HOSTS_NUM=%s
-	NUM_DRIVE_CONTAINERS=%s
+	NVMES_NUM=%s
 	CLUSTER_NAME=%s
 	NUM_COMPUTE_CONTAINERS=%s
 	COMPUTE_MEMORY=%s
@@ -95,7 +95,7 @@ func generateClusterizationScript(
 	sleep 30s
 	
 	for (( i=0; i<$HOSTS_NUM; i++ )); do
-		for (( d=0; d<$NUM_DRIVE_CONTAINERS; d++ )); do
+		for (( d=0; d<$NVMES_NUM; d++ )); do
 			weka cluster drive add $i "/dev/nvme$d"n1
 		done
 	done
@@ -142,7 +142,7 @@ func generateClusterizationScript(
 
 	logger.Info().Msgf("Formatting clusterization script template")
 	clusterizeScript = fmt.Sprintf(
-		dedent.Dedent(clusterizeScriptTemplate), vmNames, ips, cluster.HostsNum, cluster.DrivesContainerNum,
+		dedent.Dedent(clusterizeScriptTemplate), vmNames, ips, cluster.HostsNum, cluster.NvmesNum,
 		cluster.Name, cluster.ComputeContainerNum, cluster.ComputeMemory, cluster.FrontendContainerNum,
 		obs.SetObs, obs.Name, obs.ContainerName, obs.AccessKey, cluster.TieringSsdPercent, prefix, functionAppKey,
 		cluster.DataProtection.StripeWidth, cluster.DataProtection.ProtectionLevel, cluster.DataProtection.Hotspare,
@@ -302,7 +302,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	obsContainerName := os.Getenv("OBS_CONTAINER_NAME")
 	obsAccessKey := os.Getenv("OBS_ACCESS_KEY")
 	location := os.Getenv("LOCATION")
-	drivesContainerNum := os.Getenv("NUM_DRIVE_CONTAINERS")
+	nvmesNum := os.Getenv("NVMES_NUM")
 	computeContainerNum := os.Getenv("NUM_COMPUTE_CONTAINERS")
 	frontendContainerNum := os.Getenv("NUM_FRONTEND_CONTAINERS")
 	tieringSsdPercent := os.Getenv("TIERING_SSD_PERCENT")
@@ -354,7 +354,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			HostsNum:             hostsNum,
 			Name:                 clusterName,
 			ComputeMemory:        computeMemory,
-			DrivesContainerNum:   drivesContainerNum,
+			NvmesNum:             nvmesNum,
 			ComputeContainerNum:  computeContainerNum,
 			FrontendContainerNum: frontendContainerNum,
 			TieringSsdPercent:    tieringSsdPercent,
