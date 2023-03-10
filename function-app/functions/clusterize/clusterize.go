@@ -168,6 +168,12 @@ shutdown now
 `)
 }
 
+func reportClusterizeError(ctx context.Context, p ClusterizationParams, err error) {
+	hostName := strings.Split(p.Cluster.VmName, ":")[1]
+	report := common.Report{Type: "error", Hostname: hostName, Message: err.Error()}
+	_ = common.UpdateStateReporting(ctx, p.SubscriptionId, p.ResourceGroupName, p.StateContainerName, p.StateStorageName, report)
+}
+
 func HandleLastClusterVm(ctx context.Context, state common.ClusterState, p ClusterizationParams) (clusterizeScript string) {
 	logger := common.LoggerFromCtx(ctx)
 	logger.Info().Msg("This is the last instance in the cluster, creating obs and clusterization script")
@@ -197,10 +203,7 @@ func HandleLastClusterVm(ctx context.Context, state common.ClusterState, p Clust
 		)
 		if err != nil {
 			clusterizeScript = GetErrorScript(err)
-			hostName := strings.Split(p.Cluster.VmName, ":")[1]
-			report := common.Report{Type: "error", Hostname: hostName, Message: err.Error()}
-			err2 := common.UpdateStateReporting(ctx, p.SubscriptionId, p.ResourceGroupName, p.StateContainerName, p.StateStorageName, report)
-			clusterizeScript = GetErrorScript(fmt.Errorf("%s\n%s", err.Error(), err2.Error()))
+			reportClusterizeError(ctx, p, err)
 			return
 		}
 	}
@@ -276,6 +279,7 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 	err = common.SetDeletionProtection(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, instanceId, true)
 	if err != nil {
 		clusterizeScript = GetErrorScript(err)
+		reportClusterizeError(ctx, p, err)
 		return
 	}
 
