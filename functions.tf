@@ -203,8 +203,8 @@ resource "azurerm_role_assignment" "function-app-reader" {
   depends_on           = [azurerm_linux_function_app.function_app]
 }
 resource "azurerm_role_assignment" "function-app-scale-set-machine-owner" {
-  scope                = var.custom_image_id != null ? azurerm_linux_virtual_machine_scale_set.custom_image_vmss[0].id : azurerm_linux_virtual_machine_scale_set.default_image_vmss[0].id
+  scope                = var.custom_image_id != null ? azurerm_orchestrated_virtual_machine_scale_set.custom_image_vmss[0].id : azurerm_orchestrated_virtual_machine_scale_set.default_image_vmss[0].id
   role_definition_name = "Owner"
   principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
-  depends_on           = [azurerm_linux_function_app.function_app, azurerm_linux_virtual_machine_scale_set.custom_image_vmss, azurerm_linux_virtual_machine_scale_set.default_image_vmss]
+  depends_on           = [azurerm_linux_function_app.function_app, azurerm_orchestrated_virtual_machine_scale_set.custom_image_vmss, azurerm_orchestrated_virtual_machine_scale_set.default_image_vmss]
 }

@@ -279,3 +279,15 @@ variable "function_app_log_level" {
     error_message = "Allowed values for log level are from -1 to 5."
   }
 }
+
+variable "platform_fault_domain_count" {
+  type = list(string)
+  default = ["eastus","eastus2","westus","centralus","northcentralus","southcentralus","canadacentral","northeurope","westeurope"]
+  description = "The number of Fault Domains varies depending on which Azure Region you're using"
+}
+
+variable "single_placement_group" {
+  type = bool
+  default = false
+  description = "Limited Single Placement Group, which means the number of instances will be capped at 100 Virtual Machines"
+}

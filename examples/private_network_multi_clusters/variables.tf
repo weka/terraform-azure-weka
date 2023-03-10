@@ -80,3 +80,8 @@ variable "cluster_size" {
   type = number
   description = "Weka cluster size"
 }
+
+variable "single_placement_group" {
+  type = bool
+  description = "Limited Single Placement Group, which means the number of instances will be capped at 100 Virtual Machines"
+}

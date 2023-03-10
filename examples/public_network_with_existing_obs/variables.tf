@@ -82,3 +82,8 @@ variable "blob_obs_access_key" {
   description = "Access key of existing blob obs container"
   sensitive   = true
 }
+
+variable "single_placement_group" {
+  type = bool
+  description = "Limited Single Placement Group, which means the number of instances will be capped at 100 Virtual Machines"
+}
