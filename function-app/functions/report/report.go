@@ -1,20 +1,12 @@
 package report
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
-	"time"
 	"weka-deployment/common"
 )
-
-type Report struct {
-	Type     string `json:"type"`
-	Message  string `json:"message"`
-	Hostname string `json:"hostname"`
-}
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	outputs := make(map[string]interface{})
@@ -30,7 +22,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	var invokeRequest common.InvokeRequest
 
-	var report Report
+	var report common.Report
 
 	if err := json.NewDecoder(r.Body).Decode(&invokeRequest); err != nil {
 		err = fmt.Errorf("cannot decode the request: %v", err)
@@ -56,7 +48,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logger.Info().Msgf("Updating state %s with %s", report.Type, report.Message)
-	err = UpdateState(ctx, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, report)
+	err = common.UpdateStateReporting(ctx, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, report)
 
 	if err != nil {
 		resData["body"] = err.Error()
@@ -71,54 +63,4 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(responseJson)
-}
-
-func UpdateState(ctx context.Context, subscriptionId, resourceGroupName, stateContainerName, stateStorageName string, report Report) (err error) {
-	logger := common.LoggerFromCtx(ctx)
-
-	leaseId, err := common.LockContainer(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
-	if err != nil {
-		return
-	}
-
-	err = UpdateStateWithoutLocking(ctx, stateContainerName, stateStorageName, report)
-
-	_, err2 := common.UnlockContainer(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName, leaseId)
-	if err2 != nil {
-		if err == nil {
-			err = err2
-		}
-		logger.Error().Msgf("unlocking %s failed", stateStorageName)
-	}
-	return
-}
-
-func UpdateStateWithoutLocking(ctx context.Context, stateContainerName, stateStorageName string, report Report) (err error) {
-	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
-	if err != nil {
-		return
-	}
-	currentTime := time.Now().UTC().Format("15:04:05") + " UTC"
-	switch report.Type {
-	case "error":
-		if state.Errors == nil {
-			state.Errors = make(map[string][]string)
-		}
-		state.Errors[report.Hostname] = append(state.Errors[report.Hostname], fmt.Sprintf("%s: %s", currentTime, report.Message))
-	case "progress":
-		if state.Progress == nil {
-			state.Progress = make(map[string][]string)
-		}
-		state.Progress[report.Hostname] = append(state.Progress[report.Hostname], fmt.Sprintf("%s: %s", currentTime, report.Message))
-	default:
-		err = fmt.Errorf("invalid type: %s", report.Type)
-		return
-	}
-
-	err = common.WriteState(ctx, stateStorageName, stateContainerName, state)
-	if err != nil {
-		err = fmt.Errorf("failed updating state errors")
-		return
-	}
-	return
 }
