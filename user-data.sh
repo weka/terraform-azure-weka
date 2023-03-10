@@ -1,6 +1,8 @@
 #!/bin/bash
 set -ex
 
+curl ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running init script\"}"
+
 handle_error () {
   if [ "$1" -ne 0 ]; then
     curl ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"${2}\"}"
@@ -53,7 +55,6 @@ if [[ "${skip_ofed_installation}" == false ]]; then
   disk=$(lsblk -o NAME,HCTL,SIZE,MOUNTPOINT | grep "3:0:0:0" | awk '{print $1}')
   curl ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"ofed installation completed\"}"
 else
-  curl ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Using custom image no need to install ofed\"}"
   disk=$(lsblk -o NAME,HCTL,SIZE,MOUNTPOINT | grep "1:0:0:0" | awk '{print $1}')
 fi
 
