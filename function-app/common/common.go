@@ -885,3 +885,59 @@ func TerminateScaleSetInstances(ctx context.Context, subscriptionId, resourceGro
 
 	return
 }
+
+type Report struct {
+	Type     string `json:"type"`
+	Message  string `json:"message"`
+	Hostname string `json:"hostname"`
+}
+
+func UpdateStateReporting(ctx context.Context, subscriptionId, resourceGroupName, stateContainerName, stateStorageName string, report Report) (err error) {
+	logger := LoggerFromCtx(ctx)
+
+	leaseId, err := LockContainer(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
+	if err != nil {
+		return
+	}
+
+	err = UpdateStateReportingWithoutLocking(ctx, stateContainerName, stateStorageName, report)
+
+	_, err2 := UnlockContainer(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName, leaseId)
+	if err2 != nil {
+		if err == nil {
+			err = err2
+		}
+		logger.Error().Msgf("unlocking %s failed", stateStorageName)
+	}
+	return
+}
+
+func UpdateStateReportingWithoutLocking(ctx context.Context, stateContainerName, stateStorageName string, report Report) (err error) {
+	state, err := ReadState(ctx, stateStorageName, stateContainerName)
+	if err != nil {
+		return
+	}
+	currentTime := time.Now().UTC().Format("15:04:05") + " UTC"
+	switch report.Type {
+	case "error":
+		if state.Errors == nil {
+			state.Errors = make(map[string][]string)
+		}
+		state.Errors[report.Hostname] = append(state.Errors[report.Hostname], fmt.Sprintf("%s: %s", currentTime, report.Message))
+	case "progress":
+		if state.Progress == nil {
+			state.Progress = make(map[string][]string)
+		}
+		state.Progress[report.Hostname] = append(state.Progress[report.Hostname], fmt.Sprintf("%s: %s", currentTime, report.Message))
+	default:
+		err = fmt.Errorf("invalid type: %s", report.Type)
+		return
+	}
+
+	err = WriteState(ctx, stateStorageName, stateContainerName, state)
+	if err != nil {
+		err = fmt.Errorf("failed updating state errors")
+		return
+	}
+	return
+}

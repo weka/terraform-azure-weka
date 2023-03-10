@@ -197,6 +197,10 @@ func HandleLastClusterVm(ctx context.Context, state common.ClusterState, p Clust
 		)
 		if err != nil {
 			clusterizeScript = GetErrorScript(err)
+			hostName := strings.Split(p.Cluster.VmName, ":")[1]
+			report := common.Report{Type: "error", Hostname: hostName, Message: err.Error()}
+			err2 := common.UpdateStateReporting(ctx, p.SubscriptionId, p.ResourceGroupName, p.StateContainerName, p.StateStorageName, report)
+			clusterizeScript = GetErrorScript(fmt.Errorf("%s\n%s", err.Error(), err2.Error()))
 			return
 		}
 	}

@@ -2,9 +2,8 @@
 set -ex
 
 handle_error () {
-  echo $2
   if [ "$1" -ne 0 ]; then
-    curl ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"$2\"}"
+    curl ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"${2}\"}"
     exit 1
   fi
 }
@@ -64,12 +63,14 @@ apt install -y jq
 # attache disk
 wekaiosw_device=/dev/$disk
 
-output=$(mkfs.ext4 -L wekaiosw $wekaiosw_device 2>&1)
-handle_error $? $output
-errormessage=$(mkdir -p /opt/weka)
-handle_error $? $output
-errormessage=$(mount $wekaiosw_device /opt/weka)
-handle_error $? $output
+status=0
+mkfs.ext4 -L wekaiosw $wekaiosw_device 2>&1 | tee /tmp/output  || status=$?
+handle_error $status "$(cat /tmp/output)"
+mkdir -p /opt/weka 2>&1 | tee /tmp/output || status=$?
+handle_error $status "$(cat /tmp/output)"
+mount $wekaiosw_device /opt/weka  2>&1 | tee /tmp/output || status=$?
+handle_error $status "$(cat /tmp/output)"
+rm /tmp/output
 
 echo "LABEL=wekaiosw /opt/weka ext4 defaults 0 2" >>/etc/fstab
 
