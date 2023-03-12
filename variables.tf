@@ -279,3 +279,39 @@ variable "function_app_log_level" {
     error_message = "Allowed values for log level are from -1 to 5."
   }
 }
+
+variable "function_app_storage_account_prefix" {
+  type = string
+  description = "Weka storage account name prefix"
+  default = "weka"
+}
+
+variable "function_app_storage_account_container_prefix" {
+  type = string
+  description = "Weka storage account container name prefix"
+  default = "weka-tf-functions-deployment-"
+}
+
+variable "function_app_version" {
+  type = string
+  description = "Function app code version (hash)"
+  default = "657ce9aabec9766c2bd330c9100834b0"
+}
+
+variable "function_app_dist" {
+  type = string
+  description = "Function app code dist"
+  default = "dev"
+
+  validation {
+    condition = contains(["dev", "release"], var.function_app_dist)
+    error_message = "Valid value is one of the following: dev, release."
+  }
+}
+
+locals {
+  function_code_path     = "${path.module}/function-app/code"
+  function_app_code_hash = md5(join("", [for f in fileset(local.function_code_path, "**") : filemd5("${local.function_code_path}/${f}")]))
+  # tflint-ignore: terraform_unused_declarations
+  validate_versioning = (var.function_app_version != local.function_app_code_hash) ? tobool("Code MD5 does not coincide with version provided. Please update code version.") : true
+}

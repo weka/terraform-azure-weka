@@ -2,11 +2,12 @@ package scale_down
 
 import (
 	"encoding/json"
+	"net/http"
+	"weka-deployment/common"
+
 	"github.com/weka/go-cloud-lib/logging"
 	"github.com/weka/go-cloud-lib/protocol"
 	"github.com/weka/go-cloud-lib/scale_down"
-	"net/http"
-	"weka-deployment/common"
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
