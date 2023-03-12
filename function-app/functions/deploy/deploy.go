@@ -194,6 +194,7 @@ func GetDeployScript(
 
 	clusterizeUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/clusterize", prefix, clusterName)
 	reportUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/report", prefix, clusterName)
+	protectUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/protect", prefix, clusterName)
 
 	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
 	if err != nil {
@@ -225,6 +226,7 @@ func GetDeployScript(
 			PACKAGE_NAME=%s
 			CLUSTERIZE_URL=%s
 			REPORT_URL=%s
+			PROTECT_URL=%s
 			FUNCTION_KEY=%s
 			DRIVE_CONTAINERS_NUM=%d
 
@@ -242,11 +244,12 @@ func GetDeployScript(
 
 			compute_name=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" | jq '.compute.name')
 			compute_name=$(echo "$compute_name" | cut -c2- | rev | cut -c2- | rev)
-			curl $CLUSTERIZE_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json"  -d "{\"vm\": \"$compute_name:$HOSTNAME\"}" > /tmp/clusterize.sh
+			curl $PROTECT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$compute_name:$HOSTNAME\"}"
+			curl $CLUSTERIZE_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$compute_name:$HOSTNAME\"}" > /tmp/clusterize.sh
 			chmod +x /tmp/clusterize.sh
 			/tmp/clusterize.sh 2>&1 | tee /tmp/weka_clusterization.log
 			`
-			bashScript = fmt.Sprintf(installTemplate, installUrl, tarName, packageName, clusterizeUrl, reportUrl, functionKey, instanceParams.drive)
+			bashScript = fmt.Sprintf(installTemplate, installUrl, tarName, packageName, clusterizeUrl, reportUrl, protectUrl, functionKey, instanceParams.drive)
 
 		} else {
 			token, err2 := getWekaIoToken(ctx, keyVaultUri)
@@ -262,6 +265,7 @@ func GetDeployScript(
 			INSTALL_URL=%s
 			CLUSTERIZE_URL=%s
 			REPORT_URL=%s
+			PROTECT_URL=%s
 			FUNCTION_KEY=%s
 			DRIVE_CONTAINERS_NUM=%d
 
@@ -293,11 +297,12 @@ func GetDeployScript(
 
 			compute_name=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" | jq '.compute.name')
 			compute_name=$(echo "$compute_name" | cut -c2- | rev | cut -c2- | rev)
-			curl $CLUSTERIZE_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json"  -d "{\"vm\": \"$compute_name:$HOSTNAME\"}" > /tmp/clusterize.sh
+			curl $PROTECT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$compute_name:$HOSTNAME\"}"
+			curl $CLUSTERIZE_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$compute_name:$HOSTNAME\"}" > /tmp/clusterize.sh
 			chmod +x /tmp/clusterize.sh
 			/tmp/clusterize.sh > /tmp/cluster_creation.log 2>&1
 			`
-			bashScript = fmt.Sprintf(installTemplate, token, installUrl, clusterizeUrl, reportUrl, functionKey, instanceParams.drive)
+			bashScript = fmt.Sprintf(installTemplate, token, installUrl, clusterizeUrl, reportUrl, protectUrl, functionKey, instanceParams.drive)
 		}
 	} else {
 		bashScript, err = GetJoinParams(ctx, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey)
