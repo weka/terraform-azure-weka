@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/weka/go-cloud-lib/logging"
 	"net/http"
 	"os"
 	"weka-deployment/functions/clusterize"
@@ -18,6 +17,8 @@ import (
 	"weka-deployment/functions/status"
 	"weka-deployment/functions/terminate"
 	"weka-deployment/functions/transient"
+
+	"github.com/weka/go-cloud-lib/logging"
 )
 
 var (

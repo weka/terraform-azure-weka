@@ -1,0 +1,75 @@
+name: 'Function app code distribution'
+
+on:
+  push:
+    branches:
+      - add-autoscaling-support
+      - main
+    paths:
+      - 'function-app/**'
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      regions:
+        required: true
+        description: Azure regions list
+        default: '{"dev"=["eastus"]}'
+
+jobs:
+  function-app-dist:
+    name: Upload function app code 
+    runs-on: ubuntu-latest
+    env:
+      ARM_CLIENT_ID: ${{ secrets.RND_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.RND_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.RND_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.RND_TENANT_ID }}
+      DIST: ${{ github.event_name == 'release' && 'release' || 'dev' }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./function-app/distribution
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          # add to be able to refer to the output correctly
+          terraform_wrapper: false
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+          cache-dependency-path: function-app/code/go.mod
+
+      - name: Terraform Format
+        run: terraform fmt -check
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        if: github.event_name != 'workflow_dispatch'
+        run: terraform apply -auto-approve -var='subscription_id=${{ secrets.RND_SUBSCRIPTION_ID }}' -var="dist=$DIST"
+     
+      - name: Terraform Apply (only selected regions)
+        if: github.event_name == 'workflow_dispatch'
+        run: terraform apply -auto-approve -var='subscription_id=${{ secrets.RND_SUBSCRIPTION_ID }}' -var='regions=${{ inputs.regions }}'
+
+      - name: Update Function App Zip Version
+        run: |
+          new_function_app_zip_version=$(terraform output function_app_zip_md5)
+          cd ../../
+          old_function_app_zip_version=$(awk '/Function app code version/{getline;print $NF;}' variables.tf)
+          sed -i "s/$old_function_app_zip_version/$new_function_app_zip_version/" variables.tf
+
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: 'chore: update function_app_version'
+          file_pattern: 'variables.tf'
