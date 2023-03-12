@@ -86,6 +86,11 @@ func generateClusterizationScript(
 	HOTSPARE=%d
 	WEKA_PASSWORD="%s"
 
+	report_url=https://$PREFIX-$CLUSTER_NAME-function-app.azurewebsites.net/api/report
+	clusterize_finalization_url=https://$PREFIX-$CLUSTER_NAME-function-app.azurewebsites.net/api/clusterize_finalization
+
+	curl "$report_url?code=$FUNCTION_APP_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running Clusterization\"}"
+
 	weka_status_ready="Containers: 1/1 running (1 weka)"
 	ssh_command="ssh -o StrictHostKeyChecking=no"
 	
@@ -137,7 +142,7 @@ func generateClusterizationScript(
 
 	echo "completed successfully" > /tmp/weka_clusterization_completion_validation
 
-	curl "https://$PREFIX-$CLUSTER_NAME-function-app.azurewebsites.net/api/clusterize_finalization?code=$FUNCTION_APP_KEY"
+	curl "$clusterize_finalization_url?code=$FUNCTION_APP_KEY"
 	`
 
 	logger.Info().Msgf("Formatting clusterization script template")
@@ -273,13 +278,6 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 	initialSize, err := strconv.Atoi(p.Cluster.HostsNum)
 	if err != nil {
 		clusterizeScript = GetErrorScript(err)
-		return
-	}
-
-	err = common.SetDeletionProtection(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, instanceId, true)
-	if err != nil {
-		clusterizeScript = GetErrorScript(err)
-		reportClusterizeError(ctx, p, err)
 		return
 	}
 
