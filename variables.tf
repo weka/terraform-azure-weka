@@ -279,3 +279,9 @@ variable "function_app_log_level" {
     error_message = "Allowed values for log level are from -1 to 5."
   }
 }
+
+variable "function_app_version" {
+  type = string
+  description = "Function app code version (hash)"
+  default = "0dd68a158466df1156afec1a5aa6a92c"
+}
