@@ -1,5 +1,6 @@
 provider "azurerm" {
   subscription_id = var.subscription_id
+  partner_id      = var.weka_partner_id
   features {
   }
 }
