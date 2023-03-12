@@ -82,9 +82,3 @@ variable "blob_obs_access_key" {
   description = "Access key of existing blob obs container"
   sensitive   = true
 }
-
-variable "weka_partner_id" {
-  type = string
-  default = "f13589d1-f10d-4c3b-ae42-3b1a8337eaf1"
-  description = "Weka partner ID which registered with Microsoft resource"
-}
