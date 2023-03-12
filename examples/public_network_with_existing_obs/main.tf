@@ -1,6 +1,6 @@
 provider "azurerm" {
   subscription_id = var.subscription_id
-  partner_id      = var.weka_partner_id
+  partner_id      = "f13589d1-f10d-4c3b-ae42-3b1a8337eaf1"
   features {
   }
 }
