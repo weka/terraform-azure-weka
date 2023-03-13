@@ -27,7 +27,7 @@ resource "null_resource" "make_function_zip" {
   provisioner "local-exec" {
     command = (
       !fileexists(local.function_zip_path)
-      ? "zip -r ${local.function_zip_path} ${local.function_app_tf_path}"
+      ? "cd ${local.function_app_tf_path} && zip -r ${local.function_zip_path} ."
       : "echo \"File ${local.function_zip_path} already exists.\""
     )
   }
