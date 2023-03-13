@@ -63,41 +63,15 @@ locals {
   function_code_path = "${path.module}/function-app/"
 }
 
-resource "null_resource" "build_function_code" {
-  triggers = {
-    always_run = timestamp()
-  }
-
-  provisioner "local-exec" {
-    command = <<EOT
-    cd ${path.module}/function-app
-    go mod tidy
-    GOOS=linux GOARCH=amd64 go build
-    EOT
-  }
-}
-
-data "archive_file" "function_zip" {
-  type        = "zip"
-  output_path = local.function_zip_path
-  source_dir  = local.function_code_path
-  depends_on = [null_resource.build_function_code]
-}
-
-resource "azurerm_storage_blob" "function_app_code" {
-  name = "function_app.zip"
-  storage_account_name = azurerm_storage_account.deployment_sa.name
-  storage_container_name = azurerm_storage_container.deployment.name
-  type = "Block"
-  source = data.archive_file.function_zip.output_path
-  content_md5 = data.archive_file.function_zip.output_md5
-  depends_on = [data.archive_file.function_zip]
-}
-
-
 locals {
   stripe_width_calculated = var.cluster_size - var.protection_level - 1
   stripe_width = local.stripe_width_calculated < 16 ? local.stripe_width_calculated : 16
+}
+
+data "azurerm_storage_blob" "function_app_zip" {
+  name                   = "${var.function_app_version}.zip"
+  storage_account_name   = "wekatf${data.azurerm_resource_group.rg.location}"
+  storage_container_name = "weka-tf-functions-deployment-${data.azurerm_resource_group.rg.location}"
 }
 
 resource "azurerm_linux_function_app" "function_app" {
@@ -147,8 +121,8 @@ resource "azurerm_linux_function_app" "function_app" {
     https_only = true
     FUNCTIONS_WORKER_RUNTIME = "custom"
     FUNCTION_APP_EDIT_MODE   = "readonly"
-    HASH                     = azurerm_storage_blob.function_app_code.content_md5
-    WEBSITE_RUN_FROM_PACKAGE = "https://${azurerm_storage_account.deployment_sa.name}.blob.core.windows.net/${azurerm_storage_container.deployment.name}/${azurerm_storage_blob.function_app_code.name}"
+    HASH                     = data.azurerm_storage_blob.function_app_zip.content_md5
+    WEBSITE_RUN_FROM_PACKAGE = data.azurerm_storage_blob.function_app_zip.url
     WEBSITE_VNET_ROUTE_ALL   = true
   }
 
@@ -156,7 +130,7 @@ resource "azurerm_linux_function_app" "function_app" {
     type = "SystemAssigned"
   }
 
-  depends_on = [azurerm_storage_account.deployment_sa, azurerm_storage_blob.function_app_code]
+  depends_on = [azurerm_storage_account.deployment_sa]
 }
 
 data "azurerm_subscription" "primary" {}
