@@ -68,6 +68,12 @@ locals {
   stripe_width = local.stripe_width_calculated < 16 ? local.stripe_width_calculated : 16
 }
 
+data "azurerm_storage_blob" "function_app_zip" {
+  name                   = "${var.function_app_version}.zip"
+  storage_account_name   = "wekatf${data.azurerm_resource_group.rg.location}"
+  storage_container_name = "weka-tf-functions-deployment-${data.azurerm_resource_group.rg.location}"
+}
+
 resource "azurerm_linux_function_app" "function_app" {
   name                       = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-function-app"
   resource_group_name        = data.azurerm_resource_group.rg.name
@@ -114,8 +120,8 @@ resource "azurerm_linux_function_app" "function_app" {
     https_only = true
     FUNCTIONS_WORKER_RUNTIME = "custom"
     FUNCTION_APP_EDIT_MODE   = "readonly"
-    HASH                     = var.function_app_version
-    WEBSITE_RUN_FROM_PACKAGE = "https://wekatf${data.azurerm_resource_group.rg.location}.blob.core.windows.net/weka-tf-functions-deployment-${data.azurerm_resource_group.rg.location}/${var.function_app_version}.zip"
+    HASH                     = data.azurerm_storage_blob.function_app_zip.content_md5
+    WEBSITE_RUN_FROM_PACKAGE = data.azurerm_storage_blob.function_app_zip.url
     WEBSITE_VNET_ROUTE_ALL   = true
   }
 

@@ -8,7 +8,7 @@ variable "function_app_zip_path" {
   description = "An absolute path to the code zip on the local system."
 }
 
-variable "function_app_zip_md5" {
+variable "function_app_code_hash" {
   type = string
-  description = "The MD5 checksum of output archive file."
+  description = "The MD5 checksum of function app dir."
 }

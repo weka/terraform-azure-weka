@@ -7,7 +7,7 @@ on:
       - add-autoscaling-support
       - distribute-function-zip
     paths:
-      - 'function-app/code/**'
+      - 'function-app/**'
 
 jobs:
   function-app-dist:
@@ -28,6 +28,9 @@ jobs:
       
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
+        with:
+          # add to be able to refer to the output correctly
+          terraform_wrapper: false
 
       - name: Setup Go
         uses: actions/setup-go@v3
@@ -41,17 +44,19 @@ jobs:
         run: terraform init
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve -var="subscription_id=${{ secrets.SUBSCRIPTION_ID }}"
 
       - name: Update Function App Zip Version
         run: |
-          old_function_app_zip_version=$(awk '/Function app code version/{getline;print $NF;}' variables.tf)
-          echo $old_function_app_zip_version
-          new_function_app_zip_version=$(terraform output -raw function_app_zip_md5)
-          echo $new_function_app_zip_version
+          new_function_app_zip_version=$(terraform output function_app_zip_md5)
           cd ../../
-          sed -i 's/'"$old_function_app_zip_version"'/'"$new_function_app_zip_version"'/' variables.tf 
-          tail variables.tf
+          old_function_app_zip_version=$(awk '/Function app code version/{getline;print $NF;}' variables.tf)
+          sed -i "s/$old_function_app_zip_version/$new_function_app_zip_version/" variables.tf
 
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: 'chore: update function_app_version'
+          file_pattern: 'variables.tf'
+          skip_fetch: true    
+          skip_checkout: true

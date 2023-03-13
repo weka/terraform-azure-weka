@@ -55,24 +55,24 @@ data "azurerm_storage_account_sas" "sa_sas" {
 
 resource "null_resource" "function_app_code" {
   triggers = {
-    zip_md5 = var.function_app_zip_md5
+    code_md5 = var.function_app_code_hash
   }
 
   provisioner "local-exec" {
     command = <<EOT
-DATE_NOW=$(date -Ru | sed 's/\+0000/GMT/')
-AZ_VERSION="2021-12-02"
-AZ_BLOB_TARGET="${azurerm_storage_account.sa.primary_blob_endpoint}${azurerm_storage_container.container.name}"
-FILENAME="${var.function_app_zip_md5}.zip"
-AZ_SAS_TOKEN="${data.azurerm_storage_account_sas.sa_sas.sas}"
+    DATE_NOW=$(date -Ru | sed 's/\+0000/GMT/')
+    AZ_VERSION="2021-12-02"
+    AZ_BLOB_TARGET="${azurerm_storage_account.sa.primary_blob_endpoint}${azurerm_storage_container.container.name}"
+    FILENAME="${var.function_app_code_hash}.zip"
+    AZ_SAS_TOKEN="${data.azurerm_storage_account_sas.sa_sas.sas}"
 
-curl --fail -X PUT -T ${var.function_app_zip_path} \
-    -H "x-ms-date: $DATE_NOW" \
-    -H "x-ms-blob-type: BlockBlob" \
-    "$AZ_BLOB_TARGET/$FILENAME$AZ_SAS_TOKEN"
+    curl --fail -X PUT -T ${var.function_app_zip_path} \
+        -H "x-ms-date: $DATE_NOW" \
+        -H "x-ms-blob-type: BlockBlob" \
+        "$AZ_BLOB_TARGET/$FILENAME$AZ_SAS_TOKEN"
     EOT
   }
 
-  depends_on             = [azurerm_storage_container.container]
+  depends_on = [azurerm_storage_container.container]
 }
 
