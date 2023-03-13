@@ -12,6 +12,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 	"weka-deployment/lib/jsonrpc2"
 
@@ -338,7 +339,11 @@ func (h logHandler) Request(ctx context.Context, conn *jsonrpc2.Conn, direction 
 	if err != nil {
 		paramBytes = []byte(fmt.Sprintf("error in json.Marshal of parameters: %v", err))
 	}
-	h.log.Printf("--(%s: %v)--> %s %s", h.ep.String(), r.ID, r.Method, string(paramBytes))
+	if strings.Contains(r.Method, "login") || strings.Contains(r.Method, "auth") {
+		h.log.Printf("--(%s: %v)--> %s %s", h.ep.String(), r.ID, r.Method, "<hidden>")
+	} else {
+		h.log.Printf("--(%s: %v)--> %s %s", h.ep.String(), r.ID, r.Method, string(paramBytes))
+	}
 	return ctx
 }
 
