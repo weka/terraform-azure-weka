@@ -20,21 +20,27 @@ resource "null_resource" "build_function_code" {
   }
 }
 
-data "archive_file" "function_zip" {
-  type        = "zip"
-  output_path = local.function_zip_path
-  source_dir  = local.function_app_tf_path
-  depends_on  = [null_resource.build_function_code]
+resource "null_resource" "make_function_zip" {
+  triggers = {
+    dir_md5 = local.function_app_code_hash
+  }
+  provisioner "local-exec" {
+    command = (
+      !fileexists(local.function_zip_path)
+      ? "zip -r ${local.function_zip_path} ${local.function_app_tf_path}"
+      : "echo \"File ${local.function_zip_path} already exists.\""
+    )
+  }
+  depends_on = [null_resource.build_function_code]
 }
-
 
 module "upload-zip" {
   source   = "./upload_zip"
   for_each = toset(var.regions)
 
-  region                = each.key
-  function_app_zip_md5  = data.archive_file.function_zip.output_md5
-  function_app_zip_path = data.archive_file.function_zip.output_path
+  region                 = each.key
+  function_app_zip_path  = local.function_zip_path
+  function_app_code_hash = local.function_app_code_hash
 
-  depends_on = [data.archive_file.function_zip]
+  depends_on = [null_resource.make_function_zip]
 }
