@@ -283,5 +283,5 @@ variable "function_app_log_level" {
 variable "function_app_version" {
   type = string
   description = "Function app code version (hash)"
-  default = "0dd68a158466df1156afec1a5aa6a92c"
+  default = "4fa023909e3edadbf981b050de002be1"
 }
