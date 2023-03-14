@@ -32,6 +32,7 @@ No resources.
 | <a name="input_prefix"></a> [prefix](#input\_prefix) | Prefix for all resources | `string` | n/a | yes |
 | <a name="input_rg_name"></a> [rg\_name](#input\_rg\_name) | Name of existing resource group | `string` | n/a | yes |
 | <a name="input_set_obs_integration"></a> [set\_obs\_integration](#input\_set\_obs\_integration) | Should be true to enable OBS integration with weka cluster | `bool` | n/a | yes |
+| <a name="input_single_placement_group"></a> [single\_placement\_group](#input\_single\_placement\_group) | Limited Single Placement Group, which means the number of instances will be capped at 100 Virtual Machines | `bool` | n/a | yes |
 | <a name="input_subnet_delegation"></a> [subnet\_delegation](#input\_subnet\_delegation) | Subnet delegation enables you to designate a specific subnet for an Azure PaaS service | `string` | n/a | yes |
 | <a name="input_subnets_name_list"></a> [subnets\_name\_list](#input\_subnets\_name\_list) | Names of existing subnets list | `list(string)` | `[]` | no |
 | <a name="input_subscription_id"></a> [subscription\_id](#input\_subscription\_id) | Subscription id for deployment | `string` | n/a | yes |

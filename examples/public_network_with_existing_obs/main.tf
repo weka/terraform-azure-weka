@@ -14,23 +14,24 @@ module "create-network" {
 }
 
 module "deploy-weka" {
-  source                = "../.."
-  prefix                = var.prefix
-  rg_name               = var.rg_name
-  vnet_name             = module.create-network.vnet-name
-  subnets               = module.create-network.subnets-name
-  sg_id                 = module.create-network.sg-id
-  subnet_delegation_id  = module.create-network.subnet-delegation-id
-  get_weka_io_token     = var.get_weka_io_token
-  cluster_name          = var.cluster_name
-  set_obs_integration   = var.set_obs_integration
-  instance_type         = var.instance_type
-  cluster_size          = var.cluster_size
-  obs_name              = var.obs_name
-  obs_container_name    = var.obs_container_name
-  blob_obs_access_key   = var.blob_obs_access_key
-  tiering_ssd_percent   = var.tiering_ssd_percent
-  subscription_id       = var.subscription_id
-  private_dns_zone_name = module.create-network.private-dns-zone-name
-  depends_on            = [module.create-network]
+  source                 = "../.."
+  prefix                 = var.prefix
+  rg_name                = var.rg_name
+  vnet_name              = module.create-network.vnet-name
+  subnets                = module.create-network.subnets-name
+  sg_id                  = module.create-network.sg-id
+  subnet_delegation_id   = module.create-network.subnet-delegation-id
+  get_weka_io_token      = var.get_weka_io_token
+  cluster_name           = var.cluster_name
+  set_obs_integration    = var.set_obs_integration
+  instance_type          = var.instance_type
+  cluster_size           = var.cluster_size
+  obs_name               = var.obs_name
+  obs_container_name     = var.obs_container_name
+  blob_obs_access_key    = var.blob_obs_access_key
+  tiering_ssd_percent    = var.tiering_ssd_percent
+  subscription_id        = var.subscription_id
+  single_placement_group = var.single_placement_group
+  private_dns_zone_name  = module.create-network.private-dns-zone-name
+  depends_on             = [module.create-network]
 }
