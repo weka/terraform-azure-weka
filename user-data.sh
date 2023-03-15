@@ -38,7 +38,7 @@ INSTALLATION_PATH="/tmp/weka"
 mkdir -p $INSTALLATION_PATH
 
 # install ofed
-if [[ "${skip_ofed_installation}" == false ]]; then
+if [[ ${install_ofed} == true ]]; then
   curl -i ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"installing ofed\"}"
   OFED_NAME=ofed-${ofed_version}
   if [[ "${install_ofed_url}" ]]; then

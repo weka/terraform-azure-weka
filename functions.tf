@@ -116,6 +116,9 @@ resource "azurerm_linux_function_app" "function_app" {
     "PREFIX" = var.prefix
     "KEY_VAULT_URI" = azurerm_key_vault.key_vault.vault_uri
     "SUBNET" = var.subnets[0]
+    "INSTALL_DPDK" = var.install_cluster_dpdk
+    "SUBNETS_RANGE" = join(" ",local.subnets_range)
+    "NICS_NUM" = var.container_number_map[var.instance_type].nics
     "INSTANCE_TYPE" = var.instance_type
     "INSTALL_URL" =  var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.weka.io/dist/v1/install/${var.weka_version}/${var.weka_version}"
     "LOG_LEVEL" = var.function_app_log_level

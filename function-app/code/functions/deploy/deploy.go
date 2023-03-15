@@ -51,7 +51,7 @@ func getFunctionKey(ctx context.Context, keyVaultUri string) (functionAppKey str
 	return
 }
 
-func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey, vm string) (bashScript string, err error) {
+func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey, vm, installDpdk, subnetsRange, nicsNum string) (bashScript string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	joinFinalizationUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/join_finalization", prefix, clusterName)
@@ -129,9 +129,80 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	DRIVES=%d
 	COMPUTE_MEMORY=%d
 	IPS=%s
-	weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $IPS --failure-domain "$HASHED_IP"
-	weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY"GB --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $IPS --failure-domain "$HASHED_IP"
-	weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $IPS --failure-domain "$HASHED_IP"`
+	INSTALL_DPDK=%s
+	SUBNETS_RANGE="%s"
+	NICS_NUM=%s
+
+	if [[ $INSTALL_DPDK == true ]]; then
+		for(( i=0; i<$NICS_NUM; i++)); do
+				   echo "20$i eth$i-rt" >> /etc/iproute2/rt_tables
+		done
+		
+		echo "network:"> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+		echo "  config: disabled" >> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+		
+		gateway=$(ip r | grep default | awk '{print $3}')
+		for(( i=0; i<$NICS_NUM; i++)); do
+			eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
+			cat <<-EOF | sed -i "/            set-name: eth$i/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
+            routes:
+            - to: $SUBNETS_RANGE
+              via: $gateway
+              metric: 200
+              table: 20$i
+            - to: 0.0.0.0/0
+              via: $gateway
+              table: 20$i
+            routing-policy:
+            - from: $eth/32
+              table: 20$i
+            - to: $eth/32
+              table: 20$i
+		EOF
+		done
+		netplan apply
+
+  		for ((i=0; i<$NICS_NUM i++)); do
+      		 ifconfig eth$i mtu 3900 up
+  		done
+		net=""
+		for ((i=1; i<=$DRIVE_CONTAINERS_NUM; i++)); do
+			enp=$(ls -l /sys/class/net/eth$i/ | grep enP | awk -F"_" '{print $2}' | awk '{print $1}')
+			eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
+			gateway=$(echo ${eth::-1}1)
+			bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
+            IFS='/' read -ra netmask <<< "$bits"
+			net="$net --net $enp/$eth/${netmask[1]}/$gateway "
+		done
+		weka local setup container --name drives0 --base-port 14000 --cores $DRIVE_CONTAINERS_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINERS_NUM $net --failure-domain "$HASHED_IP"
+		
+		i=$((1+$DRIVE_CONTAINERS_NUM))
+		j=$(($i+$NUM_COMPUTE_CONTAINERS))
+		net=""
+		for ((i; i<$j; i++)); do
+			enp=$(ls -l /sys/class/net/eth$i/ | grep enP | awk -F"_" '{print $2}' | awk '{print $1}')
+			eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
+			gateway=$(echo ${eth::-1}1)
+			bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
+            IFS='/' read -ra netmask <<< "$bits"
+			net="$net --net $enp/$eth/${netmask[1]}/$gateway "
+		done
+		weka local setup container --name compute0 --base-port 15000 --cores $NUM_COMPUTE_CONTAINERS --no-frontends --compute-dedicated-cores $NUM_COMPUTE_CONTAINERS  --memory $COMPUTE_MEMORY --join-ips $IPS $net --failure-domain "$HASHED_IP"
+
+			
+		i=$(($NICS_NUM-1))
+		enp=$(ls -l /sys/class/net/eth$i/ | grep enP | awk -F"_" '{print $2}' | awk '{print $1}')
+		eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
+		gateway=$(echo ${eth::-1}1)
+		bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
+        IFS='/' read -ra netmask <<< "$bits"
+		weka local setup container --name frontend0 --base-port 16000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --allow-protocols true --join-ips $IPS --net $enp/$eth/${netmask[1]}/$gateway --failure-domain "$HASHED_IP"
+
+	else
+		weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $IPS --failure-domain "$HASHED_IP"
+		weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY"GB --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $IPS --failure-domain "$HASHED_IP"
+		weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $IPS --failure-domain "$HASHED_IP"
+	fi`
 
 	isReady := `
 	while ! weka debug manhole -s 0 operational_status | grep '"is_ready": true' ; do
@@ -210,7 +281,10 @@ func GetDeployScript(
 	installUrl,
 	keyVaultUri,
 	subnet,
-	vm string) (bashScript string, err error) {
+	vm,
+	installDpdk,
+	subnetsRange,
+	nicsNum string) (bashScript string, err error) {
 
 	clusterizeUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/clusterize", prefix, clusterName)
 	reportUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/report", prefix, clusterName)
@@ -242,6 +316,9 @@ func GetDeployScript(
 			PROTECT_URL=%s
 			FUNCTION_KEY=%s
 			VM=%s
+			INSTALL_DPDK=%s
+			SUBNETS_RANGE="%s"
+			NICS_NUM=%s
 
 			gsutil cp $INSTALL_URL /tmp
 			cd /tmp
@@ -253,13 +330,59 @@ func GetDeployScript(
 
 			weka local stop
 			weka local rm default --force
+			
+			if [[ $INSTALL_DPDK == true ]]; then
+				for(( i=0; i<$NICS_NUM; i++)); do
+						   echo "20$i eth$i-rt" >> /etc/iproute2/rt_tables
+				done
+		
+				echo "network:"> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+				echo "  config: disabled" >> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+						
+				gateway=$(ip r | grep default | awk '{print $3}')
+				for(( i=0; i<$NICS_NUM; i++)); do
+					eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
+					cat <<-EOF | sed -i "/            set-name: eth$i/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
+            routes:
+            - to: $SUBNETS_RANGE
+              via: $gateway
+              metric: 200
+              table: 20$i
+            - to: 0.0.0.0/0
+              via: $gateway
+              table: 20$i
+            routing-policy:
+            - from: $eth/32
+              table: 20$i
+            - to: $eth/32
+              table: 20$i
+				EOF
+				done
+				netplan apply
+
+  				for ((i=0; i<$NICS_NUM; i++)); do
+      				  ifconfig eth$i mtu 3900 up
+  				done
+				net=""
+				for ((i=1; i<=$DRIVE_CONTAINERS_NUM; i++)); do
+					enp=$(ls -l /sys/class/net/eth$i/ | grep enP | awk -F"_" '{print $2}' | awk '{print $1}')
+					eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
+					gateway=$(echo ${eth::-1}1)
+					bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
+            		IFS='/' read -ra netmask <<< "$bits"
+					net="$net --net $enp/$eth/${netmask[1]}/$gateway "
+				done
+				weka local setup container --name drives0 --base-port 14000 --cores $DRIVE_CONTAINERS_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINERS_NUM $net
+			else
+				weka local setup container --name drives0 --base-port 14000 --cores $DRIVE_CONTAINERS_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINERS_NUM
+			fi
 
 			curl $PROTECT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$VM\"}"
 			curl $CLUSTERIZE_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$VM\"}" > /tmp/clusterize.sh
 			chmod +x /tmp/clusterize.sh
 			/tmp/clusterize.sh 2>&1 | tee /tmp/weka_clusterization.log
 			`
-			bashScript = fmt.Sprintf(installTemplate, installUrl, tarName, packageName, clusterizeUrl, reportUrl, protectUrl, functionKey, vm)
+			bashScript = fmt.Sprintf(installTemplate, installUrl, tarName, packageName, clusterizeUrl, reportUrl, protectUrl, functionKey, vm, installDpdk, subnetsRange, nicsNum)
 
 		} else {
 			token, err2 := getWekaIoToken(ctx, keyVaultUri)
@@ -278,6 +401,9 @@ func GetDeployScript(
 			PROTECT_URL=%s
 			FUNCTION_KEY=%s
 			VM=%s
+			INSTALL_DPDK=%s
+			SUBNETS_RANGE="%s"
+			NICS_NUM=%s
 
 			# https://gist.github.com/fungusakafungus/1026804
 			function retry {
@@ -297,22 +423,55 @@ func GetDeployScript(
 					return 0
 			}
 
-			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
-			retry 300 2 curl --fail --max-time 10 $INSTALL_URL | sh
-			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka installation completed\"}"
+			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"installing weka\"}"
+			retry 300 2 curl --fail --max-time 10 https://$TOKEN@get.prod.weka.io/dist/v1/install/4.1.2-79fa6212c4ac2650d2ea4f402e984973/4.1.2.602-792f309deb1e08d41534aca31b7ab123 | sh
+			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"weka installation completed\"}"
 
 			weka local stop
 			weka local rm default --force
+			if [[ $INSTALL_DPDK == true ]]; then
+				for(( i=0; i<$NICS_NUM; i++)); do
+						   echo "20$i eth$i-rt" >> /etc/iproute2/rt_tables
+				done
+		
+				echo "network:"> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+				echo "  config: disabled" >> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+				
+				gateway=$(ip r | grep default | awk '{print $3}')
+				for(( i=0; i<$NICS_NUM; i++)); do
+					eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
+					cat <<-EOF | sed -i "/            set-name: eth$i/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
+            routes:
+            - to: $SUBNETS_RANGE
+              via: $gateway
+              metric: 200
+              table: 20$i
+            - to: 0.0.0.0/0
+              via: $gateway
+              table: 20$i
+            routing-policy:
+            - from: $eth/32
+              table: 20$i
+            - to: $eth/32
+              table: 20$i
+				EOF
+				done
+				netplan apply
+
+  				for ((i=0; i<$NICS_NUM; i++)); do
+      				 ifconfig eth$i mtu 3900 up
+  				done
+			fi
 
 			curl $PROTECT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$VM\"}"
 			curl $CLUSTERIZE_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$VM\"}" > /tmp/clusterize.sh
 			chmod +x /tmp/clusterize.sh
 			/tmp/clusterize.sh > /tmp/cluster_creation.log 2>&1
 			`
-			bashScript = fmt.Sprintf(installTemplate, token, installUrl, clusterizeUrl, reportUrl, protectUrl, functionKey, vm)
+			bashScript = fmt.Sprintf(installTemplate, token, installUrl, clusterizeUrl, reportUrl, protectUrl, functionKey, vm, installDpdk, subnetsRange, nicsNum)
 		}
 	} else {
-		bashScript, err = GetJoinParams(ctx, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey, vm)
+		bashScript, err = GetJoinParams(ctx, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey, vm, installDpdk, subnetsRange, nicsNum)
 		if err != nil {
 			return
 		}
@@ -338,6 +497,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	subnet := os.Getenv("SUBNET")
 	instanceType := os.Getenv("INSTANCE_TYPE")
 	installUrl := os.Getenv("INSTALL_URL")
+	installDpdk := os.Getenv("INSTALL_DPDK")
+	subnetsRange := os.Getenv("SUBNETS_RANGE")
+	nicsNum := os.Getenv("NICS_NUM")
 
 	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
@@ -379,7 +541,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		installUrl,
 		keyVaultUri,
 		subnet,
-		data.Vm)
+		data.Vm,
+		installDpdk,
+		subnetsRange,
+		nicsNum)
 
 	if err != nil {
 		resData["body"] = err.Error()

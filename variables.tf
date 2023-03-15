@@ -72,7 +72,7 @@ variable "subnet_delegation_id" {
 variable "weka_version" {
   type = string
   description = "The Weka version to deploy."
-  default = "4.1.0.71"
+  default = "4.1.2.602-792f309deb1e08d41534aca31b7ab123"
 }
 
 variable "get_weka_io_token" {
@@ -307,4 +307,16 @@ variable "function_app_dist" {
     condition = contains(["dev", "release"], var.function_app_dist)
     error_message = "Valid value is one of the following: dev, release."
   }
+}
+
+variable "install_cluster_dpdk" {
+  type        = bool
+  default     = false
+  description = "Install weka cluster with DPDK"
+}
+
+variable "install_ofed" {
+  type        = bool
+  default     = false
+  description = "Install ofed for weka cluster with dpdk configuration"
 }
