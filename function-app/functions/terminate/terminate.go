@@ -63,10 +63,10 @@ func setForExplicitRemoval(instance *armcompute.VirtualMachineScaleSetVM, toRemo
 	return false
 }
 
-func getInstanceCreationTime(instance *armcompute.VirtualMachineScaleSetVM) (provisionTime time.Time) {
+func getInstanceCreationTime(instance *armcompute.VirtualMachineScaleSetVM) (provisionTime *time.Time) {
 	for _, status := range instance.Properties.InstanceView.Statuses {
 		if *status.Code == "ProvisioningState/succeeded" {
-			provisionTime = *status.Time
+			provisionTime = status.Time
 			return
 		}
 	}
@@ -93,8 +93,13 @@ func terminateUnneededInstances(ctx context.Context, subscriptionId, resourceGro
 	for _, instance := range instances {
 		logger.Info().Msgf("Handling instance %s(%s) removal", *instance.Name, *instance.InstanceID)
 		if !setForExplicitRemoval(instance, explicitRemoval) {
-			if time.Now().Sub(getInstanceCreationTime(instance)) < time.Minute*30 {
-				logger.Debug().Msgf("Instance %s is not explicitly set for removal, giving 30M grace time", *instance.InstanceID)
+			instanceCreationTime := getInstanceCreationTime(instance)
+			if instanceCreationTime == nil {
+				logger.Info().Msgf("Couldn't retrieve instance %s creation time, it is probably too new, giving grace time before removal", *instance.InstanceID)
+				continue
+			}
+			if time.Now().Sub(*instanceCreationTime) < time.Minute*30 {
+				logger.Info().Msgf("Instance %s is not explicitly set for removal, giving 30M grace time", *instance.InstanceID)
 				continue
 			}
 		}
@@ -124,6 +129,9 @@ func terminateUnhealthyInstances(ctx context.Context, subscriptionId, resourceGr
 	}
 
 	for _, vm := range vms {
+		if vm.Properties.InstanceView == nil || vm.Properties.InstanceView.VMHealth == nil {
+			continue
+		}
 		healthStatus := *vm.Properties.InstanceView.VMHealth.Status.Code
 		if healthStatus == "HealthState/unhealthy" {
 			instanceState := getInstancePowerState(vm)
@@ -135,7 +143,7 @@ func terminateUnhealthyInstances(ctx context.Context, subscriptionId, resourceGr
 		}
 	}
 
-	logger.Debug().Msgf("found %d stopped instances", len(toTerminate))
+	logger.Info().Msgf("found %d unhealthy stopped instances to terminate: %s", len(toTerminate), toTerminate)
 	_, terminateErrors := common.TerminateScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, toTerminate)
 	errs = append(errs, terminateErrors...)
 
@@ -169,6 +177,7 @@ func Terminate(ctx context.Context, scaleResponse protocol.ScaleResponse, subscr
 		response.AddTransientErrors(errs)
 	}
 
+	logger.Info().Msgf("Instances set for explicit removal: %s", scaleResponse.ToTerminate)
 	deltaInstanceIds, err := getDeltaInstancesIds(ctx, subscriptionId, resourceGroupName, vmScaleSetName, scaleResponse)
 	if err != nil {
 		logger.Error().Msgf("%s", err)
@@ -191,10 +200,15 @@ func Terminate(ctx context.Context, scaleResponse protocol.ScaleResponse, subscr
 	response.AddTransientErrors(errs)
 
 	for instanceId, instance := range terminatedInstancesMap {
-		response.Instances = append(response.Instances, protocol.TerminatedInstance{
+		terminatedInstance := protocol.TerminatedInstance{
 			InstanceId: instanceId,
-			Creation:   getInstanceCreationTime(instance),
-		})
+		}
+
+		instanceCreationTime := getInstanceCreationTime(instance)
+		if instanceCreationTime != nil {
+			terminatedInstance.Creation = *instanceCreationTime
+		}
+		response.Instances = append(response.Instances, terminatedInstance)
 	}
 
 	return
