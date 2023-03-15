@@ -25,11 +25,11 @@ func setProtection(ctx context.Context, subscriptionId, resourceGroupName, state
 	logger := common.LoggerFromCtx(ctx)
 	logger.Info().Msgf("Setting deletion protection on %s", hostName)
 	counter := 0
-	authSleepInterval := 1 //minutes
+	authSleepInterval := 2 //minutes
 	for {
 		err = common.SetDeletionProtection(ctx, subscriptionId, resourceGroupName, vmScaleSetName, instanceId, true)
 		if err == nil {
-			msg := "Deletion protection was was set successfully"
+			msg := "Deletion protection was set successfully"
 			logger.Info().Msg(msg)
 			report(ctx, hostName, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, "progress", msg)
 			break
@@ -100,6 +100,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	err = setProtection(ctx, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, vmScaleSetName, instanceId, hostName)
 
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		resData["body"] = err.Error()
 	} else {
 		resData["body"] = "protection was set successfully"

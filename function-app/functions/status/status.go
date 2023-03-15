@@ -3,6 +3,7 @@ package status
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"os"
@@ -14,13 +15,16 @@ import (
 )
 
 type ClusterStatus struct {
-	InitialSize            int                 `json:"initial_size"`
-	DesiredSize            int                 `json:"desired_size"`
+	InitialSize int        `json:"initial_size"`
+	DesiredSize int        `json:"desired_size"`
+	Clusterized bool       `json:"clusterized"`
+	WekaStatus  WekaStatus `json:"weka_status"`
+}
+
+type Reports struct {
+	ReadyForClusterization []string            `json:"ready_for_clusterization"`
 	Progress               map[string][]string `json:"progress"`
 	Errors                 map[string][]string `json:"errors"`
-	Clusterized            bool                `json:"clusterized"`
-	ReadyForClusterization []string            `json:"ready_for_clusterization"`
-	WekaStatus             WekaStatus          `json:"weka_status"`
 }
 
 type ClusterCloud struct {
@@ -75,6 +79,21 @@ type WekaStatus struct {
 	Licensing              ClusterLicensing  `json:"licensing"`
 }
 
+func GetReports(ctx context.Context, stateStorageName, stateContainerName string) (reports Reports, err error) {
+	logger := common.LoggerFromCtx(ctx)
+	logger.Info().Msg("fetching cluster status...")
+
+	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
+	if err != nil {
+		return
+	}
+	reports.ReadyForClusterization = state.Instances
+	reports.Progress = state.Progress
+	reports.Errors = state.Errors
+
+	return
+}
+
 func GetClusterStatus(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, keyVaultUri string) (clusterStatus ClusterStatus, err error) {
 	logger := common.LoggerFromCtx(ctx)
 	logger.Info().Msg("fetching cluster status...")
@@ -85,10 +104,7 @@ func GetClusterStatus(ctx context.Context, subscriptionId, resourceGroupName, vm
 	}
 	clusterStatus.InitialSize = state.InitialSize
 	clusterStatus.DesiredSize = state.DesiredSize
-	clusterStatus.Progress = state.Progress
-	clusterStatus.Errors = state.Errors
 	clusterStatus.Clusterized = state.Clusterized
-	clusterStatus.ReadyForClusterization = state.Instances
 	if !state.Clusterized {
 		return
 	}
@@ -150,15 +166,54 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 
 	ctx := r.Context()
+	logger := common.LoggerFromCtx(ctx)
+
+	var invokeRequest common.InvokeRequest
+
+	var requestBody struct {
+		Type string `json:"type"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&invokeRequest); err != nil {
+		err = fmt.Errorf("cannot decode the request: %v", err)
+		logger.Error().Err(err).Send()
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var reqData map[string]interface{}
+	err := json.Unmarshal(invokeRequest.Data["req"], &reqData)
+	if err != nil {
+		err = fmt.Errorf("cannot unmarshal the request data: %v", err)
+		logger.Error().Err(err).Send()
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if reqData["Body"] != nil {
+		if json.Unmarshal([]byte(reqData["Body"].(string)), &requestBody) != nil {
+			err = fmt.Errorf("cannot unmarshal the request body: %v", err)
+			logger.Error().Err(err).Send()
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	}
 
 	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName)
-	clusterStatus, err := GetClusterStatus(ctx, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, keyVaultUri)
+	var result interface{}
+	if requestBody.Type == "" || requestBody.Type == "status" {
+		result, err = GetClusterStatus(ctx, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, keyVaultUri)
+	} else if requestBody.Type == "progress" {
+		result, err = GetReports(ctx, stateStorageName, stateContainerName)
+	} else {
+		result = "Invalid status type"
+	}
 
 	if err != nil {
 		resData["body"] = err.Error()
 	} else {
 
-		resData["body"] = clusterStatus
+		resData["body"] = result
 	}
 	outputs["res"] = resData
 	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}

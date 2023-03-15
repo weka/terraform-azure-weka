@@ -243,8 +243,6 @@ func UpdateClusterized(ctx context.Context, subscriptionId, resourceGroupName, s
 
 	state.Instances = []string{}
 	state.Clusterized = true
-	state.Progress = nil
-	state.Errors = nil
 	err = WriteState(ctx, stateStorageName, stateContainerName, state)
 	_, err2 := UnlockContainer(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName, leaseId)
 	if err2 != nil {
