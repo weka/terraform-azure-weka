@@ -15,5 +15,11 @@
       "direction": "out",
       "name": "res"
     }
-  ]
+  ],
+  "retry": {
+    "strategy": "exponentialBackoff",
+    "maxRetryCount": 5,
+    "minimumInterval": "00:00:10",
+    "maximumInterval": "00:15:00"
+  }
 }

@@ -54,6 +54,8 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	logger := common.LoggerFromCtx(ctx)
 
 	joinFinalizationUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/join_finalization", prefix, clusterName)
+	reportUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/report", prefix, clusterName)
+
 	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
 	vmsPrivateIps, err := common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 
@@ -82,6 +84,10 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	export WEKA_PASSWORD="%s"
 	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
 	declare -a backend_ips=("%s" )
+	FUNCTION_KEY="%s"
+	REPORT_URL="%s"
+
+	curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Joining started\"}"
 
 	random=$$
 	echo $random
@@ -101,7 +107,9 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 		ip=$(ifconfig eth0 | grep "inet " | awk '{ print $2}')
 	done
 
+	curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
 	curl $backend_ip:14000/dist/v1/install | sh
+	curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka installation completed\"}"
 
 	weka version get --from $backend_ip:14000 $VERSION --set-current
 	weka version prepare $VERSION
@@ -112,7 +120,7 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	DRIVES=%d
 	COMPUTE_MEMORY=%d
 	IPS=%s
-	weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $IPS
+	weka local setup container --name drive0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $IPS
 	weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY"GB --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $IPS
 	weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $IPS`
 
@@ -123,9 +131,10 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	echo Connected to cluster
 	`
 
+	// we will use here the FUNCTION_KEY and REPORT_URL from the bashScriptTemplate
 	addDrives := `
 	JOIN_FINALIZATION_URL="%s"
-	FUNCTION_KEY="%s"
+
 	host_id=$(weka local run --container compute0 $WEKA_RUN_CREDS manhole getServerInfo | grep hostIdValue: | awk '{print $2}')
 	mkdir -p /opt/weka/tmp
 	cat >/opt/weka/tmp/find_drives.py <<EOL
@@ -137,7 +146,7 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	EOL
 	devices=$(weka local run --container compute0 $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
 	for device in $devices; do
-		weka local run --container drive0 /weka/tools/weka_sign_drive $device
+		weka local exec --container drive0 /weka/tools/weka_sign_drive $device
 	done
 	ready=0
 	while [ $ready -eq 0 ] ; do
@@ -156,6 +165,7 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	compute_name=$(echo "$compute_name" | cut -c2- | rev | cut -c2- | rev)
 	curl $JOIN_FINALIZATION_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"name\": \"$compute_name\"}"
 	echo "completed successfully" > /tmp/weka_join_completion_validation
+	curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Join completed successfully\"}"
 	`
 	var compute, frontend, drive, mem int
 	backendCoreCounts := getBackendCoreCountsDefaults()
@@ -172,9 +182,9 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	if !instanceParams.converged {
 		bashScriptTemplate += " --dedicate"
 	}
-	bashScriptTemplate += isReady + fmt.Sprintf(addDrives, joinFinalizationUrl, functionKey)
+	bashScriptTemplate += isReady + fmt.Sprintf(addDrives, joinFinalizationUrl)
 
-	bashScript = fmt.Sprintf(bashScriptTemplate, wekaPassword, strings.Join(ips, "\" \""), subnet, compute, frontend, drive, mem, strings.Join(ips, ","))
+	bashScript = fmt.Sprintf(bashScriptTemplate, wekaPassword, strings.Join(ips, "\" \""), functionKey, reportUrl, subnet, compute, frontend, drive, mem, strings.Join(ips, ","))
 
 	return
 }
@@ -234,13 +244,13 @@ func GetDeployScript(
 			cd /tmp
 			tar -xvf $TAR_NAME
 			cd $PACKAGE_NAME
-			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"installing weka\"}"
+			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
 			./install.sh
-			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"weka installation completed\"}"
+			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka installation completed\"}"
 
 			weka local stop
 			weka local rm default --force
-			weka local setup container --name drives0 --base-port 14000 --cores $DRIVE_CONTAINERS_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINERS_NUM
+			weka local setup container --name drive0 --base-port 14000 --cores $DRIVE_CONTAINERS_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINERS_NUM
 
 			compute_name=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" | jq '.compute.name')
 			compute_name=$(echo "$compute_name" | cut -c2- | rev | cut -c2- | rev)
@@ -287,13 +297,13 @@ func GetDeployScript(
 					return 0
 			}
 
-			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"installing weka\"}"
+			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
 			retry 300 2 curl --fail --max-time 10 $INSTALL_URL | sh
-			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"weka installation completed\"}"
+			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka installation completed\"}"
 
 			weka local stop
 			weka local rm default --force
-			weka local setup container --name drives0 --base-port 14000 --cores $DRIVE_CONTAINERS_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINERS_NUM
+			weka local setup container --name drive0 --base-port 14000 --cores $DRIVE_CONTAINERS_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINERS_NUM
 
 			compute_name=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" | jq '.compute.name')
 			compute_name=$(echo "$compute_name" | cut -c2- | rev | cut -c2- | rev)

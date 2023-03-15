@@ -141,6 +141,7 @@ func generateClusterizationScript(
 	weka alerts mute UdpModePerformanceWarning 365d
 
 	echo "completed successfully" > /tmp/weka_clusterization_completion_validation
+	curl "$report_url?code=$FUNCTION_APP_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Clusterization completed successfully\"}"
 
 	curl "$clusterize_finalization_url?code=$FUNCTION_APP_KEY"
 	`
