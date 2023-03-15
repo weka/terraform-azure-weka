@@ -51,7 +51,7 @@ func getFunctionKey(ctx context.Context, keyVaultUri string) (functionAppKey str
 	return
 }
 
-func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey, vm, installDpdk, subnetsRange, nicsNum string) (bashScript string, err error) {
+func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, keyVaultUri, functionKey, vm, installDpdk, subnetsRange, nicsNum string) (bashScript string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	joinFinalizationUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/join_finalization", prefix, clusterName)
@@ -96,20 +96,6 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	REPORT_URL="%s"
 	HASHED_IP="%s"
 
-	function getNetStrForDpdk() {
-		i=$1
-		j=$2
-		net=" "
-		gateway=$(route -n | grep 0.0.0.0 | grep UG | awk '{print $2}')
-		for ((i; i<$j; i++)); do
-			eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
-			enp=$(ls -l /sys/class/net/eth$i/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}')
-			bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
-			IFS='/' read -ra netmask <<< "$bits"
-			net="$net --net $enp/$eth/${netmask[1]}/$gateway"
-		done
-	}
-
 	curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Joining started\"}"
 
 	random=$$
@@ -121,8 +107,6 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 			fi
 		fi
 	done
-
-	SUBNET=%s
 
 	ip=$(ifconfig eth0 | grep "inet " | awk '{ print $2}')
 	while [ ! $ip ] ; do
@@ -139,11 +123,25 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	NICS_NUM=%s
 	IPS=%s
 
+	function getNetStrForDpdk() {
+		i=$1
+		j=$2
+		net=" "
+		gateway=$(route -n | grep 0.0.0.0 | grep UG | awk '{print $2}')
+		for ((i; i<$j; i++)); do
+			eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
+			enp=$(ls -l /sys/class/net/eth$i/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}')
+			bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
+			IFS='/' read -ra netmask <<< "$bits"
+			net="$net --net $enp/$eth/${netmask[1]}/$gateway"
+		done
+	}
+
 	core_ids=$(cat /sys/devices/system/cpu/cpu*/topology/thread_siblings_list | cut -d "-" -f 1 | sort -u | tr '\n' ' ')
 	core_ids="${core_ids[@]/0}"
 	IFS=', ' read -r -a core_ids <<< "$core_ids"
 	core_idx_begin=0
-	core_idx_end=$(($core_idx_begin + $DRIVE))
+	core_idx_end=$(($core_idx_begin + $NUM_DRIVE_CONTAINERS))
 	get_core_ids() {
 		core_idx_end=$(($core_idx_begin + $1))
 		res=${core_ids[i]}
@@ -162,7 +160,7 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 		for(( i=0; i<$NICS_NUM; i++)); do
 				   echo "20$i eth$i-rt" >> /etc/iproute2/rt_tables
 		done
-		
+
 		echo "network:"> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
 		echo "  config: disabled" >> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
 		subnets=($SUBNETS_RANGE)
@@ -228,12 +226,12 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	host_id=$(weka local run --container compute0 $WEKA_RUN_CREDS manhole getServerInfo | grep hostIdValue: | awk '{print $2}')
 	mkdir -p /opt/weka/tmp
 	cat >/opt/weka/tmp/find_drives.py <<EOL
-	import json
-	import sys
-	for d in json.load(sys.stdin)['disks']:
-		if d['isRotational']: continue
-		print(d['devPath'])
-	EOL
+import json
+import sys
+for d in json.load(sys.stdin)['disks']:
+	if d['isRotational']: continue
+	print(d['devPath'])
+EOL
 	devices=$(weka local run --container compute0 $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
 	for device in $devices; do
 		weka local exec --container drives0 /weka/tools/weka_sign_drive $device
@@ -271,7 +269,7 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 
 	bashScriptTemplate += isReady + fmt.Sprintf(addDrives, joinFinalizationUrl)
 
-	bashScript = fmt.Sprintf(bashScriptTemplate, wekaPassword, strings.Join(ips, "\" \""), functionKey, reportUrl, hashedPrivateIp, subnet, compute, frontend, drive, mem, installDpdk, subnetsRange, nicsNum, strings.Join(ips, ","))
+	bashScript = fmt.Sprintf(bashScriptTemplate, wekaPassword, strings.Join(ips, "\" \""), functionKey, reportUrl, hashedPrivateIp, compute, frontend, drive, mem, installDpdk, subnetsRange, nicsNum, strings.Join(ips, ","))
 
 	return
 }
@@ -287,7 +285,6 @@ func GetDeployScript(
 	instanceType,
 	installUrl,
 	keyVaultUri,
-	subnet,
 	vm,
 	installDpdk,
 	subnetsRange,
@@ -332,10 +329,10 @@ func GetDeployScript(
 				for(( i=0; i<$NICS_NUM; i++)); do
 						   echo "20$i eth$i-rt" >> /etc/iproute2/rt_tables
 				done
-		
+
 				echo "network:"> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
 				echo "  config: disabled" >> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
-						
+
 				gateway=$(ip r | grep default | awk '{print $3}')
 				for(( i=0; i<$NICS_NUM; i++)); do
 					eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
@@ -358,9 +355,9 @@ func GetDeployScript(
 				done
 				netplan apply
 			fi
-	
+
 			sleep 30
-		
+
 			gsutil cp $INSTALL_URL /tmp
 			cd /tmp
 			tar -xvf $TAR_NAME
@@ -371,7 +368,6 @@ func GetDeployScript(
 
 			weka local stop
 			weka local rm default --force
-			
 
 			curl $PROTECT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$VM\"}"
 			curl $CLUSTERIZE_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$VM\"}" > /tmp/clusterize.sh
@@ -419,16 +415,14 @@ func GetDeployScript(
 					return 0
 			}
 
-			
 			if [[ $INSTALL_DPDK == true ]]; then
 				subnets=($SUBNETS_RANGE)
 				for(( i=0; i<$NICS_NUM; i++)); do
 						   echo "20$i eth$i-rt" >> /etc/iproute2/rt_tables
 				done
-		
+
 				echo "network:"> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
 				echo "  config: disabled" >> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
-				
 				gateway=$(ip r | grep default | awk '{print $3}')
 				for(( i=0; i<$NICS_NUM; i++)); do
 					eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
@@ -469,7 +463,7 @@ func GetDeployScript(
 			bashScript = fmt.Sprintf(installTemplate, token, installUrl, clusterizeUrl, reportUrl, protectUrl, functionKey, vm, installDpdk, subnetsRange, nicsNum)
 		}
 	} else {
-		bashScript, err = GetJoinParams(ctx, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey, vm, installDpdk, subnetsRange, nicsNum)
+		bashScript, err = GetJoinParams(ctx, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, keyVaultUri, functionKey, vm, installDpdk, subnetsRange, nicsNum)
 		if err != nil {
 			return
 		}
@@ -492,7 +486,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	prefix := os.Getenv("PREFIX")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 
-	subnet := os.Getenv("SUBNET")
 	instanceType := os.Getenv("INSTANCE_TYPE")
 	installUrl := os.Getenv("INSTALL_URL")
 	installDpdk := os.Getenv("INSTALL_DPDK")
@@ -538,7 +531,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		instanceType,
 		installUrl,
 		keyVaultUri,
-		subnet,
 		data.Vm,
 		installDpdk,
 		subnetsRange,
