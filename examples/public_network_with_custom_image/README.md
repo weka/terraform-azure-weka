@@ -38,7 +38,6 @@ No resources.
 | <a name="input_subnet_prefixes"></a> [subnet\_prefixes](#input\_subnet\_prefixes) | List of address prefixes to use for the subnet | `list(string)` | n/a | yes |
 | <a name="input_subscription_id"></a> [subscription\_id](#input\_subscription\_id) | Subscription id for deployment | `string` | n/a | yes |
 | <a name="input_tiering_ssd_percent"></a> [tiering\_ssd\_percent](#input\_tiering\_ssd\_percent) | When OBS integration set to true , this parameter sets how much of the filesystem capacity should reside on SSD. For example, if this parameter is 20 and the total available SSD capacity is 20GB, the total capacity would be 100GB | `number` | n/a | yes |
-| <a name="input_weka_partner_id"></a> [weka\_partner\_id](#input\_weka\_partner\_id) | Weka partner ID which registered with Microsoft resource | `string` | `"f13589d1-f10d-4c3b-ae42-3b1a8337eaf1"` | no |
 
 ## Outputs
 
