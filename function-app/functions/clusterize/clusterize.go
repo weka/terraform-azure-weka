@@ -98,7 +98,7 @@ func generateClusterizationScript(
 
 	for index in ${!VMS[*]}; do
 		hashed_ip=${HASHED_IPS[$index]}
-		$ssh_command ${VMS[$index]} "sudo weka local setup container --name drive0 --base-port 14000 --cores $NUM_DRIVE_CONTAINERS --no-frontends --drives-dedicated-cores $NUM_DRIVE_CONTAINERS --failure-domain $hashed_ip"
+		$ssh_command ${VMS[$index]} "sudo weka local setup container --name drives0 --base-port 14000 --cores $NUM_DRIVE_CONTAINERS --no-frontends --drives-dedicated-cores $NUM_DRIVE_CONTAINERS --failure-domain $hashed_ip"
 	done
 	
 	vms_string=$(printf "%%s "  "${VMS[@]}" | rev | cut -c2- | rev)
