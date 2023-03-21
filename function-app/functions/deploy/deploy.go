@@ -128,7 +128,7 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	DRIVES=%d
 	COMPUTE_MEMORY=%d
 	IPS=%s
-	weka local setup container --name drive0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $IPS --failure-domain "$HASHED_IP"
+	weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $IPS --failure-domain "$HASHED_IP"
 	weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY"GB --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $IPS --failure-domain "$HASHED_IP"
 	weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $IPS --failure-domain "$HASHED_IP"`
 
@@ -154,7 +154,7 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	EOL
 	devices=$(weka local run --container compute0 $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
 	for device in $devices; do
-		weka local exec --container drive0 /weka/tools/weka_sign_drive $device
+		weka local exec --container drives0 /weka/tools/weka_sign_drive $device
 	done
 	ready=0
 	while [ $ready -eq 0 ] ; do
