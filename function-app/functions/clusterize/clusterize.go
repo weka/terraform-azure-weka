@@ -34,6 +34,7 @@ type WekaClusterParams struct {
 	NvmesNum             string
 	ComputeContainerNum  string
 	FrontendContainerNum string
+	driveContainerNum    string
 	TieringSsdPercent    string
 	DataProtection       DataProtectionParams
 }
@@ -57,7 +58,7 @@ type RequestBody struct {
 }
 
 func generateClusterizationScript(
-	ctx context.Context, vmNames, ips, prefix, functionAppKey, wekaPassword string, cluster WekaClusterParams, obs ObsParams,
+	ctx context.Context, vmNames, ips, prefix, functionAppKey, wekaPassword string, cluster WekaClusterParams, obs ObsParams, hashedIps []string,
 ) (clusterizeScript string) {
 	logger := common.LoggerFromCtx(ctx)
 	logger.Info().Msg("Generating clusterization script")
@@ -66,7 +67,7 @@ func generateClusterizationScript(
 	#!/bin/bash
 	
 	set -ex
-	VMS="%s"
+	VMS=(%s)
 	IPS=%s
 	HOSTS_NUM=%s
 	NVMES_NUM=%s
@@ -74,6 +75,7 @@ func generateClusterizationScript(
 	NUM_COMPUTE_CONTAINERS=%s
 	COMPUTE_MEMORY=%s
 	NUM_FRONTEND_CONTAINERS=%s
+	NUM_DRIVE_CONTAINERS=%s
 	SET_OBS=%s
 	OBS_NAME=%s
 	OBS_CONTAINER_NAME=%s
@@ -85,16 +87,22 @@ func generateClusterizationScript(
 	PROTECTION_LEVEL=%d
 	HOTSPARE=%d
 	WEKA_PASSWORD="%s"
+	HASHED_IPS=(%s)
 
 	report_url=https://$PREFIX-$CLUSTER_NAME-function-app.azurewebsites.net/api/report
 	clusterize_finalization_url=https://$PREFIX-$CLUSTER_NAME-function-app.azurewebsites.net/api/clusterize_finalization
 
 	curl "$report_url?code=$FUNCTION_APP_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running Clusterization\"}"
 
-	weka_status_ready="Containers: 1/1 running (1 weka)"
 	ssh_command="ssh -o StrictHostKeyChecking=no"
+
+	for index in ${!VMS[*]}; do
+		hashed_ip=${HASHED_IPS[$index]}
+		$ssh_command ${VMS[$index]} "sudo weka local setup container --name drive0 --base-port 14000 --cores $NUM_DRIVE_CONTAINERS --no-frontends --drives-dedicated-cores $NUM_DRIVE_CONTAINERS --failure-domain $hashed_ip"
+	done
 	
-	weka cluster create $VMS --host-ips $IPS --admin-password "$WEKA_PASSWORD"
+	vms_string=$(printf "%%s "  "${VMS[@]}" | rev | cut -c2- | rev)
+	weka cluster create $vms_string --host-ips $IPS --admin-password "$WEKA_PASSWORD"
 	weka user login admin "$WEKA_PASSWORD"
 	
 	sleep 30s
@@ -107,8 +115,9 @@ func generateClusterizationScript(
 
 	weka cluster update --cluster-name="$CLUSTER_NAME"
 	
-	for vm in $VMS; do
-	  $ssh_command $vm "sudo weka local setup container --name compute0 --base-port 15000 --cores $NUM_COMPUTE_CONTAINERS --no-frontends --compute-dedicated-cores $NUM_COMPUTE_CONTAINERS  --memory $COMPUTE_MEMORY --join-ips $IPS"
+	for index in ${!VMS[*]}; do
+		hashed_ip=${HASHED_IPS[$index]}
+		$ssh_command ${VMS[$index]} "sudo weka local setup container --name compute0 --base-port 15000 --cores $NUM_COMPUTE_CONTAINERS --no-frontends --compute-dedicated-cores $NUM_COMPUTE_CONTAINERS  --memory $COMPUTE_MEMORY --join-ips $IPS --failure-domain $hashed_ip"
 	done
 	
 	weka cloud enable
@@ -116,8 +125,9 @@ func generateClusterizationScript(
 	weka cluster hot-spare $HOTSPARE
 	weka cluster start-io
 	
-	for vm in $VMS; do
-	  $ssh_command $vm "sudo weka local setup container --name frontend0 --base-port 16000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --allow-protocols true --join-ips $IPS"
+	for index in ${!VMS[*]}; do
+		hashed_ip=${HASHED_IPS[$index]}
+		$ssh_command ${VMS[$index]} "sudo weka local setup container --name frontend0 --base-port 16000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --allow-protocols true --join-ips $IPS --failure-domain $hashed_ip"
 	done
 	
 	sleep 15s
@@ -148,11 +158,11 @@ func generateClusterizationScript(
 
 	logger.Info().Msgf("Formatting clusterization script template")
 	clusterizeScript = fmt.Sprintf(
-		dedent.Dedent(clusterizeScriptTemplate), vmNames, ips, cluster.HostsNum, cluster.NvmesNum,
-		cluster.Name, cluster.ComputeContainerNum, cluster.ComputeMemory, cluster.FrontendContainerNum,
+		dedent.Dedent(clusterizeScriptTemplate), vmNames, ips, cluster.HostsNum, cluster.NvmesNum, cluster.Name,
+		cluster.ComputeContainerNum, cluster.ComputeMemory, cluster.FrontendContainerNum, cluster.driveContainerNum,
 		obs.SetObs, obs.Name, obs.ContainerName, obs.AccessKey, cluster.TieringSsdPercent, prefix, functionAppKey,
 		cluster.DataProtection.StripeWidth, cluster.DataProtection.ProtectionLevel, cluster.DataProtection.Hotspare,
-		wekaPassword,
+		wekaPassword, strings.Join(hashedIps, " "),
 	)
 	return
 }
@@ -243,7 +253,12 @@ func HandleLastClusterVm(ctx context.Context, state common.ClusterState, p Clust
 	vmNames := strings.Join(vmNamesList, " ")
 	ips := strings.Join(ipsList, ",")
 
-	clusterizeScript = generateClusterizationScript(ctx, vmNames, ips, p.Prefix, functionAppKey, wekaPassword, p.Cluster, p.Obs)
+	var hashedIps []string
+	for _, privateIp := range ipsList {
+		hashedIps = append(hashedIps, common.GetHashedPrivateIp(privateIp))
+	}
+
+	clusterizeScript = generateClusterizationScript(ctx, vmNames, ips, p.Prefix, functionAppKey, wekaPassword, p.Cluster, p.Obs, hashedIps)
 	return
 }
 
@@ -312,6 +327,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	nvmesNum := os.Getenv("NVMES_NUM")
 	computeContainerNum := os.Getenv("NUM_COMPUTE_CONTAINERS")
 	frontendContainerNum := os.Getenv("NUM_FRONTEND_CONTAINERS")
+	driveContainerNum := os.Getenv("NUM_DRIVE_CONTAINERS")
 	tieringSsdPercent := os.Getenv("TIERING_SSD_PERCENT")
 	prefix := os.Getenv("PREFIX")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
@@ -364,6 +380,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			NvmesNum:             nvmesNum,
 			ComputeContainerNum:  computeContainerNum,
 			FrontendContainerNum: frontendContainerNum,
+			driveContainerNum:    driveContainerNum,
 			TieringSsdPercent:    tieringSsdPercent,
 			DataProtection: DataProtectionParams{
 				StripeWidth:     stripeWidth,

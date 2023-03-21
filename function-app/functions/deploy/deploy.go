@@ -50,7 +50,7 @@ func getFunctionKey(ctx context.Context, keyVaultUri string) (functionAppKey str
 	return
 }
 
-func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey string) (bashScript string, err error) {
+func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey, vm string) (bashScript string, err error) {
 	logger := common.LoggerFromCtx(ctx)
 
 	joinFinalizationUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/join_finalization", prefix, clusterName)
@@ -58,6 +58,13 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 
 	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
 	vmsPrivateIps, err := common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	if err != nil {
+		return
+	}
+
+	computeName := strings.Split(vm, ":")[0]
+	privateIp := vmsPrivateIps[computeName]
+	hashedPrivateIp := common.GetHashedPrivateIp(privateIp)
 
 	var ips []string
 	for _, ip := range vmsPrivateIps {
@@ -86,6 +93,7 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	declare -a backend_ips=("%s" )
 	FUNCTION_KEY="%s"
 	REPORT_URL="%s"
+	HASHED_IP="%s"
 
 	curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Joining started\"}"
 
@@ -120,9 +128,9 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	DRIVES=%d
 	COMPUTE_MEMORY=%d
 	IPS=%s
-	weka local setup container --name drive0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $IPS
-	weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY"GB --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $IPS
-	weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $IPS`
+	weka local setup container --name drive0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $IPS --failure-domain "$HASHED_IP"
+	weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY"GB --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $IPS --failure-domain "$HASHED_IP"
+	weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $IPS --failure-domain "$HASHED_IP"`
 
 	isReady := `
 	while ! weka debug manhole -s 0 operational_status | grep '"is_ready": true' ; do
@@ -184,7 +192,7 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	}
 	bashScriptTemplate += isReady + fmt.Sprintf(addDrives, joinFinalizationUrl)
 
-	bashScript = fmt.Sprintf(bashScriptTemplate, wekaPassword, strings.Join(ips, "\" \""), functionKey, reportUrl, subnet, compute, frontend, drive, mem, strings.Join(ips, ","))
+	bashScript = fmt.Sprintf(bashScriptTemplate, wekaPassword, strings.Join(ips, "\" \""), functionKey, reportUrl, hashedPrivateIp, subnet, compute, frontend, drive, mem, strings.Join(ips, ","))
 
 	return
 }
@@ -200,7 +208,8 @@ func GetDeployScript(
 	instanceType,
 	installUrl,
 	keyVaultUri,
-	subnet string) (bashScript string, err error) {
+	subnet,
+	vm string) (bashScript string, err error) {
 
 	clusterizeUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/clusterize", prefix, clusterName)
 	reportUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/report", prefix, clusterName)
@@ -213,13 +222,6 @@ func GetDeployScript(
 
 	functionKey, err := getFunctionKey(ctx, keyVaultUri)
 	if err != nil {
-		return
-	}
-
-	backendCoreCounts := getBackendCoreCountsDefaults()
-	instanceParams, ok := backendCoreCounts[instanceType]
-	if !ok {
-		err = fmt.Errorf("unsupported instance type: %s", instanceType)
 		return
 	}
 
@@ -238,7 +240,7 @@ func GetDeployScript(
 			REPORT_URL=%s
 			PROTECT_URL=%s
 			FUNCTION_KEY=%s
-			DRIVE_CONTAINERS_NUM=%d
+			VM=%s
 
 			gsutil cp $INSTALL_URL /tmp
 			cd /tmp
@@ -250,16 +252,13 @@ func GetDeployScript(
 
 			weka local stop
 			weka local rm default --force
-			weka local setup container --name drive0 --base-port 14000 --cores $DRIVE_CONTAINERS_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINERS_NUM
 
-			compute_name=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" | jq '.compute.name')
-			compute_name=$(echo "$compute_name" | cut -c2- | rev | cut -c2- | rev)
-			curl $PROTECT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$compute_name:$HOSTNAME\"}"
-			curl $CLUSTERIZE_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$compute_name:$HOSTNAME\"}" > /tmp/clusterize.sh
+			curl $PROTECT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$VM\"}"
+			curl $CLUSTERIZE_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$VM\"}" > /tmp/clusterize.sh
 			chmod +x /tmp/clusterize.sh
 			/tmp/clusterize.sh 2>&1 | tee /tmp/weka_clusterization.log
 			`
-			bashScript = fmt.Sprintf(installTemplate, installUrl, tarName, packageName, clusterizeUrl, reportUrl, protectUrl, functionKey, instanceParams.drive)
+			bashScript = fmt.Sprintf(installTemplate, installUrl, tarName, packageName, clusterizeUrl, reportUrl, protectUrl, functionKey, vm)
 
 		} else {
 			token, err2 := getWekaIoToken(ctx, keyVaultUri)
@@ -277,7 +276,7 @@ func GetDeployScript(
 			REPORT_URL=%s
 			PROTECT_URL=%s
 			FUNCTION_KEY=%s
-			DRIVE_CONTAINERS_NUM=%d
+			VM=%s
 
 			# https://gist.github.com/fungusakafungus/1026804
 			function retry {
@@ -303,19 +302,16 @@ func GetDeployScript(
 
 			weka local stop
 			weka local rm default --force
-			weka local setup container --name drive0 --base-port 14000 --cores $DRIVE_CONTAINERS_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINERS_NUM
 
-			compute_name=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" | jq '.compute.name')
-			compute_name=$(echo "$compute_name" | cut -c2- | rev | cut -c2- | rev)
-			curl $PROTECT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$compute_name:$HOSTNAME\"}"
-			curl $CLUSTERIZE_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$compute_name:$HOSTNAME\"}" > /tmp/clusterize.sh
+			curl $PROTECT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$VM\"}"
+			curl $CLUSTERIZE_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$VM\"}" > /tmp/clusterize.sh
 			chmod +x /tmp/clusterize.sh
 			/tmp/clusterize.sh > /tmp/cluster_creation.log 2>&1
 			`
-			bashScript = fmt.Sprintf(installTemplate, token, installUrl, clusterizeUrl, reportUrl, protectUrl, functionKey, instanceParams.drive)
+			bashScript = fmt.Sprintf(installTemplate, token, installUrl, clusterizeUrl, reportUrl, protectUrl, functionKey, vm)
 		}
 	} else {
-		bashScript, err = GetJoinParams(ctx, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey)
+		bashScript, err = GetJoinParams(ctx, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey, vm)
 		if err != nil {
 			return
 		}
@@ -325,10 +321,11 @@ func GetDeployScript(
 	return
 }
 
-func Handler(w http.ResponseWriter, r *http.Request) {
-	outputs := make(map[string]interface{})
-	resData := make(map[string]interface{})
+type RequestBody struct {
+	Vm string `json:"vm"`
+}
 
+func Handler(w http.ResponseWriter, r *http.Request) {
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 	clusterName := os.Getenv("CLUSTER_NAME")
@@ -341,7 +338,33 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	instanceType := os.Getenv("INSTANCE_TYPE")
 	installUrl := os.Getenv("INSTALL_URL")
 
+	outputs := make(map[string]interface{})
+	resData := make(map[string]interface{})
+	var invokeRequest common.InvokeRequest
+
 	ctx := r.Context()
+	logger := common.LoggerFromCtx(ctx)
+
+	d := json.NewDecoder(r.Body)
+	err := d.Decode(&invokeRequest)
+	if err != nil {
+		logger.Error().Msg("Bad request")
+		return
+	}
+
+	var reqData map[string]interface{}
+	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
+	if err != nil {
+		logger.Error().Msg("Bad request")
+		return
+	}
+
+	var data RequestBody
+
+	if json.Unmarshal([]byte(reqData["Body"].(string)), &data) != nil {
+		logger.Error().Msg("Bad request")
+		return
+	}
 
 	bashScript, err := GetDeployScript(
 		ctx,
@@ -354,7 +377,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		instanceType,
 		installUrl,
 		keyVaultUri,
-		subnet)
+		subnet,
+		data.Vm)
 
 	if err != nil {
 		resData["body"] = err.Error()
