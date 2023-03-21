@@ -3,6 +3,7 @@ package common
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -458,6 +459,8 @@ func GetPublicIp(ctx context.Context, subscriptionId, resourceGroupName, vmScale
 }
 
 func GetVmsPrivateIps(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (vmsPrivateIps map[string]string, err error) {
+	//returns compute_name to private ip map
+
 	logger := LoggerFromCtx(ctx)
 	logger.Info().Msg("fetching scale set vms private ips")
 
@@ -938,4 +941,8 @@ func UpdateStateReportingWithoutLocking(ctx context.Context, stateContainerName,
 		return
 	}
 	return
+}
+
+func GetHashedPrivateIp(privateIp string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(privateIp)))[:16]
 }
