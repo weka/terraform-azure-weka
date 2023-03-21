@@ -505,7 +505,7 @@ resource "azurerm_logic_app_action_custom" "logic_app_action_scale_up" {
             "x-functions-key": "@body('${azurerm_logic_app_action_custom.scale_up_logic_app_action_get_secret.name}')?['value']"
         },
         "function": {
-            "id": "${azurerm_linux_function_app.function_app.id}/functions/scale_down"
+            "id": "${azurerm_linux_function_app.function_app.id}/functions/scale_up"
         }
     },
     "type": "Function",
