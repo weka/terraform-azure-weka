@@ -243,6 +243,7 @@ func removeContainer(ctx context.Context, jpool *jrpc.Pool, hostId int, p *proto
 func removeInactive(ctx context.Context, hostsApiList weka.HostListResponse, hosts []hostInfo, jpool *jrpc.Pool, instances []protocol.HgInstance, p *protocol.ScaleResponse) {
 	logger := common.LoggerFromCtx(ctx)
 	for _, host := range hosts {
+		deactivateHost(ctx, jpool, hostsApiList, p, host)
 		logger.Info().Msgf("Removing machine with inactive container/s: %s", host.HostIp)
 		jpool.Drop(host.HostIp)
 		containers := getMachineContainers(hostsApiList, host)
@@ -304,6 +305,47 @@ func getMachineContainers(hostsApiList weka.HostListResponse, inputHost hostInfo
 		}
 	}
 	return
+}
+
+func deactivateHost(ctx context.Context, jpool *jrpc.Pool, hostsApiList weka.HostListResponse, response *protocol.ScaleResponse, host hostInfo) {
+	logger := common.LoggerFromCtx(ctx)
+	logger.Info().Msgf("Trying to deactivate machine %s...", host.HostIp)
+	for _, drive := range host.drives {
+		logger.Info().Msgf("Trying to deactivate drive: %s", drive.Uuid.String())
+		if drive.ShouldBeActive {
+			err1 := jpool.Call(weka.JrpcDeactivateDrives, types.JsonDict{
+				"drive_uuids": []uuid.UUID{drive.Uuid},
+			}, nil)
+			if err1 != nil {
+				logger.Error().Err(err1).Send()
+				response.AddTransientError(err1, "deactivateDrive")
+			}
+		}
+	}
+
+	containers := getMachineContainers(hostsApiList, host)
+	logger.Info().Msgf(
+		"Trying to deactivate machine %s containers drive:%s compute:%s frontend:%s",
+		host.HostIp,
+		containers.Drive,
+		containers.Compute,
+		containers.Frontend,
+	)
+	err1 := jpool.Call(weka.JrpcDeactivateHosts, types.JsonDict{
+		"host_ids": []weka.HostId{
+			containers.Drive,
+			containers.Compute,
+			containers.Frontend,
+		},
+		"skip_resource_validation": false,
+	}, nil)
+	if err1 != nil {
+		logger.Error().Err(err1)
+		response.AddTransientError(err1, "deactivateHost")
+	} else {
+		jpool.Drop(host.HostIp)
+	}
+
 }
 
 func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (response protocol.ScaleResponse, err error) {
@@ -469,52 +511,12 @@ func ScaleDown(ctx context.Context, info protocol.HostGroupInfoResponse) (respon
 		logger.Debug().Msgf("Number of machines to deactivate: %d", machinesNumber-info.DesiredCapacity)
 	}
 
-	deactivateHost := func(host hostInfo) {
-		logger.Info().Msgf("Trying to deactivate machine %s...", host.HostIp)
-		for _, drive := range host.drives {
-			logger.Info().Msgf("Trying to deactivate drive: %s", drive.Uuid.String())
-			if drive.ShouldBeActive {
-				err1 := jpool.Call(weka.JrpcDeactivateDrives, types.JsonDict{
-					"drive_uuids": []uuid.UUID{drive.Uuid},
-				}, nil)
-				if err1 != nil {
-					logger.Error().Err(err1).Send()
-					response.AddTransientError(err1, "deactivateDrive")
-				}
-			}
-		}
-
-		containers := getMachineContainers(hostsApiList, host)
-		logger.Info().Msgf(
-			"Trying to deactivate machine %s containers drive:%s compute:%s frontend:%s",
-			host.HostIp,
-			containers.Drive,
-			containers.Compute,
-			containers.Frontend,
-		)
-		err1 := jpool.Call(weka.JrpcDeactivateHosts, types.JsonDict{
-			"host_ids": []weka.HostId{
-				containers.Drive,
-				containers.Compute,
-				containers.Frontend,
-			},
-			"skip_resource_validation": false,
-		}, nil)
-		if err1 != nil {
-			logger.Error().Err(err1)
-			response.AddTransientError(err1, "deactivateHost")
-		} else {
-			jpool.Drop(host.HostIp)
-		}
-
-	}
-
 	for _, host := range driveContainers[:numToDeactivate] {
-		deactivateHost(host)
+		deactivateHost(ctx, jpool, hostsApiList, &response, host)
 	}
 
 	for _, host := range downHosts {
-		deactivateHost(host)
+		deactivateHost(ctx, jpool, hostsApiList, &response, host)
 	}
 
 	for _, host := range hostsList {
