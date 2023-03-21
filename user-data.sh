@@ -77,6 +77,8 @@ echo "LABEL=wekaiosw /opt/weka ext4 defaults 0 2" >>/etc/fstab
 
 rm -rf $INSTALLATION_PATH
 
-curl ${deploy_url}?code="${function_app_default_key}" > /tmp/deploy.sh
+compute_name=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" | jq '.compute.name')
+compute_name=$(echo "$compute_name" | cut -c2- | rev | cut -c2- | rev)
+curl ${deploy_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"vm\": \"$compute_name:$HOSTNAME\"}" > /tmp/deploy.sh
 chmod +x /tmp/deploy.sh
 /tmp/deploy.sh 2>&1 | tee /tmp/weka_deploy.log
