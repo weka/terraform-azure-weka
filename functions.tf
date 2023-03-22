@@ -60,7 +60,8 @@ resource "azurerm_service_plan" "app_service_plan" {
 
 locals {
   function_zip_path = "/tmp/${var.prefix}-${var.cluster_name}-function-app.zip"
-  function_code_path = "${path.module}/function-app/"
+  function_code_path = "${path.module}/function-app/code"
+  function_triggers_path = "${path.module}/function-app/triggers"
 }
 
 resource "null_resource" "build_function_code" {
@@ -70,9 +71,9 @@ resource "null_resource" "build_function_code" {
 
   provisioner "local-exec" {
     command = <<EOT
-    cd ${path.module}/function-app
+    cd ${local.function_code_path}
     go mod tidy
-    GOOS=linux GOARCH=amd64 go build
+    GOOS=linux GOARCH=amd64 go build -o ${local.function_triggers_path}
     EOT
   }
 }
@@ -80,7 +81,7 @@ resource "null_resource" "build_function_code" {
 data "archive_file" "function_zip" {
   type        = "zip"
   output_path = local.function_zip_path
-  source_dir  = local.function_code_path
+  source_dir  = local.function_triggers_path
   depends_on = [null_resource.build_function_code]
 }
 
