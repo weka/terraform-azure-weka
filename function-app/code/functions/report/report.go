@@ -3,6 +3,7 @@ package report
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/weka/go-cloud-lib/logging"
 	"net/http"
 	"os"
 	"weka-deployment/common"
@@ -18,7 +19,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
 
 	ctx := r.Context()
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	var invokeRequest common.InvokeRequest
 

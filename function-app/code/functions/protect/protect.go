@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/weka/go-cloud-lib/logging"
 	"net/http"
 	"os"
 	"strings"
@@ -22,7 +23,7 @@ func report(ctx context.Context, hostName, subscriptionId, resourceGroupName, st
 }
 
 func setProtection(ctx context.Context, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, vmScaleSetName, instanceId, hostName string) (err error) {
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("Setting deletion protection on %s", hostName)
 	counter := 0
 	authSleepInterval := 2 //minutes
@@ -68,7 +69,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	var invokeRequest common.InvokeRequest
 
 	ctx := r.Context()
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	d := json.NewDecoder(r.Body)
 	err := d.Decode(&invokeRequest)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/weka/go-cloud-lib/logging"
 	"math/rand"
 	"net/http"
 	"os"
@@ -51,7 +52,7 @@ func getFunctionKey(ctx context.Context, keyVaultUri string) (functionAppKey str
 }
 
 func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey, vm string) (bashScript string, err error) {
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	joinFinalizationUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/join_finalization", prefix, clusterName)
 	reportUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/report", prefix, clusterName)
@@ -343,7 +344,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	var invokeRequest common.InvokeRequest
 
 	ctx := r.Context()
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	d := json.NewDecoder(r.Body)
 	err := d.Decode(&invokeRequest)

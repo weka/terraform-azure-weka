@@ -5,14 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute"
+	"github.com/weka/go-cloud-lib/logging"
+	"github.com/weka/go-cloud-lib/protocol"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 	"weka-deployment/common"
-	"weka-deployment/protocol"
-
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute"
 )
 
 type instancesMap map[string]*armcompute.VirtualMachineScaleSetVM
@@ -26,7 +26,7 @@ func instancesToMap(instances []*armcompute.VirtualMachineScaleSetVM) instancesM
 }
 
 func getDeltaInstancesIds(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, scaleResponse protocol.ScaleResponse) (deltaInstanceIDs []string, err error) {
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("Getting delta instances")
 	netInterfaces, err := common.GetScaleSetVmsNetworkInterfaces(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
@@ -85,7 +85,7 @@ func getInstancePowerState(instance *armcompute.VirtualMachineScaleSetVM) (power
 }
 
 func terminateUnneededInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, instances []*armcompute.VirtualMachineScaleSetVM, explicitRemoval []protocol.HgInstance) (terminatedInstancesMap instancesMap, errs []error) {
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	terminateInstanceIds := make([]string, 0, 0)
 	imap := instancesToMap(instances)
@@ -118,7 +118,7 @@ func terminateUnneededInstances(ctx context.Context, subscriptionId, resourceGro
 }
 
 func terminateUnhealthyInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (errs []error) {
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 	var toTerminate []string
 
 	expand := "instanceView"
@@ -151,7 +151,7 @@ func terminateUnhealthyInstances(ctx context.Context, subscriptionId, resourceGr
 }
 
 func Terminate(ctx context.Context, scaleResponse protocol.ScaleResponse, subscriptionId, resourceGroupName, vmScaleSetName string) (response protocol.TerminatedInstancesResponse, err error) {
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("Running termination function...")
 
 	response.Version = protocol.Version
@@ -221,7 +221,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	clusterName := os.Getenv("CLUSTER_NAME")
 
 	ctx := r.Context()
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
 
