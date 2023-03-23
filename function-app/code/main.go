@@ -1,9 +1,9 @@
 package main
 
 import (
+	"github.com/weka/go-cloud-lib/logging"
 	"net/http"
 	"os"
-	"weka-deployment/common"
 	"weka-deployment/functions/clusterize"
 	"weka-deployment/functions/clusterize_finalization"
 	"weka-deployment/functions/debug"
@@ -21,11 +21,11 @@ import (
 )
 
 var (
-	logger *common.Logger
+	logger *logging.Logger
 )
 
 func init() {
-	logger = common.NewLogger()
+	logger = logging.NewLogger()
 }
 
 func main() {
@@ -34,20 +34,20 @@ func main() {
 		customHandlerPort = "8080"
 	}
 	mux := http.NewServeMux()
-	mux.Handle("/clusterize", common.LoggingMiddleware(clusterize.Handler))
-	mux.Handle("/clusterize_finalization", common.LoggingMiddleware(clusterize_finalization.Handler))
-	mux.Handle("/status", common.LoggingMiddleware(status.Handler))
-	mux.Handle("/debug", common.LoggingMiddleware(debug.Handler))
-	mux.Handle("/scale_up", common.LoggingMiddleware(scale_up.Handler))
-	mux.Handle("/fetch", common.LoggingMiddleware(fetch.Handler))
-	mux.Handle("/deploy", common.LoggingMiddleware(deploy.Handler))
-	mux.Handle("/join_finalization", common.LoggingMiddleware(join_finalization.Handler))
-	mux.Handle("/scale_down", common.LoggingMiddleware(scale_down.Handler))
-	mux.Handle("/terminate", common.LoggingMiddleware(terminate.Handler))
-	mux.Handle("/transient", common.LoggingMiddleware(transient.Handler))
-	mux.Handle("/resize", common.LoggingMiddleware(resize.Handler))
-	mux.Handle("/report", common.LoggingMiddleware(report.Handler))
-	mux.Handle("/protect", common.LoggingMiddleware(protect.Handler))
+	mux.Handle("/clusterize", logging.LoggingMiddleware(clusterize.Handler))
+	mux.Handle("/clusterize_finalization", logging.LoggingMiddleware(clusterize_finalization.Handler))
+	mux.Handle("/status", logging.LoggingMiddleware(status.Handler))
+	mux.Handle("/debug", logging.LoggingMiddleware(debug.Handler))
+	mux.Handle("/scale_up", logging.LoggingMiddleware(scale_up.Handler))
+	mux.Handle("/fetch", logging.LoggingMiddleware(fetch.Handler))
+	mux.Handle("/deploy", logging.LoggingMiddleware(deploy.Handler))
+	mux.Handle("/join_finalization", logging.LoggingMiddleware(join_finalization.Handler))
+	mux.Handle("/scale_down", logging.LoggingMiddleware(scale_down.Handler))
+	mux.Handle("/terminate", logging.LoggingMiddleware(terminate.Handler))
+	mux.Handle("/transient", logging.LoggingMiddleware(transient.Handler))
+	mux.Handle("/resize", logging.LoggingMiddleware(resize.Handler))
+	mux.Handle("/report", logging.LoggingMiddleware(report.Handler))
+	mux.Handle("/protect", logging.LoggingMiddleware(protect.Handler))
 	logger.Info().Msgf("Go server Listening on: %v", customHandlerPort)
 	logger.Fatal().Err(http.ListenAndServe(":"+customHandlerPort, mux)).Send()
 }

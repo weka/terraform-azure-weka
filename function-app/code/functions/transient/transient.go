@@ -2,9 +2,10 @@ package transient
 
 import (
 	"encoding/json"
+	"github.com/weka/go-cloud-lib/logging"
+	"github.com/weka/go-cloud-lib/protocol"
 	"net/http"
 	"weka-deployment/common"
-	"weka-deployment/protocol"
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -13,7 +14,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	var invokeRequest common.InvokeRequest
 
 	ctx := r.Context()
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	d := json.NewDecoder(r.Body)
 	err := d.Decode(&invokeRequest)

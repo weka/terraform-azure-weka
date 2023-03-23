@@ -6,12 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"io"
-	"strings"
-	"time"
-	"weka-deployment/lib/types"
-	"weka-deployment/protocol"
-
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets"
@@ -21,6 +15,12 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/google/uuid"
+	"github.com/weka/go-cloud-lib/lib/types"
+	"github.com/weka/go-cloud-lib/logging"
+	"github.com/weka/go-cloud-lib/protocol"
+	"io"
+	"strings"
+	"time"
 )
 
 type InvokeRequest struct {
@@ -44,7 +44,7 @@ type ClusterState struct {
 }
 
 func leaseContainer(ctx context.Context, subscriptionId, resourceGroupName, storageAccountName, containerName string, leaseIdIn *string, action armstorage.LeaseContainerRequestAction) (leaseIdOut *string, err error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
@@ -88,19 +88,19 @@ func leaseContainer(ctx context.Context, subscriptionId, resourceGroupName, stor
 }
 
 func LockContainer(ctx context.Context, subscriptionId, resourceGroupName, storageAccountName, containerName string) (*string, error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 	logger.Debug().Msgf("locking %s", containerName)
 	return leaseContainer(ctx, subscriptionId, resourceGroupName, storageAccountName, containerName, nil, armstorage.LeaseContainerRequestActionAcquire)
 }
 
 func UnlockContainer(ctx context.Context, subscriptionId, resourceGroupName, storageAccountName, containerName string, leaseId *string) (*string, error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 	logger.Debug().Msgf("unlocking %s", containerName)
 	return leaseContainer(ctx, subscriptionId, resourceGroupName, storageAccountName, containerName, leaseId, armstorage.LeaseContainerRequestActionRelease)
 }
 
 func ReadBlobObject(ctx context.Context, stateStorageName, containerName, blobName string) (state []byte, err error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
@@ -130,7 +130,7 @@ func ReadBlobObject(ctx context.Context, stateStorageName, containerName, blobNa
 }
 
 func ReadState(ctx context.Context, stateStorageName, containerName string) (state ClusterState, err error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	stateAsByteArray, err := ReadBlobObject(ctx, stateStorageName, containerName, "state")
 	if err != nil {
@@ -146,7 +146,7 @@ func ReadState(ctx context.Context, stateStorageName, containerName string) (sta
 }
 
 func WriteBlobObject(ctx context.Context, stateStorageName, containerName, blobName string, state []byte) (err error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
@@ -167,7 +167,7 @@ func WriteBlobObject(ctx context.Context, stateStorageName, containerName, blobN
 }
 
 func WriteState(ctx context.Context, stateStorageName, containerName string, state ClusterState) (err error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	stateAsByteArray, err := json.Marshal(state)
 	if err != nil {
@@ -192,7 +192,7 @@ func (e *ShutdownRequired) Error() string {
 }
 
 func AddInstanceToState(ctx context.Context, subscriptionId, resourceGroupName, stateStorageName, stateContainerName, newInstance string) (state ClusterState, err error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	leaseId, err := LockContainer(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
 	if err != nil {
@@ -230,7 +230,7 @@ func AddInstanceToState(ctx context.Context, subscriptionId, resourceGroupName, 
 }
 
 func UpdateClusterized(ctx context.Context, subscriptionId, resourceGroupName, stateStorageName, stateContainerName string) (state ClusterState, err error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	leaseId, err := LockContainer(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
 	if err != nil {
@@ -256,7 +256,7 @@ func UpdateClusterized(ctx context.Context, subscriptionId, resourceGroupName, s
 }
 
 func CreateStorageAccount(ctx context.Context, subscriptionId, resourceGroupName, obsName, location string) (accessKey string, err error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("creating storage account: %s", obsName)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
@@ -321,7 +321,7 @@ func CreateStorageAccount(ctx context.Context, subscriptionId, resourceGroupName
 }
 
 func getStorageAccountAccessKey(ctx context.Context, subscriptionId, resourceGroupName, obsName string) (accessKey string, err error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
@@ -344,7 +344,7 @@ func getStorageAccountAccessKey(ctx context.Context, subscriptionId, resourceGro
 }
 
 func CreateContainer(ctx context.Context, storageAccountName, containerName string) (err error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("creating obs container %s in storage account %s", containerName, storageAccountName)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
@@ -374,7 +374,7 @@ func CreateContainer(ctx context.Context, storageAccountName, containerName stri
 }
 
 func GetKeyVaultValue(ctx context.Context, keyVaultUri, secretName string) (secret string, err error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("fetching key vault secret: %s", secretName)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
@@ -402,7 +402,7 @@ func GetKeyVaultValue(ctx context.Context, keyVaultUri, secretName string) (secr
 // Gets all network interfaces in a VM scale set
 // see https://learn.microsoft.com/en-us/rest/api/virtualnetwork/network-interface-in-vm-ss/list-virtual-machine-scale-set-network-interfaces
 func GetScaleSetVmsNetworkInterfaces(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (networkInterfaces []*armnetwork.Interface, err error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
@@ -430,7 +430,7 @@ func GetScaleSetVmsNetworkInterfaces(ctx context.Context, subscriptionId, resour
 }
 
 func GetPublicIp(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, prefix, clusterName, instanceIndex string) (publicIp string, err error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
@@ -461,7 +461,7 @@ func GetPublicIp(ctx context.Context, subscriptionId, resourceGroupName, vmScale
 func GetVmsPrivateIps(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (vmsPrivateIps map[string]string, err error) {
 	//returns compute_name to private ip map
 
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("fetching scale set vms private ips")
 
 	networkInterfaces, err := GetScaleSetVmsNetworkInterfaces(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
@@ -480,7 +480,7 @@ func GetVmsPrivateIps(ctx context.Context, subscriptionId, resourceGroupName, vm
 }
 
 func UpdateVmScaleSetNum(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, newSize int64) (err error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("updating scale set vms num")
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
@@ -506,7 +506,7 @@ func UpdateVmScaleSetNum(ctx context.Context, subscriptionId, resourceGroupName,
 }
 
 func GetRoleDefinitionByRoleName(ctx context.Context, roleName, scope string) (*armauthorization.RoleDefinition, error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
@@ -557,7 +557,7 @@ func GetRoleDefinitionByRoleName(ctx context.Context, roleName, scope string) (*
 func AssignStorageBlobDataContributorRoleToScaleSet(
 	ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, storageAccountName, containerName string,
 ) (*armauthorization.RoleAssignment, error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
@@ -626,7 +626,7 @@ type ScaleSetInfo struct {
 // Gets scale set
 // see https://learn.microsoft.com/en-us/rest/api/compute/virtual-machine-scale-sets/get
 func getScaleSet(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (*armcompute.VirtualMachineScaleSet, error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("Getting scale set %s info", vmScaleSetName)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
@@ -651,7 +651,7 @@ func getScaleSet(ctx context.Context, subscriptionId, resourceGroupName, vmScale
 
 // Gets single scale set info
 func GetScaleSetInfo(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, keyVaultUri string) (*ScaleSetInfo, error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	scaleSet, err := getScaleSet(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
@@ -679,7 +679,7 @@ func GetScaleSetInfo(ctx context.Context, subscriptionId, resourceGroupName, vmS
 // Gets a list of all VMs in a scale set
 // see https://learn.microsoft.com/en-us/rest/api/compute/virtual-machine-scale-set-vms/list
 func GetScaleSetInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, expand *string) (vms []*armcompute.VirtualMachineScaleSetVM, err error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
@@ -723,7 +723,7 @@ func GetScaleSetVmId(resourceId string) string {
 }
 
 func GetScaleSetInstancesInfo(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (instances []ScaleSetInstanceInfo, err error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("Getting scale set instances %s info", vmScaleSetName)
 
 	netInterfaces, err := GetScaleSetVmsNetworkInterfaces(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
@@ -764,7 +764,7 @@ func GetScaleSetVmIndex(vmName string) string {
 }
 
 func SetDeletionProtection(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, instanceId string, protect bool) (err error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("Setting deletion protection: %t on instanceId %s", protect, instanceId)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
@@ -848,7 +848,7 @@ func GetSpecificScaleSetInstances(ctx context.Context, subscriptionId, resourceG
 }
 
 func TerminateScaleSetInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, terminateInstanceIds []string) (terminatedInstances []string, errs []error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
@@ -894,7 +894,7 @@ type Report struct {
 }
 
 func UpdateStateReporting(ctx context.Context, subscriptionId, resourceGroupName, stateContainerName, stateStorageName string, report Report) (err error) {
-	logger := LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	leaseId, err := LockContainer(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
 	if err != nil {

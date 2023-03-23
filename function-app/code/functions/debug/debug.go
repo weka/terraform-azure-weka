@@ -3,6 +3,7 @@ package debug
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/weka/go-cloud-lib/logging"
 	"net/http"
 	"os"
 	"strconv"
@@ -40,7 +41,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	resData := make(map[string]interface{})
 
 	ctx := r.Context()
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	var invokeRequest common.InvokeRequest
 
