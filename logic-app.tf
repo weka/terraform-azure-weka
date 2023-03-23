@@ -231,6 +231,13 @@ resource "azurerm_logic_app_action_custom" "logic_app_action_fetch" {
         }
     },
     "type": "Function",
+    "runtimeConfiguration": {
+          "secureData": {
+               "properties": [
+                    "outputs"
+              ]
+          }
+    },
     "runAfter": {
         "${azurerm_logic_app_action_custom.scale_down_logic_app_action_get_secret.name}": [
             "Succeeded"
@@ -260,6 +267,13 @@ resource "azurerm_logic_app_action_custom" "logic_app_action_scale_down" {
         }
     },
     "type": "Function",
+    "runtimeConfiguration": {
+          "secureData": {
+               "properties": [
+                    "inputs"
+              ]
+          }
+    },
      "runAfter": {
         "${azurerm_logic_app_action_custom.logic_app_action_fetch.name}": [
             "Succeeded"
