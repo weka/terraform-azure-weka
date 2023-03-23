@@ -26,11 +26,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		resData["body"] = err.Error()
 	} else {
-		err = common.UpdateVmScaleSetNum(ctx, subscriptionId, resourceGroupName, vmScaleSetName, int64(state.InitialSize))
-		if err != nil {
-			resData["body"] = err.Error()
+		if !state.Clusterized {
+			resData["body"] = "Not clusterized yet, skipping..."
 		} else {
-			resData["body"] = "updated size successfully"
+			err = common.UpdateVmScaleSetNum(ctx, subscriptionId, resourceGroupName, vmScaleSetName, int64(state.DesiredSize))
+			if err != nil {
+				resData["body"] = err.Error()
+			} else {
+				resData["body"] = "updated size successfully"
+			}
 		}
 	}
 
