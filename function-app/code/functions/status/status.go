@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/weka/go-cloud-lib/connectors"
+	"github.com/weka/go-cloud-lib/lib/jrpc"
+	"github.com/weka/go-cloud-lib/lib/weka"
+	"github.com/weka/go-cloud-lib/logging"
 	"math/rand"
 	"net/http"
 	"os"
 	"time"
 	"weka-deployment/common"
-	"weka-deployment/connectors"
-	"weka-deployment/lib/jrpc"
-	"weka-deployment/lib/weka"
 )
 
 type ClusterStatus struct {
@@ -80,7 +81,7 @@ type WekaStatus struct {
 }
 
 func GetReports(ctx context.Context, stateStorageName, stateContainerName string) (reports Reports, err error) {
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("fetching cluster status...")
 
 	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
@@ -95,7 +96,7 @@ func GetReports(ctx context.Context, stateStorageName, stateContainerName string
 }
 
 func GetClusterStatus(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, keyVaultUri string) (clusterStatus ClusterStatus, err error) {
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("fetching cluster status...")
 
 	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
@@ -166,7 +167,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 
 	ctx := r.Context()
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	var invokeRequest common.InvokeRequest
 
