@@ -9,7 +9,7 @@ output "cluster_helpers_commands" {
   value = <<EOT
 ########################################## Get cluster status ############################################################################
 function_key=$(az functionapp keys list --name ${azurerm_linux_function_app.function_app.name} --resource-group ${data.azurerm_resource_group.rg.name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
-curl https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/status?code=$function_key
+curl --fail https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/status?code=$function_key
 
 ######################################### Fetch weka cluster password ####################################################################
 az keyvault secret show --vault-name ${azurerm_key_vault.key_vault.name} --name weka-password | jq .value
@@ -23,7 +23,7 @@ ${local.vm_ips}
 
 ########################################## Resize cluster #################################################################################
 function_key=$(az functionapp keys list --name ${azurerm_linux_function_app.function_app.name} --resource-group ${data.azurerm_resource_group.rg.name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
-curl https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/resize?code=$function_key -H "Content-Type:application/json" -d '{"value":ENTER_NEW_VALUE_HERE}'
+curl --fail https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/resize?code=$function_key -H "Content-Type:application/json" -d '{"value":ENTER_NEW_VALUE_HERE}'
 EOT
   description = "Useful commands and script to interact with weka cluster"
 }
