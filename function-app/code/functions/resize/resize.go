@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/weka/go-cloud-lib/logging"
 	"net/http"
 	"os"
 	"weka-deployment/common"
@@ -21,7 +22,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	clusterName := os.Getenv("CLUSTER_NAME")
 
 	ctx := r.Context()
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	var invokeRequest common.InvokeRequest
 
@@ -94,7 +95,7 @@ func updateDesiredClusterSize(ctx context.Context, newSize int, subscriptionId, 
 
 	if !state.Clusterized {
 		err = fmt.Errorf("weka cluster is not ready")
-		logger := common.LoggerFromCtx(ctx)
+		logger := logging.LoggerFromCtx(ctx)
 		logger.Error().Err(err).Send()
 		return err
 	}

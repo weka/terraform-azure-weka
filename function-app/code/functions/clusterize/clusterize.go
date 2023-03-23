@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/weka/go-cloud-lib/logging"
 	"net/http"
 	"os"
 	"strconv"
@@ -60,7 +61,7 @@ type RequestBody struct {
 func generateClusterizationScript(
 	ctx context.Context, vmNames, ips, prefix, functionAppKey, wekaPassword string, cluster WekaClusterParams, obs ObsParams, hashedIps []string,
 ) (clusterizeScript string) {
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("Generating clusterization script")
 
 	clusterizeScriptTemplate := `
@@ -191,7 +192,7 @@ func reportClusterizeError(ctx context.Context, p ClusterizationParams, err erro
 }
 
 func HandleLastClusterVm(ctx context.Context, state common.ClusterState, p ClusterizationParams) (clusterizeScript string) {
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("This is the last instance in the cluster, creating obs and clusterization script")
 
 	var err error
@@ -263,7 +264,7 @@ func HandleLastClusterVm(ctx context.Context, state common.ClusterState, p Clust
 }
 
 func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript string) {
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	instanceName := strings.Split(p.Cluster.VmName, ":")[0]
 	instanceId := common.GetScaleSetVmIndex(instanceName)
@@ -341,7 +342,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	var invokeRequest common.InvokeRequest
 
 	ctx := r.Context()
-	logger := common.LoggerFromCtx(ctx)
+	logger := logging.LoggerFromCtx(ctx)
 
 	d := json.NewDecoder(r.Body)
 	err := d.Decode(&invokeRequest)
