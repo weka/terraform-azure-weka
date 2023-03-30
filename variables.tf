@@ -308,10 +308,3 @@ variable "function_app_dist" {
     error_message = "Valid value is one of the following: dev, release."
   }
 }
-
-locals {
-  function_code_path     = "${path.module}/function-app/code"
-  function_app_code_hash = md5(join("", [for f in fileset(local.function_code_path, "**") : filemd5("${local.function_code_path}/${f}")]))
-  # tflint-ignore: terraform_unused_declarations
-  validate_versioning = (var.function_app_version != local.function_app_code_hash) ? tobool("Code MD5 does not coincide with version provided. Please update code version.") : true
-}
