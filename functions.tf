@@ -70,6 +70,12 @@ locals {
   weka_sa_container     = "${var.function_app_storage_account_container_prefix}${local.location}"
 }
 
+locals {
+  function_code_path     = "${path.module}/function-app/code"
+  function_app_code_hash = md5(join("", [for f in fileset(local.function_code_path, "**") : filemd5("${local.function_code_path}/${f}")]))
+}
+
+
 resource "azurerm_linux_function_app" "function_app" {
   name                       = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-function-app"
   resource_group_name        = data.azurerm_resource_group.rg.name
@@ -124,6 +130,13 @@ resource "azurerm_linux_function_app" "function_app" {
 
   identity {
     type = "SystemAssigned"
+  }
+
+  lifecycle {
+    precondition {
+      condition     = var.function_app_version == local.function_app_code_hash
+      error_message = "Please update function app code version."
+    }
   }
 
   depends_on = [azurerm_storage_account.deployment_sa]
