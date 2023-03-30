@@ -52,17 +52,14 @@ if [[ "${skip_ofed_installation}" == false ]]; then
   ./mlnxofedinstall --without-fw-update --add-kernel-support --force 2>&1 | tee /tmp/weka_ofed_installation
   /etc/init.d/openibd restart
 
-  disk=$(lsblk -o NAME,HCTL,SIZE,MOUNTPOINT | grep "3:0:0:0" | awk '{print $1}')
   curl ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"ofed installation completed\"}"
-else
-  disk=$(lsblk -o NAME,HCTL,SIZE,MOUNTPOINT | grep "1:0:0:0" | awk '{print $1}')
 fi
 
 apt update -y
 apt install -y jq
 
 # attache disk
-wekaiosw_device=/dev/$disk
+wekaiosw_device=/dev/sdc
 
 status=0
 mkfs.ext4 -L wekaiosw $wekaiosw_device 2>&1 | tee /tmp/output  || status=$?
