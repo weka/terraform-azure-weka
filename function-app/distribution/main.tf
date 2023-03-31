@@ -27,10 +27,15 @@ data "archive_file" "function_zip" {
   depends_on  = [null_resource.build_function_code]
 }
 
+data "azurerm_resource_group" "rg" {
+  name = var.resource_group_name
+}
+
 module "upload-zip" {
   source   = "./upload_zip"
   for_each = toset(var.regions[var.dist])
 
+  rg_name                = data.azurerm_resource_group.rg.name
   region                 = each.key
   function_app_zip_path  = local.function_zip_path
   function_app_code_hash = local.function_app_code_hash
