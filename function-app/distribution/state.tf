@@ -6,7 +6,7 @@ terraform {
     }
   }
   backend "azurerm" {
-    resource_group_name  = "weka-tf-functions-state"
+    resource_group_name  = "weka-tf-functions"
     storage_account_name = "wekatfstate"
     container_name       = "weka-tf-functions-state-container"
     key                  = "terraform.tfstate"
