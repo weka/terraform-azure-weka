@@ -59,7 +59,7 @@ apt update -y
 apt install -y jq
 
 # attache disk
-wekaiosw_device=/dev/sdc
+wekaiosw_device=/dev/"$(lsblk | grep ${disk_size}G | awk '{print $1}')"
 
 status=0
 mkfs.ext4 -L wekaiosw $wekaiosw_device 2>&1 | tee /tmp/output  || status=$?
