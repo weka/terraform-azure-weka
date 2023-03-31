@@ -1,12 +1,7 @@
-resource "azurerm_resource_group" "rg" {
-  name     = "weka-tf-functions-${var.region}-rg"
-  location = var.region
-}
-
 resource "azurerm_storage_account" "sa" {
-  name                     = "weka${var.region}"  // can only consist of lowercase letters and numbers, and must be between 3 and 24 characters long
-  location                 = azurerm_resource_group.rg.location
-  resource_group_name      = azurerm_resource_group.rg.name
+  name                     = "wekatf${var.region}"  // can only consist of lowercase letters and numbers, and must be between 3 and 24 characters long
+  location                 = var.region
+  resource_group_name      = var.rg_name
   account_kind             = "StorageV2"
   account_tier             = "Standard"
   account_replication_type = "ZRS"

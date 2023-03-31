@@ -1,3 +1,9 @@
+variable "resource_group_name" {
+  type        = string
+  description = "The name of Azure resource group"
+  default     = "weka-tf-functions"
+}
+
 variable "subscription_id" {
   type        = string
   description = "Subscription id for deployment"
