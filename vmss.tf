@@ -57,6 +57,7 @@ data "template_file" "init" {
     deploy_url               = "https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/deploy"
     report_url               = "https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/report"
     function_app_default_key = data.azurerm_function_app_host_keys.function_keys.default_function_key
+    disk_size                = local.disk_size
   }
 }
 
