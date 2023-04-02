@@ -96,6 +96,20 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	REPORT_URL="%s"
 	HASHED_IP="%s"
 
+	function getNetStrForDpdk() {
+		i=$1
+		j=$2
+		net=" "
+		gateway=$(route -n | grep 0.0.0.0 | grep UG | awk '{print $2}')
+		for ((i; i<$j; i++)); do
+			eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
+			enp=$(ls -l /sys/class/net/eth$i/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}')
+			bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
+			IFS='/' read -ra netmask <<< "$bits"
+			net="$net --net $enp/$eth/${netmask[1]}/$gateway"
+		done
+	}
+
 	curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Joining started\"}"
 
 	random=$$
@@ -116,22 +130,33 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 		ip=$(ifconfig eth0 | grep "inet " | awk '{ print $2}')
 	done
 
-	curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
-	curl $backend_ip:14000/dist/v1/install | sh
-	curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka installation completed\"}"
-
-	weka version get --from $backend_ip:14000 $VERSION --set-current
-	weka version prepare $VERSION
-	weka local stop && weka local rm --all -f
-
 	COMPUTE=%d
 	FRONTEND=%d
 	DRIVES=%d
 	COMPUTE_MEMORY=%d
-	IPS=%s
 	INSTALL_DPDK=%s
 	SUBNETS_RANGE="%s"
 	NICS_NUM=%s
+	IPS=%s
+
+	core_ids=$(cat /sys/devices/system/cpu/cpu*/topology/thread_siblings_list | cut -d "-" -f 1 | sort -u | tr '\n' ' ')
+	core_ids="${core_ids[@]/0}"
+	IFS=', ' read -r -a core_ids <<< "$core_ids"
+	core_idx_begin=0
+	core_idx_end=$(($core_idx_begin + $DRIVE))
+	get_core_ids() {
+		core_idx_end=$(($core_idx_begin + $1))
+		res=${core_ids[i]}
+		for (( i=$(($core_idx_begin + 1)); i<$core_idx_end; i++ ))
+		do
+			res=$res,${core_ids[i]}
+		done
+		core_idx_begin=$core_idx_end
+		eval "$2=$res"
+	}
+	get_core_ids $DRIVES drive_core_ids
+	get_core_ids $COMPUTE compute_core_ids
+	get_core_ids $FRONTEND frontend_core_ids
 
 	if [[ $INSTALL_DPDK == true ]]; then
 		for(( i=0; i<$NICS_NUM; i++)); do
@@ -140,13 +165,14 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 		
 		echo "network:"> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
 		echo "  config: disabled" >> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
-		
+		subnets=($SUBNETS_RANGE)
 		gateway=$(ip r | grep default | awk '{print $3}')
 		for(( i=0; i<$NICS_NUM; i++)); do
 			eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
 			cat <<-EOF | sed -i "/            set-name: eth$i/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
+            mtu: 3900
             routes:
-            - to: $SUBNETS_RANGE
+            - to: ${subnets[0]}
               via: $gateway
               metric: 200
               table: 20$i
@@ -161,47 +187,31 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 		EOF
 		done
 		netplan apply
+	fi
 
-  		for ((i=0; i<$NICS_NUM i++)); do
-      		 ifconfig eth$i mtu 3900 up
-  		done
-		net=""
-		for ((i=1; i<=$DRIVE_CONTAINERS_NUM; i++)); do
-			enp=$(ls -l /sys/class/net/eth$i/ | grep enP | awk -F"_" '{print $2}' | awk '{print $1}')
-			eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
-			gateway=$(echo ${eth::-1}1)
-			bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
-            IFS='/' read -ra netmask <<< "$bits"
-			net="$net --net $enp/$eth/${netmask[1]}/$gateway "
-		done
-		weka local setup container --name drives0 --base-port 14000 --cores $DRIVE_CONTAINERS_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINERS_NUM $net --failure-domain "$HASHED_IP"
-		
-		i=$((1+$DRIVE_CONTAINERS_NUM))
-		j=$(($i+$NUM_COMPUTE_CONTAINERS))
-		net=""
-		for ((i; i<$j; i++)); do
-			enp=$(ls -l /sys/class/net/eth$i/ | grep enP | awk -F"_" '{print $2}' | awk '{print $1}')
-			eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
-			gateway=$(echo ${eth::-1}1)
-			bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
-            IFS='/' read -ra netmask <<< "$bits"
-			net="$net --net $enp/$eth/${netmask[1]}/$gateway "
-		done
-		weka local setup container --name compute0 --base-port 15000 --cores $NUM_COMPUTE_CONTAINERS --no-frontends --compute-dedicated-cores $NUM_COMPUTE_CONTAINERS  --memory $COMPUTE_MEMORY --join-ips $IPS $net --failure-domain "$HASHED_IP"
+	sleep 30
 
-			
-		i=$(($NICS_NUM-1))
-		enp=$(ls -l /sys/class/net/eth$i/ | grep enP | awk -F"_" '{print $2}' | awk '{print $1}')
-		eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
-		gateway=$(echo ${eth::-1}1)
-		bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
-        IFS='/' read -ra netmask <<< "$bits"
-		weka local setup container --name frontend0 --base-port 16000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --allow-protocols true --join-ips $IPS --net $enp/$eth/${netmask[1]}/$gateway --failure-domain "$HASHED_IP"
+	curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
+	curl $backend_ip:14000/dist/v1/install | sh
+	curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka installation completed\"}"
 
+	weka version get --from $backend_ip:14000 $VERSION --set-current
+	weka version prepare $VERSION
+	weka local stop && weka local rm --all -f
+
+	if [[ $INSTALL_DPDK == true ]]; then
+		getNetStrForDpdk 1 $(($DRIVES+1))
+		weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $IPS --failure-domain "$HASHED_IP" --core-ids $drive_core_ids $net --dedicate
+
+		getNetStrForDpdk $((1+$DRIVES)) $((1+$DRIVES+$COMPUTE))
+		weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY"GB --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $IPS --failure-domain "$HASHED_IP" --core-ids $compute_core_ids $net --dedicate
+
+		getNetStrForDpdk $(($NICS_NUM-1)) $(($NICS_NUM))
+		weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $IPS --failure-domain "$HASHED_IP" --core-ids $frontend_core_ids $net --dedicate
 	else
-		weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $IPS --failure-domain "$HASHED_IP"
-		weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY"GB --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $IPS --failure-domain "$HASHED_IP"
-		weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $IPS --failure-domain "$HASHED_IP"
+		weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $IPS --failure-domain "$HASHED_IP" --core-ids $drive_core_ids --dedicate
+		weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY"GB --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $IPS --failure-domain "$HASHED_IP" --core-ids $compute_core_ids --dedicate
+		weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $IPS --failure-domain "$HASHED_IP" --core-ids $frontend_core_ids --dedicate
 	fi`
 
 	isReady := `
@@ -259,12 +269,9 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	compute = instanceParams.total - frontend - drive - 1
 	mem = instanceParams.memory
 
-	if !instanceParams.converged {
-		bashScriptTemplate += " --dedicate"
-	}
 	bashScriptTemplate += isReady + fmt.Sprintf(addDrives, joinFinalizationUrl)
 
-	bashScript = fmt.Sprintf(bashScriptTemplate, wekaPassword, strings.Join(ips, "\" \""), functionKey, reportUrl, hashedPrivateIp, subnet, compute, frontend, drive, mem, strings.Join(ips, ","))
+	bashScript = fmt.Sprintf(bashScriptTemplate, wekaPassword, strings.Join(ips, "\" \""), functionKey, reportUrl, hashedPrivateIp, subnet, compute, frontend, drive, mem, installDpdk, subnetsRange, nicsNum, strings.Join(ips, ","))
 
 	return
 }
@@ -318,20 +325,10 @@ func GetDeployScript(
 			VM=%s
 			INSTALL_DPDK=%s
 			SUBNETS_RANGE="%s"
-			NICS_NUM=%s
+			NICS_NUM=%s	
 
-			gsutil cp $INSTALL_URL /tmp
-			cd /tmp
-			tar -xvf $TAR_NAME
-			cd $PACKAGE_NAME
-			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
-			./install.sh
-			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka installation completed\"}"
-
-			weka local stop
-			weka local rm default --force
-			
 			if [[ $INSTALL_DPDK == true ]]; then
+				subnets=($SUBNETS_RANGE)
 				for(( i=0; i<$NICS_NUM; i++)); do
 						   echo "20$i eth$i-rt" >> /etc/iproute2/rt_tables
 				done
@@ -343,8 +340,9 @@ func GetDeployScript(
 				for(( i=0; i<$NICS_NUM; i++)); do
 					eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
 					cat <<-EOF | sed -i "/            set-name: eth$i/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
+            mtu: 3900
             routes:
-            - to: $SUBNETS_RANGE
+            - to: ${subnets[0]}
               via: $gateway
               metric: 200
               table: 20$i
@@ -359,23 +357,21 @@ func GetDeployScript(
 				EOF
 				done
 				netplan apply
-
-  				for ((i=0; i<$NICS_NUM; i++)); do
-      				  ifconfig eth$i mtu 3900 up
-  				done
-				net=""
-				for ((i=1; i<=$DRIVE_CONTAINERS_NUM; i++)); do
-					enp=$(ls -l /sys/class/net/eth$i/ | grep enP | awk -F"_" '{print $2}' | awk '{print $1}')
-					eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
-					gateway=$(echo ${eth::-1}1)
-					bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
-            		IFS='/' read -ra netmask <<< "$bits"
-					net="$net --net $enp/$eth/${netmask[1]}/$gateway "
-				done
-				weka local setup container --name drives0 --base-port 14000 --cores $DRIVE_CONTAINERS_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINERS_NUM $net
-			else
-				weka local setup container --name drives0 --base-port 14000 --cores $DRIVE_CONTAINERS_NUM --no-frontends --drives-dedicated-cores $DRIVE_CONTAINERS_NUM
 			fi
+	
+			sleep 30
+		
+			gsutil cp $INSTALL_URL /tmp
+			cd /tmp
+			tar -xvf $TAR_NAME
+			cd $PACKAGE_NAME
+			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
+			./install.sh
+			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka installation completed\"}"
+
+			weka local stop
+			weka local rm default --force
+			
 
 			curl $PROTECT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$VM\"}"
 			curl $CLUSTERIZE_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$VM\"}" > /tmp/clusterize.sh
@@ -423,13 +419,9 @@ func GetDeployScript(
 					return 0
 			}
 
-			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"installing weka\"}"
-			retry 300 2 curl --fail --max-time 10 https://$TOKEN@get.prod.weka.io/dist/v1/install/4.1.2-79fa6212c4ac2650d2ea4f402e984973/4.1.2.602-792f309deb1e08d41534aca31b7ab123 | sh
-			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"weka installation completed\"}"
-
-			weka local stop
-			weka local rm default --force
+			
 			if [[ $INSTALL_DPDK == true ]]; then
+				subnets=($SUBNETS_RANGE)
 				for(( i=0; i<$NICS_NUM; i++)); do
 						   echo "20$i eth$i-rt" >> /etc/iproute2/rt_tables
 				done
@@ -441,8 +433,9 @@ func GetDeployScript(
 				for(( i=0; i<$NICS_NUM; i++)); do
 					eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
 					cat <<-EOF | sed -i "/            set-name: eth$i/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
+            mtu: 3900
             routes:
-            - to: $SUBNETS_RANGE
+            - to: ${subnets[0]}
               via: $gateway
               metric: 200
               table: 20$i
@@ -457,11 +450,16 @@ func GetDeployScript(
 				EOF
 				done
 				netplan apply
-
-  				for ((i=0; i<$NICS_NUM; i++)); do
-      				 ifconfig eth$i mtu 3900 up
-  				done
 			fi
+
+			sleep 30
+
+			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
+			retry 300 2 curl --fail --max-time 10 $INSTALL_URL | sh
+			curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka installation completed\"}"
+
+			weka local stop
+			weka local rm default --force
 
 			curl $PROTECT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$VM\"}"
 			curl $CLUSTERIZE_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$VM\"}" > /tmp/clusterize.sh

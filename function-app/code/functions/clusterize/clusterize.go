@@ -94,13 +94,12 @@ func generateClusterizationScript(
 	INSTALL_DPDK=%s
 	NICS_NUM=%s
 	HASHED_IPS=(%s)
-
+	
+	ssh_command="ssh -o StrictHostKeyChecking=no"
 	report_url=https://$PREFIX-$CLUSTER_NAME-function-app.azurewebsites.net/api/report
 	clusterize_finalization_url=https://$PREFIX-$CLUSTER_NAME-function-app.azurewebsites.net/api/clusterize_finalization
 
 	curl "$report_url?code=$FUNCTION_APP_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running Clusterization\"}"
-
-	ssh_command="ssh -o StrictHostKeyChecking=no"
 
 	core_ids=$(cat /sys/devices/system/cpu/cpu*/topology/thread_siblings_list | cut -d "-" -f 1 | sort -u | tr '\n' ' ')
 	core_ids="${core_ids[@]/0}"
@@ -121,20 +120,41 @@ func generateClusterizationScript(
 	get_core_ids $NUM_COMPUTE_CONTAINERS compute_core_ids
 	get_core_ids $NUM_FRONTEND_CONTAINERS frontend_core_ids
 
-	for index in ${!VMS[*]}; do
+	function getNetStrForDpdk() {
+		i=$1
+		j=$2
+		vm=$3
+		net=" "
+		gateway=$(ip r | grep default | awk '{print $3}')
+		for ((i; i<$j; i++)); do
+			enp=$($ssh_command $vm "ls -l /sys/class/net/eth$i/ | grep lower" | awk -F"_" '{print $2}' | awk '{print $1}')
+			eth=$($ssh_command $vm "ifconfig | grep eth$i -C2 | grep 'inet '" | awk '{print $2}')
+			bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
+			IFS='/' read -ra netmask <<< "$bits"
+			net="$net --net $enp/$eth/${netmask[1]}/$gateway"
+		done
+	}
+
+	index=0
+	for vm in $(echo "$IPS" | sed "s|,| |g"); do
 		hashed_ip=${HASHED_IPS[$index]}
-		$ssh_command ${VMS[$index]} "sudo weka local setup container --name drives0 --base-port 14000 --cores $NUM_DRIVE_CONTAINERS --no-frontends --drives-dedicated-cores $NUM_DRIVE_CONTAINERS --failure-domain $hashed_ip --core-ids $drive_core_ids"
+		if [[ $INSTALL_DPDK == true ]]; then
+			getNetStrForDpdk 1 $((1+$NUM_DRIVE_CONTAINERS)) $vm
+			$ssh_command $vm "sudo weka local setup container --name drives0 --base-port 14000 --cores $NUM_DRIVE_CONTAINERS --no-frontends --drives-dedicated-cores $NUM_DRIVE_CONTAINERS --failure-domain $hashed_ip $net --core-ids $drive_core_ids --dedicate"
+		else
+			$ssh_command $vm "sudo weka local setup container --name drives0 --base-port 14000 --cores $NUM_DRIVE_CONTAINERS --no-frontends --drives-dedicated-cores $NUM_DRIVE_CONTAINERS --failure-domain $hashed_ip --core-ids $drive_core_ids --dedicate"
+		fi
+		index=$(($index+1))
 	done
+
+	sleep 10s
 	
 	vms_string=$(printf "%%s "  "${VMS[@]}" | rev | cut -c2- | rev)
 	weka cluster create $vms_string --host-ips $IPS --admin-password "$WEKA_PASSWORD"
-	weka user login admin "$WEKA_PASSWORD"
-	if [[ $INSTALL_DPDK == true ]]; then
-		weka debug override add --key allow_azure_auto_detection
-		weka debug override add --key allow_uncomputed_backend_checksum
-	fi
 	
-	sleep 30s
+	sleep 10s
+	
+	weka user login admin "$WEKA_PASSWORD"
 	
 	for (( i=0; i<$HOSTS_NUM; i++ )); do
 		for (( d=0; d<$NVMES_NUM; d++ )); do
@@ -143,49 +163,35 @@ func generateClusterizationScript(
 	done
 
 	weka cluster update --cluster-name="$CLUSTER_NAME"
-	
-	for index in ${!VMS[*]}; do
+
+	index=0
+	for vm in $(echo "$IPS" | sed "s|,| |g"); do
 		hashed_ip=${HASHED_IPS[$index]}
 		net=""
       	if [[ $INSTALL_DPDK == true ]]; then
-			i=$(($NICS_NUM-1-$NUM_COMPUTE_CONTAINERS))
-			j=$(($i+$NUM_COMPUTE_CONTAINERS))
-			net=""
-			for ((i; i<$j; i++)); do
-				enp=$($ssh_command $vm "ls -l /sys/class/net/eth$i/ | grep enP" | awk -F"_" '{print $2}' | awk '{print $1}')
-				eth=$($ssh_command $vm "ifconfig | grep eth$i -C2 | grep 'inet '" | awk '{print $2}')
-				gateway=$(echo ${eth::-1}1)
-				bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
-            	IFS='/' read -ra netmask <<< "$bits"
-				net="$net --net $enp/$eth/${netmask[1]}/$gateway "
-			done
-			$ssh_command ${VMS[$index]} "sudo weka local setup container --name compute0 --base-port 15000 --cores $NUM_COMPUTE_CONTAINERS --no-frontends --compute-dedicated-cores $NUM_COMPUTE_CONTAINERS  --memory $COMPUTE_MEMORY --join-ips $IPS --failure-domain $hashed_ip $net --core-ids $compute_core_ids"
+			getNetStrForDpdk $((1+$NUM_DRIVE_CONTAINERS)) $((1+$NUM_COMPUTE_CONTAINERS+$NUM_DRIVE_CONTAINERS)) $vm
+			$ssh_command $vm "sudo weka local setup container --name compute0 --base-port 15000 --cores $NUM_COMPUTE_CONTAINERS --no-frontends --compute-dedicated-cores $NUM_COMPUTE_CONTAINERS  --memory $COMPUTE_MEMORY --join-ips $IPS --failure-domain $hashed_ip $net --core-ids $compute_core_ids --dedicate"
 		else
-			$ssh_command ${VMS[$index]} "sudo weka local setup container --name frontend0 --base-port 16000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --allow-protocols true --join-ips $IPS --failure-domain $hashed_ip --core-ids $compute_core_ids"
+			$ssh_command $vm "sudo weka local setup container --name compute0 --base-port 15000 --cores $NUM_COMPUTE_CONTAINERS --no-frontends --compute-dedicated-cores $NUM_COMPUTE_CONTAINERS  --memory $COMPUTE_MEMORY --join-ips $IPS --failure-domain $hashed_ip --core-ids $compute_core_ids --dedicate"
 		fi
+		index=$(($index+1))
 	done
 	
 	weka cloud enable
 	weka cluster update --data-drives $STRIPE_WIDTH --parity-drives $PROTECTION_LEVEL
 	weka cluster hot-spare $HOTSPARE
 	weka cluster start-io
-	
-	for index in ${!VMS[*]}; do
-		hashed_ip=${HASHED_IPS[$index]}
-		net=""
-		if [[ $INSTALL_DPDK == true ]]; then
-			i=$(($NICS_NUM-1))
-			enp=$($ssh_command $vm "ls -l /sys/class/net/eth$i/ | grep enP" | awk -F"_" '{print $2}' | awk '{print $1}')
-			eth=$($ssh_command $vm "ifconfig | grep eth$i -C2 | grep 'inet '" | awk '{print $2}')
-			gateway=$(echo ${eth::-1}1)
-			bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
-            IFS='/' read -ra netmask <<< "$bits"
-			net="$net --net $enp/$eth/${netmask[1]}/$gateway "
-			$ssh_command ${VMS[$index]} "sudo weka local setup container --name drives0 --base-port 14000 --cores $NUM_DRIVE_CONTAINERS --no-frontends --drives-dedicated-cores $NUM_DRIVE_CONTAINERS --failure-domain $hashed_ip $net --core-ids $frontend_core_ids"
 
+	index=0
+	for vm in $(echo "$IPS" | sed "s|,| |g"); do
+		hashed_ip=${HASHED_IPS[$index]}
+		if [[ $INSTALL_DPDK == true ]]; then
+			getNetStrForDpdk $(($NICS_NUM-1)) $NICS_NUM $vm
+			$ssh_command $vm "sudo weka local setup container --name frontend0 --base-port 16000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --allow-protocols true --join-ips $IPS --failure-domain $hashed_ip $net --core-ids $frontend_core_ids --dedicate"
 		else
-			$ssh_command ${VMS[$index]} "sudo weka local setup container --name drives0 --base-port 14000 --cores $NUM_DRIVE_CONTAINERS --no-frontends --drives-dedicated-cores $NUM_DRIVE_CONTAINERS --failure-domain $hashed_ip --core-ids $frontend_core_ids"
+			$ssh_command $vm "sudo weka local setup container --name frontend0 --base-port 16000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --allow-protocols true --join-ips $IPS --failure-domain $hashed_ip --core-ids $frontend_core_ids --dedicate"
 		fi
+		index=$(($index+1))
 	done
 	
 	sleep 15s
@@ -206,6 +212,8 @@ func generateClusterizationScript(
 	fi
 	
 	if [[ $INSTALL_DPDK == true ]]; then
+		weka alerts mute NodeRDMANotActive 365d
+	else
 		weka alerts mute JumboConnectivity 365d
 		weka alerts mute UdpModePerformanceWarning 365d
 	fi

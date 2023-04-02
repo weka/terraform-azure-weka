@@ -123,7 +123,6 @@ resource "azurerm_linux_virtual_machine_scale_set" "custom_image_vmss" {
       name                          = "${var.prefix}-${var.cluster_name}-backend-nic-0"
       network_security_group_id     = var.sg_id
       primary                       = true
-      enable_accelerated_networking = var.install_cluster_dpdk
       ip_configuration {
         primary                                = true
         name                                   = "ipconfig0"
@@ -161,7 +160,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "custom_image_vmss" {
       ip_configuration {
         primary                                = false
         name                                   = "ipconfig${network_interface.value}"
-        subnet_id                              = data.azurerm_subnet.subnets[0].id #data.azurerm_subnet.subnets[network_interface.value].id
+        subnet_id                              = data.azurerm_subnet.subnets[1].id
         load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
       }
     }
@@ -221,7 +220,6 @@ resource "azurerm_linux_virtual_machine_scale_set" "default_image_vmss" {
       name                          = "${var.prefix}-${var.cluster_name}-backend-nic-0"
       network_security_group_id     = var.sg_id
       primary                       = true
-      enable_accelerated_networking = var.install_cluster_dpdk
       ip_configuration {
         primary                                = true
         name                                   = "ipconfig0"
@@ -258,7 +256,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "default_image_vmss" {
       ip_configuration {
         primary                                = false
         name                                   = "ipconfig${network_interface.value}"
-        subnet_id                              = data.azurerm_subnet.subnets[0].id #data.azurerm_subnet.subnets[network_interface.value].id
+        subnet_id                              = data.azurerm_subnet.subnets[1].id
         load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
       }
     }

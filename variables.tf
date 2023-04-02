@@ -72,7 +72,7 @@ variable "subnet_delegation_id" {
 variable "weka_version" {
   type = string
   description = "The Weka version to deploy."
-  default = "4.1.2.602-792f309deb1e08d41534aca31b7ab123"
+  default = "4.1.0.71"
 }
 
 variable "get_weka_io_token" {
@@ -132,7 +132,7 @@ variable "private_dns_zone_name" {
 variable "ofed_version" {
   type = string
   description = "The OFED driver version to for ubuntu 18."
-  default = "5.7-1.0.2.0"
+  default = "5.9-0.5.6.0"
 }
 
 variable "install_ofed_url" {
@@ -295,7 +295,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type = string
   description = "Function app code version (hash)"
-  default = "389790ea7a380624d681e599de569ec2"
+  default = "b7697cddf1a251e6c61923c3713dda5b"
 }
 
 variable "function_app_dist" {
@@ -311,12 +311,12 @@ variable "function_app_dist" {
 
 variable "install_cluster_dpdk" {
   type        = bool
-  default     = false
+  default     = true
   description = "Install weka cluster with DPDK"
 }
 
 variable "install_ofed" {
   type        = bool
-  default     = false
+  default     = true
   description = "Install ofed for weka cluster with dpdk configuration"
 }
