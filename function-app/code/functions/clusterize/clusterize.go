@@ -98,9 +98,28 @@ func generateClusterizationScript(
 
 	ssh_command="ssh -o StrictHostKeyChecking=no"
 
+	core_ids=$(cat /sys/devices/system/cpu/cpu*/topology/thread_siblings_list | cut -d "-" -f 1 | sort -u | tr '\n' ' ')
+	core_ids="${core_ids[@]/0}"
+	IFS=', ' read -r -a core_ids <<< "$core_ids"
+	core_idx_begin=0
+	core_idx_end=$(($core_idx_begin + $NUM_DRIVE_CONTAINERS))
+	get_core_ids() {
+		core_idx_end=$(($core_idx_begin + $1))
+		res=${core_ids[i]}
+		for (( i=$(($core_idx_begin + 1)); i<$core_idx_end; i++ ))
+		do
+			res=$res,${core_ids[i]}
+		done
+		core_idx_begin=$core_idx_end
+		eval "$2=$res"
+	}
+	get_core_ids $NUM_DRIVE_CONTAINERS drive_core_ids
+	get_core_ids $NUM_COMPUTE_CONTAINERS compute_core_ids
+	get_core_ids $NUM_FRONTEND_CONTAINERS frontend_core_ids
+
 	for index in ${!VMS[*]}; do
 		hashed_ip=${HASHED_IPS[$index]}
-		$ssh_command ${VMS[$index]} "sudo weka local setup container --name drives0 --base-port 14000 --cores $NUM_DRIVE_CONTAINERS --no-frontends --drives-dedicated-cores $NUM_DRIVE_CONTAINERS --failure-domain $hashed_ip"
+		$ssh_command ${VMS[$index]} "sudo weka local setup container --name drives0 --base-port 14000 --cores $NUM_DRIVE_CONTAINERS --no-frontends --drives-dedicated-cores $NUM_DRIVE_CONTAINERS --failure-domain $hashed_ip --core-ids $drive_core_ids"
 	done
 	
 	vms_string=$(printf "%%s "  "${VMS[@]}" | rev | cut -c2- | rev)
@@ -119,7 +138,7 @@ func generateClusterizationScript(
 	
 	for index in ${!VMS[*]}; do
 		hashed_ip=${HASHED_IPS[$index]}
-		$ssh_command ${VMS[$index]} "sudo weka local setup container --name compute0 --base-port 15000 --cores $NUM_COMPUTE_CONTAINERS --no-frontends --compute-dedicated-cores $NUM_COMPUTE_CONTAINERS  --memory $COMPUTE_MEMORY --join-ips $IPS --failure-domain $hashed_ip"
+		$ssh_command ${VMS[$index]} "sudo weka local setup container --name compute0 --base-port 15000 --cores $NUM_COMPUTE_CONTAINERS --no-frontends --compute-dedicated-cores $NUM_COMPUTE_CONTAINERS  --memory $COMPUTE_MEMORY --join-ips $IPS --failure-domain $hashed_ip --core-ids $compute_core_ids"
 	done
 	
 	weka cloud enable
@@ -129,7 +148,7 @@ func generateClusterizationScript(
 	
 	for index in ${!VMS[*]}; do
 		hashed_ip=${HASHED_IPS[$index]}
-		$ssh_command ${VMS[$index]} "sudo weka local setup container --name frontend0 --base-port 16000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --allow-protocols true --join-ips $IPS --failure-domain $hashed_ip"
+		$ssh_command ${VMS[$index]} "sudo weka local setup container --name frontend0 --base-port 16000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --allow-protocols true --join-ips $IPS --failure-domain $hashed_ip --core-ids $frontend_core_ids"
 	done
 	
 	sleep 15s
