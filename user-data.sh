@@ -1,11 +1,11 @@
 #!/bin/bash
 set -ex
 
-curl ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running init script\"}"
+curl -i ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running init script\"}"
 
 handle_error () {
   if [ "$1" -ne 0 ]; then
-    curl ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"${2}\"}"
+    curl -i ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"${2}\"}"
     exit 1
   fi
 }
@@ -39,7 +39,7 @@ mkdir -p $INSTALLATION_PATH
 
 # install ofed
 if [[ "${skip_ofed_installation}" == false ]]; then
-  curl ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"installing ofed\"}"
+  curl -i ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"installing ofed\"}"
   OFED_NAME=ofed-${ofed_version}
   if [[ "${install_ofed_url}" ]]; then
     wget ${install_ofed_url} -O $INSTALLATION_PATH/$OFED_NAME.tgz
@@ -52,7 +52,7 @@ if [[ "${skip_ofed_installation}" == false ]]; then
   ./mlnxofedinstall --without-fw-update --add-kernel-support --force 2>&1 | tee /tmp/weka_ofed_installation
   /etc/init.d/openibd restart
 
-  curl ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"ofed installation completed\"}"
+  curl -i ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"ofed installation completed\"}"
 fi
 
 apt update -y
