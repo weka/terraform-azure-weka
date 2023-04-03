@@ -7,6 +7,10 @@ locals {
 }
 output "cluster_helpers_commands" {
   value = <<EOT
+########################################## Get clusterization status #####################################################################
+function_key=$(az functionapp keys list --name ${azurerm_linux_function_app.function_app.name} --resource-group ${data.azurerm_resource_group.rg.name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
+curl --fail https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/status?code=$function_key -H "Content-Type:application/json" -d '{"type": "progress"}'
+
 ########################################## Get cluster status ############################################################################
 function_key=$(az functionapp keys list --name ${azurerm_linux_function_app.function_app.name} --resource-group ${data.azurerm_resource_group.rg.name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
 curl --fail https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/status?code=$function_key
