@@ -104,7 +104,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		resData["body"] = err.Error()
 	} else {
-		resData["body"] = fmt.Sprintf("Updated state errors successfully")
+		resData["body"] = fmt.Sprintf("The report was added successfully")
 	}
 
 	outputs["res"] = resData
