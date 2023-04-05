@@ -254,6 +254,8 @@ func GetDeployScript(
 			weka local stop
 			weka local rm default --force
 
+			//add weka containers setup + while loop until all containers are up
+
 			curl $PROTECT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$VM\"}"
 			curl $CLUSTERIZE_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$VM\"}" > /tmp/clusterize.sh
 			chmod +x /tmp/clusterize.sh

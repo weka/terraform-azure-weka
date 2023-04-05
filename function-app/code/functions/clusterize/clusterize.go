@@ -121,12 +121,22 @@ func generateClusterizationScript(
 		hashed_ip=${HASHED_IPS[$index]}
 		$ssh_command ${VMS[$index]} "sudo weka local setup container --name drives0 --base-port 14000 --cores $NUM_DRIVE_CONTAINERS --no-frontends --drives-dedicated-cores $NUM_DRIVE_CONTAINERS --failure-domain $hashed_ip --core-ids $drive_core_ids"
 	done
+
+	for index in ${!VMS[*]}; do
+		hashed_ip=${HASHED_IPS[$index]}
+		$ssh_command ${VMS[$index]} "sudo weka local setup container --name compute0 --base-port 15000 --cores $NUM_COMPUTE_CONTAINERS --no-frontends --compute-dedicated-cores $NUM_COMPUTE_CONTAINERS  --memory $COMPUTE_MEMORY --failure-domain $hashed_ip --core-ids $compute_core_ids"
+	done
 	
+	for index in ${!VMS[*]}; do
+		hashed_ip=${HASHED_IPS[$index]}
+		$ssh_command ${VMS[$index]} "sudo weka local setup container --name frontend0 --base-port 16000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --allow-protocols true --failure-domain $hashed_ip --core-ids $frontend_core_ids"
+	done
+
 	vms_string=$(printf "%%s "  "${VMS[@]}" | rev | cut -c2- | rev)
-	weka cluster create $vms_string --host-ips $IPS --admin-password "$WEKA_PASSWORD"
+	weka cluster create $vms_string --host-ips $IPS --admin-password "$WEKA_PASSWORD"  //add join ips - check containers status
 	weka user login admin "$WEKA_PASSWORD"
 	
-	sleep 30s
+	sleep 30s //weka cluster container 
 	
 	for (( i=0; i<$HOSTS_NUM; i++ )); do
 		for (( d=0; d<$NVMES_NUM; d++ )); do
@@ -135,21 +145,11 @@ func generateClusterizationScript(
 	done
 
 	weka cluster update --cluster-name="$CLUSTER_NAME"
-	
-	for index in ${!VMS[*]}; do
-		hashed_ip=${HASHED_IPS[$index]}
-		$ssh_command ${VMS[$index]} "sudo weka local setup container --name compute0 --base-port 15000 --cores $NUM_COMPUTE_CONTAINERS --no-frontends --compute-dedicated-cores $NUM_COMPUTE_CONTAINERS  --memory $COMPUTE_MEMORY --join-ips $IPS --failure-domain $hashed_ip --core-ids $compute_core_ids"
-	done
-	
+
 	weka cloud enable
 	weka cluster update --data-drives $STRIPE_WIDTH --parity-drives $PROTECTION_LEVEL
 	weka cluster hot-spare $HOTSPARE
 	weka cluster start-io
-	
-	for index in ${!VMS[*]}; do
-		hashed_ip=${HASHED_IPS[$index]}
-		$ssh_command ${VMS[$index]} "sudo weka local setup container --name frontend0 --base-port 16000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --allow-protocols true --join-ips $IPS --failure-domain $hashed_ip --core-ids $frontend_core_ids"
-	done
 	
 	sleep 15s
 	
