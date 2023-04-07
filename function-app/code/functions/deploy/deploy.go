@@ -326,6 +326,19 @@ type RequestBody struct {
 	Vm string `json:"vm"`
 }
 
+func writeResponse(w http.ResponseWriter, outputs, resData map[string]interface{}, err error) {
+	if err != nil {
+		resData["body"] = err.Error()
+	}
+	outputs["res"] = resData
+	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
+
+	responseJson, _ := json.Marshal(invokeResponse)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(responseJson)
+}
+
 func Handler(w http.ResponseWriter, r *http.Request) {
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
@@ -349,21 +362,30 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	d := json.NewDecoder(r.Body)
 	err := d.Decode(&invokeRequest)
 	if err != nil {
-		logger.Error().Msg("Bad request")
+		err = fmt.Errorf("cannot decode the request: %v", err)
+		logger.Error().Err(err).Send()
+		w.WriteHeader(http.StatusBadRequest)
+		writeResponse(w, outputs, resData, err)
 		return
 	}
 
 	var reqData map[string]interface{}
 	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
 	if err != nil {
-		logger.Error().Msg("Bad request")
+		err = fmt.Errorf("cannot unmarshal the request data: %v", err)
+		logger.Error().Err(err).Send()
+		w.WriteHeader(http.StatusBadRequest)
+		writeResponse(w, outputs, resData, err)
 		return
 	}
 
 	var data RequestBody
 
 	if json.Unmarshal([]byte(reqData["Body"].(string)), &data) != nil {
-		logger.Error().Msg("Bad request")
+		err = fmt.Errorf("cannot unmarshal the request body: %v", err)
+		logger.Error().Err(err).Send()
+		w.WriteHeader(http.StatusBadRequest)
+		writeResponse(w, outputs, resData, err)
 		return
 	}
 
@@ -382,15 +404,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		data.Vm)
 
 	if err != nil {
-		resData["body"] = err.Error()
+		w.WriteHeader(http.StatusInternalServerError)
 	} else {
 		resData["body"] = bashScript
 	}
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	writeResponse(w, outputs, resData, err)
 }
