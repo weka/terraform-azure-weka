@@ -3,12 +3,13 @@ package debug
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/weka/go-cloud-lib/logging"
 	"net/http"
 	"os"
 	"strconv"
 	"weka-deployment/common"
 	"weka-deployment/functions/clusterize"
+
+	"github.com/weka/go-cloud-lib/logging"
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -16,7 +17,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 	hostsNum := os.Getenv("HOSTS_NUM")
 	clusterName := os.Getenv("CLUSTER_NAME")
-	computeMemory := os.Getenv("COMPUTE_MEMORY")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
 	setObs := os.Getenv("SET_OBS")
@@ -25,8 +25,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	obsAccessKey := os.Getenv("OBS_ACCESS_KEY")
 	location := os.Getenv("LOCATION")
 	nvmesNum := os.Getenv("NVMES_NUM")
-	computeContainerNum := os.Getenv("NUM_COMPUTE_CONTAINERS")
-	frontendContainerNum := os.Getenv("NUM_FRONTEND_CONTAINERS")
 	tieringSsdPercent := os.Getenv("TIERING_SSD_PERCENT")
 	prefix := os.Getenv("PREFIX")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
@@ -96,13 +94,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 				StateContainerName: stateContainerName,
 				StateStorageName:   stateStorageName,
 				Cluster: clusterize.WekaClusterParams{
-					HostsNum:             hostsNum,
-					Name:                 clusterName,
-					ComputeMemory:        computeMemory,
-					NvmesNum:             nvmesNum,
-					ComputeContainerNum:  computeContainerNum,
-					FrontendContainerNum: frontendContainerNum,
-					TieringSsdPercent:    tieringSsdPercent,
+					HostsNum:          hostsNum,
+					Name:              clusterName,
+					NvmesNum:          nvmesNum,
+					TieringSsdPercent: tieringSsdPercent,
 					DataProtection: clusterize.DataProtectionParams{
 						StripeWidth:     stripeWidth,
 						ProtectionLevel: protectionLevel,
