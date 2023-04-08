@@ -24,6 +24,7 @@ ${local.path_ssh_keys}
 
 ################################################ Vms ips ##################################################################################
 ${local.vm_ips}
+username: ${var.vm_username}
 
 ########################################## Resize cluster #################################################################################
 function_key=$(az functionapp keys list --name ${azurerm_linux_function_app.function_app.name} --resource-group ${data.azurerm_resource_group.rg.name} --subscription ${var.subscription_id} --query functionKeys -o tsv)

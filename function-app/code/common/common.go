@@ -947,3 +947,7 @@ func UpdateStateReportingWithoutLocking(ctx context.Context, stateContainerName,
 func GetHashedPrivateIp(privateIp string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(privateIp)))[:16]
 }
+
+func GetHashedPrivateIpBashCmd() string {
+	return "printf $(hostname -I) | sha256sum | tr -d '-' | cut -c1-16"
+}
