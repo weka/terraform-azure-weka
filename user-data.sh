@@ -10,19 +10,6 @@ handle_error () {
   fi
 }
 
-# add private key to ssh config
-echo "${private_ssh_key}" > /home/${user}/.ssh/weka.pem
-chmod 600 /home/${user}/.ssh/weka.pem
-
-cat > /home/${user}/.ssh/config <<EOL
-Host *
-   User ${user}
-   IdentityFile /home/${user}/.ssh/weka.pem
-EOL
-
-cp -R /home/${user}/.ssh/* /root/.ssh/
-chown -R ${user}:${user} /home/${user}/.ssh/
-
 while fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; do
    sleep 2
 done
