@@ -7,7 +7,8 @@ import (
 	"os"
 	"strconv"
 	"weka-deployment/common"
-	"weka-deployment/functions/clusterize"
+	clusterizeFunc "weka-deployment/functions/clusterize"
+	"weka-deployment/lib/clusterize"
 
 	"github.com/weka/go-cloud-lib/logging"
 )
@@ -15,16 +16,16 @@ import (
 func Handler(w http.ResponseWriter, r *http.Request) {
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
-	hostsNum := os.Getenv("HOSTS_NUM")
+	hostsNum, _ := strconv.Atoi(os.Getenv("HOSTS_NUM"))
 	clusterName := os.Getenv("CLUSTER_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
-	setObs := os.Getenv("SET_OBS")
+	setObs, _ := strconv.ParseBool(os.Getenv("SET_OBS"))
 	obsName := os.Getenv("OBS_NAME")
 	obsContainerName := os.Getenv("OBS_CONTAINER_NAME")
 	obsAccessKey := os.Getenv("OBS_ACCESS_KEY")
 	location := os.Getenv("LOCATION")
-	nvmesNum := os.Getenv("NVMES_NUM")
+	nvmesNum, _ := strconv.Atoi(os.Getenv("NVMES_NUM"))
 	tieringSsdPercent := os.Getenv("TIERING_SSD_PERCENT")
 	prefix := os.Getenv("PREFIX")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
@@ -83,9 +84,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if *function.Function == "clusterize" {
 		state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
 		if err != nil {
-			result = clusterize.GetErrorScript(err)
+			result = clusterizeFunc.GetErrorScript(err)
 		} else {
-			params := clusterize.ClusterizationParams{
+			params := clusterizeFunc.ClusterizationParams{
 				SubscriptionId:     subscriptionId,
 				ResourceGroupName:  resourceGroupName,
 				Location:           location,
@@ -93,25 +94,25 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 				KeyVaultUri:        keyVaultUri,
 				StateContainerName: stateContainerName,
 				StateStorageName:   stateStorageName,
-				Cluster: clusterize.WekaClusterParams{
-					HostsNum:          hostsNum,
-					Name:              clusterName,
-					NvmesNum:          nvmesNum,
-					TieringSsdPercent: tieringSsdPercent,
+				Cluster: clusterize.ClusterParams{
+					HostsNum:    hostsNum,
+					ClusterName: clusterName,
+					NvmesNum:    nvmesNum,
 					DataProtection: clusterize.DataProtectionParams{
 						StripeWidth:     stripeWidth,
 						ProtectionLevel: protectionLevel,
 						Hotspare:        hotspare,
 					},
+					SetObs: setObs,
 				},
-				Obs: clusterize.ObsParams{
-					SetObs:        setObs,
-					Name:          obsName,
-					ContainerName: obsContainerName,
-					AccessKey:     obsAccessKey,
+				Obs: clusterizeFunc.AzureObsParams{
+					Name:              obsName,
+					ContainerName:     obsContainerName,
+					AccessKey:         obsAccessKey,
+					TieringSsdPercent: tieringSsdPercent,
 				},
 			}
-			result = clusterize.HandleLastClusterVm(ctx, state, params)
+			result = clusterizeFunc.HandleLastClusterVm(ctx, state, params)
 		}
 	} else if *function.Function == "instances" {
 		expand := "instanceView"

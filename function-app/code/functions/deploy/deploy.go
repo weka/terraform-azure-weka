@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 	"weka-deployment/common"
+	"weka-deployment/lib/deploy"
+	fd "weka-deployment/lib/functions_def"
 
 	"github.com/weka/go-cloud-lib/logging"
 
@@ -208,20 +210,19 @@ func GetDeployScript(
 	frontendContainerNum string,
 	driveContainerNum string,
 ) (bashScript string, err error) {
-	clusterizeUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/clusterize", prefix, clusterName)
-	reportUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/report", prefix, clusterName)
-	protectUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/protect", prefix, clusterName)
-
 	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
 	if err != nil {
 		return
 	}
-
+	// create Function Definer
 	functionKey, err := getFunctionKey(ctx, keyVaultUri)
 	if err != nil {
 		return
 	}
+	baseFunctionUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/", prefix, clusterName)
+	funcDef := fd.NewFuncDef(baseFunctionUrl, functionKey)
 
+	// used for getting failure domain
 	getHashedIpCommand := common.GetHashedPrivateIpBashCmd()
 
 	if !state.Clusterized {
@@ -230,69 +231,22 @@ func GetDeployScript(
 		if err != nil {
 			return
 		}
-		installScript := getWekaInstallScript(installUrl, reportUrl, functionKey, token)
-
-		deployTemplate := `
-		#!/bin/bash
-		set -ex
-		CLUSTERIZE_URL=%s
-		PROTECT_URL=%s
-		FUNCTION_KEY=%s
-		VM=%s
-		hashed_ip=$(%s)
-		COMPUTE_MEMORY=%s
-		NUM_COMPUTE_CONTAINERS=%s
-		NUM_FRONTEND_CONTAINERS=%s
-		NUM_DRIVE_CONTAINERS=%s
-
-		# install script
-		%s
-
-		weka local stop
-		weka local rm default --force
-
-		# weka containers setup
-		core_ids=$(cat /sys/devices/system/cpu/cpu*/topology/thread_siblings_list | cut -d "-" -f 1 | sort -u | tr '\n' ' ')
-		core_ids="${core_ids[@]/0}"
-		IFS=', ' read -r -a core_ids <<< "$core_ids"
-		core_idx_begin=0
-		core_idx_end=$(($core_idx_begin + $NUM_DRIVE_CONTAINERS))
-		get_core_ids() {
-			core_idx_end=$(($core_idx_begin + $1))
-			res=${core_ids[i]}
-			for (( i=$(($core_idx_begin + 1)); i<$core_idx_end; i++ ))
-			do
-				res=$res,${core_ids[i]}
-			done
-			core_idx_begin=$core_idx_end
-			eval "$2=$res"
+		deploymentParams := deploy.DeploymentParams{
+			VMName:               vm,
+			ComputeMemory:        computeMemory,
+			ComputeContainerNum:  computeContainerNum,
+			FrontendContainerNum: frontendContainerNum,
+			DriveContainerNum:    driveContainerNum,
+			WekaInstallUrl:       installUrl,
+			WekaToken:            token,
 		}
-		get_core_ids $NUM_DRIVE_CONTAINERS drive_core_ids
-		get_core_ids $NUM_COMPUTE_CONTAINERS compute_core_ids
-		get_core_ids $NUM_FRONTEND_CONTAINERS frontend_core_ids
-	
-		sudo weka local setup container --name drives0 --base-port 14000 --cores $NUM_DRIVE_CONTAINERS --no-frontends --drives-dedicated-cores $NUM_DRIVE_CONTAINERS --failure-domain $hashed_ip --core-ids $drive_core_ids  --dedicate
-		sudo weka local setup container --name compute0 --base-port 15000 --cores $NUM_COMPUTE_CONTAINERS --no-frontends --compute-dedicated-cores $NUM_COMPUTE_CONTAINERS  --memory $COMPUTE_MEMORY --failure-domain $hashed_ip --core-ids $compute_core_ids  --dedicate
-		sudo weka local setup container --name frontend0 --base-port 16000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --allow-protocols true --failure-domain $hashed_ip --core-ids $frontend_core_ids  --dedicate
 
-		# should not call culusterize untill all 3 containers are up
-		ready_containers=0
-		while [ $ready_containers -ne 3 ];
-		do
-			sleep 10
-			ready_containers=$( weka local ps | grep -i 'running' | wc -l )
-			echo "Running containers: $ready_containers"
-		done
-
-		curl $PROTECT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$VM\"}"
-		curl $CLUSTERIZE_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"vm\": \"$VM\"}" > /tmp/clusterize.sh
-		chmod +x /tmp/clusterize.sh
-		/tmp/clusterize.sh 2>&1 | tee /tmp/weka_clusterization.log
-		`
-		bashScript = fmt.Sprintf(
-			deployTemplate, clusterizeUrl, protectUrl, functionKey, vm, getHashedIpCommand,
-			computeMemory, computeContainerNum, frontendContainerNum, driveContainerNum, installScript,
-		)
+		deployScriptGenerator := deploy.DeployScriptGenerator{
+			FuncDef:          funcDef,
+			Params:           deploymentParams,
+			FailureDomainCmd: getHashedIpCommand,
+		}
+		bashScript = deployScriptGenerator.GetDeployScript()
 	} else {
 		bashScript, err = GetJoinParams(ctx, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, keyVaultUri, functionKey, vm)
 		if err != nil {
@@ -302,62 +256,6 @@ func GetDeployScript(
 
 	bashScript = dedent.Dedent(bashScript)
 	return
-}
-
-func getWekaInstallScript(installUrl, reportUrl, functionKey, getWekaToken string) string {
-	var installScript string
-	if strings.HasSuffix(installUrl, ".tar") {
-		split := strings.Split(installUrl, "/")
-		tarName := split[len(split)-1]
-		packageName := strings.TrimSuffix(tarName, ".tar")
-		installTemplate := `
-		INSTALL_URL=%s
-		TAR_NAME=%s
-		PACKAGE_NAME=%s
-		REPORT_URL=%s
-		FUNCTION_KEY=%s
-
-		gsutil cp $INSTALL_URL /tmp
-		cd /tmp
-		tar -xvf $TAR_NAME
-		cd $PACKAGE_NAME
-		curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
-		./install.sh
-		curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka installation completed\"}"
-		`
-		installScript = fmt.Sprintf(installTemplate, installUrl, tarName, packageName, reportUrl, functionKey)
-	} else {
-		installTemplate := `
-		TOKEN=%s
-		INSTALL_URL=%s
-		REPORT_URL=%s
-		FUNCTION_KEY=%s
-
-		# https://gist.github.com/fungusakafungus/1026804
-		function retry {
-				local retry_max=$1
-				local retry_sleep=$2
-				shift 2
-				local count=$retry_max
-				while [ $count -gt 0 ]; do
-						"$@" && break
-						count=$(($count - 1))
-						sleep $retry_sleep
-				done
-				[ $count -eq 0 ] && {
-						echo "Retry failed [$retry_max]: $@"
-						return 1
-				}
-				return 0
-		}
-
-		curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
-		retry 300 2 curl --fail --max-time 10 $INSTALL_URL | sh
-		curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka installation completed\"}"
-		`
-		installScript = fmt.Sprintf(installTemplate, getWekaToken, installUrl, reportUrl, functionKey)
-	}
-	return dedent.Dedent(installScript)
 }
 
 type RequestBody struct {

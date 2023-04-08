@@ -9,32 +9,36 @@ import (
 	"strconv"
 	"strings"
 	"weka-deployment/common"
+	"weka-deployment/lib/clusterize"
+	fd "weka-deployment/lib/functions_def"
 
 	"github.com/weka/go-cloud-lib/logging"
 
 	"github.com/lithammer/dedent"
 )
 
-type ObsParams struct {
-	SetObs        string
-	Name          string
-	ContainerName string
-	AccessKey     string
-}
-
-type DataProtectionParams struct {
-	StripeWidth     int
-	ProtectionLevel int
-	Hotspare        int
-}
-
-type WekaClusterParams struct {
-	VmName            string
-	HostsNum          string
+type AzureObsParams struct {
 	Name              string
-	NvmesNum          string
+	ContainerName     string
+	AccessKey         string
 	TieringSsdPercent string
-	DataProtection    DataProtectionParams
+}
+
+func GetObsScript(obsParams AzureObsParams) string {
+	template := `
+	TIERING_SSD_PERCENT=%s
+	OBS_NAME=%s
+	OBS_CONTAINER_NAME=%s
+	OBS_BLOB_KEY=%s
+
+	weka fs tier s3 add azure-obs --site local --obs-name default-local --obs-type AZURE --hostname $OBS_NAME.blob.core.windows.net --port 443 --bucket $OBS_CONTAINER_NAME --access-key-id $OBS_NAME --secret-key $OBS_BLOB_KEY --protocol https --auth-method AWSSignature4
+	weka fs tier s3 attach default azure-obs
+	tiering_percent=$(echo "$full_capacity * 100 / $TIERING_SSD_PERCENT" | bc)
+	weka fs update default --total-capacity "$tiering_percent"B
+	`
+	return fmt.Sprintf(
+		dedent.Dedent(template), obsParams.TieringSsdPercent, obsParams.Name, obsParams.ContainerName, obsParams.AccessKey,
+	)
 }
 
 type ClusterizationParams struct {
@@ -47,114 +51,13 @@ type ClusterizationParams struct {
 	StateContainerName string
 	StateStorageName   string
 
-	Cluster WekaClusterParams
-	Obs     ObsParams
+	VmName  string
+	Cluster clusterize.ClusterParams
+	Obs     AzureObsParams
 }
 
 type RequestBody struct {
 	Vm string `json:"vm"`
-}
-
-func generateClusterizationScript(
-	ctx context.Context, vmNames, ips, prefix, functionAppKey, wekaPassword string, cluster WekaClusterParams, obs ObsParams,
-) (clusterizeScript string) {
-	logger := logging.LoggerFromCtx(ctx)
-	logger.Info().Msg("Generating clusterization script")
-
-	clusterizeScriptTemplate := `
-	#!/bin/bash
-	
-	set -ex
-	VMS=(%s)
-	IPS=(%s)
-	CONTAINER_NAMES=(drives0 compute0 frontend0)
-	PORTS=(14000 15000 16000)
-	HOSTS_NUM=%s
-	NVMES_NUM=%s
-	CLUSTER_NAME=%s
-	SET_OBS=%s
-	OBS_NAME=%s
-	OBS_CONTAINER_NAME=%s
-	OBS_BLOB_KEY=%s
-	TIERING_SSD_PERCENT=%s
-	PREFIX=%s
-	FUNCTION_APP_KEY="%s"
-	STRIPE_WIDTH=%d
-	PROTECTION_LEVEL=%d
-	HOTSPARE=%d
-	WEKA_PASSWORD="%s"
-
-	HOST_IPS=()
-	HOST_NAMES=()
-	for i in "${!IPS[@]}"; do
-		for j in "${!PORTS[@]}"; do
-			HOST_IPS+=($(echo "${IPS[i]}:${PORTS[j]}"))
-			HOST_NAMES+=($(echo "${VMS[i]}-${CONTAINER_NAMES[j]}"))
-		done
-	done
-	host_ips=$(IFS=, ;echo "${HOST_IPS[*]}")
-	host_names=$(IFS=' ' ;echo "${HOST_NAMES[*]}")
-
-	report_url=https://$PREFIX-$CLUSTER_NAME-function-app.azurewebsites.net/api/report
-	clusterize_finalization_url=https://$PREFIX-$CLUSTER_NAME-function-app.azurewebsites.net/api/clusterize_finalization
-
-	curl "$report_url?code=$FUNCTION_APP_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running Clusterization\"}"
-
-	vms_string=$(printf "%%s "  "${VMS[@]}" | rev | cut -c2- | rev)
-	weka cluster create $host_names --host-ips $host_ips --admin-password "$WEKA_PASSWORD"
-	weka user login admin "$WEKA_PASSWORD"
-	
-	sleep 30s
-
-	DRIVE_NUMS=( $(weka cluster container | grep drives | awk '{print $1;}') )
-	
-	for drive_num in "${DRIVE_NUMS[@]}"; do
-		for (( d=0; d<$NVMES_NUM; d++ )); do
-			weka cluster drive add $drive_num "/dev/nvme$d"n1
-		done
-	done
-
-	weka cluster update --cluster-name="$CLUSTER_NAME"
-
-	weka cloud enable
-	weka cluster update --data-drives $STRIPE_WIDTH --parity-drives $PROTECTION_LEVEL
-	weka cluster hot-spare $HOTSPARE
-	weka cluster start-io
-	
-	sleep 15s
-	
-	weka cluster process
-	weka cluster drive
-	weka cluster container
-	
-	full_capacity=$(weka status -J | jq .capacity.unprovisioned_bytes)
-	weka fs group create default
-	weka fs create default default "$full_capacity"B
-	
-	if [[ $SET_OBS == true ]]; then
-	  weka fs tier s3 add azure-obs --site local --obs-name default-local --obs-type AZURE --hostname $OBS_NAME.blob.core.windows.net --port 443 --bucket $OBS_CONTAINER_NAME --access-key-id $OBS_NAME --secret-key $OBS_BLOB_KEY --protocol https --auth-method AWSSignature4
-	  weka fs tier s3 attach default azure-obs
-	  tiering_percent=$(echo "$full_capacity * 100 / $TIERING_SSD_PERCENT" | bc)
-	  weka fs update default --total-capacity "$tiering_percent"B
-	fi
-	
-	weka alerts mute JumboConnectivity 365d
-	weka alerts mute UdpModePerformanceWarning 365d
-
-	echo "completed successfully" > /tmp/weka_clusterization_completion_validation
-	curl "$report_url?code=$FUNCTION_APP_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Clusterization completed successfully\"}"
-
-	curl "$clusterize_finalization_url?code=$FUNCTION_APP_KEY"
-	`
-
-	logger.Info().Msgf("Formatting clusterization script template")
-	clusterizeScript = fmt.Sprintf(
-		dedent.Dedent(clusterizeScriptTemplate), vmNames, ips, cluster.HostsNum, cluster.NvmesNum, cluster.Name,
-		obs.SetObs, obs.Name, obs.ContainerName, obs.AccessKey, cluster.TieringSsdPercent, prefix, functionAppKey,
-		cluster.DataProtection.StripeWidth, cluster.DataProtection.ProtectionLevel, cluster.DataProtection.Hotspare,
-		wekaPassword,
-	)
-	return
 }
 
 func GetErrorScript(err error) string {
@@ -175,7 +78,7 @@ shutdown now
 }
 
 func reportClusterizeError(ctx context.Context, p ClusterizationParams, err error) {
-	hostName := strings.Split(p.Cluster.VmName, ":")[1]
+	hostName := strings.Split(p.VmName, ":")[1]
 	report := common.Report{Type: "error", Hostname: hostName, Message: err.Error()}
 	_ = common.UpdateStateReporting(ctx, p.SubscriptionId, p.ResourceGroupName, p.StateContainerName, p.StateStorageName, report)
 }
@@ -185,9 +88,9 @@ func HandleLastClusterVm(ctx context.Context, state common.ClusterState, p Clust
 	logger.Info().Msg("This is the last instance in the cluster, creating obs and clusterization script")
 
 	var err error
-	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.Name)
+	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName)
 
-	if p.Obs.SetObs == "true" {
+	if p.Cluster.SetObs {
 		if p.Obs.AccessKey == "" {
 			p.Obs.AccessKey, err = common.CreateStorageAccount(
 				ctx, p.SubscriptionId, p.ResourceGroupName, p.Obs.Name, p.Location,
@@ -240,23 +143,38 @@ func HandleLastClusterVm(ctx context.Context, state common.ClusterState, p Clust
 		ipsList = append(ipsList, vmsPrivateIps[vm[0]])
 		vmNamesList = append(vmNamesList, vm[1])
 	}
-	vmNames := strings.Join(vmNamesList, " ")
-	ips := strings.Join(ipsList, " ")
 
-	clusterizeScript = generateClusterizationScript(ctx, vmNames, ips, p.Prefix, functionAppKey, wekaPassword, p.Cluster, p.Obs)
+	logger.Info().Msg("Generating clusterization script")
+
+	clusterParams := p.Cluster
+	clusterParams.VMNames = vmNamesList
+	clusterParams.IPs = ipsList
+	clusterParams.ObsScript = GetObsScript(p.Obs)
+	clusterParams.WekaPassword = wekaPassword
+	clusterParams.WekaUsername = "admin"
+
+	baseFunctionUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/", p.Prefix, p.Cluster.ClusterName)
+	funcDef := fd.NewFuncDef(baseFunctionUrl, functionAppKey)
+
+	scriptGenerator := clusterize.ClusterizeScriptGenerator{
+		Params:  clusterParams,
+		FuncDef: funcDef,
+	}
+	clusterizeScript = scriptGenerator.GetClusterizeScript()
+
+	logger.Info().Msg("Clusterization script generated")
 	return
 }
 
 func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript string) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	instanceName := strings.Split(p.Cluster.VmName, ":")[0]
+	instanceName := strings.Split(p.VmName, ":")[0]
 	instanceId := common.GetScaleSetVmIndex(instanceName)
-	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.Name)
+	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName)
+	vmName := p.VmName
 
-	ip, err := common.GetPublicIp(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, p.Prefix, p.Cluster.Name, instanceId)
-
-	vmName := p.Cluster.VmName
+	ip, err := common.GetPublicIp(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, p.Prefix, p.Cluster.ClusterName, instanceId)
 	if err != nil {
 		logger.Error().Msg("Failed to fetch public ip")
 	} else {
@@ -276,13 +194,7 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 		return
 	}
 
-	initialSize, err := strconv.Atoi(p.Cluster.HostsNum)
-	if err != nil {
-		clusterizeScript = GetErrorScript(err)
-		return
-	}
-
-	if len(state.Instances) == initialSize {
+	if len(state.Instances) == p.Cluster.HostsNum {
 		clusterizeScript = HandleLastClusterVm(ctx, state, p)
 	} else {
 		msg := fmt.Sprintf("This is instance number %d that is ready for clusterization (not last one), doing nothing.", len(state.Instances))
@@ -299,16 +211,16 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 func Handler(w http.ResponseWriter, r *http.Request) {
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
-	hostsNum := os.Getenv("HOSTS_NUM")
+	hostsNum, _ := strconv.Atoi(os.Getenv("HOSTS_NUM"))
 	clusterName := os.Getenv("CLUSTER_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
-	setObs := os.Getenv("SET_OBS")
+	setObs, _ := strconv.ParseBool(os.Getenv("SET_OBS"))
 	obsName := os.Getenv("OBS_NAME")
 	obsContainerName := os.Getenv("OBS_CONTAINER_NAME")
 	obsAccessKey := os.Getenv("OBS_ACCESS_KEY")
 	location := os.Getenv("LOCATION")
-	nvmesNum := os.Getenv("NVMES_NUM")
+	nvmesNum, _ := strconv.Atoi(os.Getenv("NVMES_NUM"))
 	tieringSsdPercent := os.Getenv("TIERING_SSD_PERCENT")
 	prefix := os.Getenv("PREFIX")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
@@ -353,23 +265,23 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		KeyVaultUri:        keyVaultUri,
 		StateContainerName: stateContainerName,
 		StateStorageName:   stateStorageName,
-		Cluster: WekaClusterParams{
-			VmName:            data.Vm,
-			HostsNum:          hostsNum,
-			Name:              clusterName,
-			NvmesNum:          nvmesNum,
-			TieringSsdPercent: tieringSsdPercent,
-			DataProtection: DataProtectionParams{
+		VmName:             data.Vm,
+		Cluster: clusterize.ClusterParams{
+			HostsNum:    hostsNum,
+			ClusterName: clusterName,
+			NvmesNum:    nvmesNum,
+			SetObs:      setObs,
+			DataProtection: clusterize.DataProtectionParams{
 				StripeWidth:     stripeWidth,
 				ProtectionLevel: protectionLevel,
 				Hotspare:        hotspare,
 			},
 		},
-		Obs: ObsParams{
-			SetObs:        setObs,
-			Name:          obsName,
-			ContainerName: obsContainerName,
-			AccessKey:     obsAccessKey,
+		Obs: AzureObsParams{
+			Name:              obsName,
+			ContainerName:     obsContainerName,
+			AccessKey:         obsAccessKey,
+			TieringSsdPercent: tieringSsdPercent,
 		},
 	}
 
