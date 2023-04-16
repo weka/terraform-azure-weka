@@ -129,9 +129,9 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	DRIVES=%d
 	COMPUTE_MEMORY=%d
 	IPS=%s
-	weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $IPS --failure-domain "$HASHED_IP"
-	weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY"GB --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $IPS --failure-domain "$HASHED_IP"
-	weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $IPS --failure-domain "$HASHED_IP"`
+	weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $IPS --failure-domain "$HASHED_IP" --dedicate
+	weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY"GB --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $IPS --failure-domain "$HASHED_IP" --dedicate
+	weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $IPS --failure-domain "$HASHED_IP" --dedicate`
 
 	isReady := `
 	while ! weka debug manhole -s 0 operational_status | grep '"is_ready": true' ; do
@@ -188,9 +188,6 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	compute = instanceParams.total - frontend - drive - 1
 	mem = instanceParams.memory
 
-	if !instanceParams.converged {
-		bashScriptTemplate += " --dedicate"
-	}
 	bashScriptTemplate += isReady + fmt.Sprintf(addDrives, joinFinalizationUrl)
 
 	bashScript = fmt.Sprintf(bashScriptTemplate, wekaPassword, strings.Join(ips, "\" \""), functionKey, reportUrl, hashedPrivateIp, subnet, compute, frontend, drive, mem, strings.Join(ips, ","))
