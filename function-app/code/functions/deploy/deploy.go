@@ -51,7 +51,7 @@ func getFunctionKey(ctx context.Context, keyVaultUri string) (functionAppKey str
 	return
 }
 
-func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey, vm string) (bashScript string, err error) {
+func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, keyVaultUri, functionKey, vm string) (bashScript string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	joinFinalizationUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/join_finalization", prefix, clusterName)
@@ -107,8 +107,6 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 			fi
 		fi
 	done
-
-	SUBNET=%s
 
 	ip=$(ifconfig eth0 | grep "inet " | awk '{ print $2}')
 	while [ ! $ip ] ; do
@@ -190,7 +188,7 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 
 	bashScriptTemplate += isReady + fmt.Sprintf(addDrives, joinFinalizationUrl)
 
-	bashScript = fmt.Sprintf(bashScriptTemplate, wekaPassword, strings.Join(ips, "\" \""), functionKey, reportUrl, hashedPrivateIp, subnet, compute, frontend, drive, mem, strings.Join(ips, ","))
+	bashScript = fmt.Sprintf(bashScriptTemplate, wekaPassword, strings.Join(ips, "\" \""), functionKey, reportUrl, hashedPrivateIp, compute, frontend, drive, mem, strings.Join(ips, ","))
 
 	return
 }
@@ -206,7 +204,6 @@ func GetDeployScript(
 	instanceType,
 	installUrl,
 	keyVaultUri,
-	subnet,
 	vm string) (bashScript string, err error) {
 
 	clusterizeUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/clusterize", prefix, clusterName)
@@ -309,7 +306,7 @@ func GetDeployScript(
 			bashScript = fmt.Sprintf(installTemplate, token, installUrl, clusterizeUrl, reportUrl, protectUrl, functionKey, vm)
 		}
 	} else {
-		bashScript, err = GetJoinParams(ctx, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, subnet, keyVaultUri, functionKey, vm)
+		bashScript, err = GetJoinParams(ctx, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, keyVaultUri, functionKey, vm)
 		if err != nil {
 			return
 		}
@@ -345,7 +342,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	prefix := os.Getenv("PREFIX")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 
-	subnet := os.Getenv("SUBNET")
 	instanceType := os.Getenv("INSTANCE_TYPE")
 	installUrl := os.Getenv("INSTALL_URL")
 
@@ -397,7 +393,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		instanceType,
 		installUrl,
 		keyVaultUri,
-		subnet,
 		data.Vm)
 
 	if err != nil {

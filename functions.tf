@@ -115,7 +115,6 @@ resource "azurerm_linux_function_app" "function_app" {
     "TIERING_SSD_PERCENT" = var.tiering_ssd_percent
     "PREFIX" = var.prefix
     "KEY_VAULT_URI" = azurerm_key_vault.key_vault.vault_uri
-    "SUBNET" = var.subnets[0]
     "INSTANCE_TYPE" = var.instance_type
     "INSTALL_URL" =  var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.weka.io/dist/v1/install/${var.weka_version}/${var.weka_version}"
     "LOG_LEVEL" = var.function_app_log_level
