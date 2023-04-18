@@ -116,7 +116,9 @@ resource "azurerm_linux_function_app" "function_app" {
     "PREFIX" = var.prefix
     "KEY_VAULT_URI" = azurerm_key_vault.key_vault.vault_uri
     "INSTANCE_TYPE" = var.instance_type
-    "INSTALL_URL" =  var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.weka.io/dist/v1/install/${var.weka_version}/${var.weka_version}"
+    "INSTALL_DPDK" = var.install_cluster_dpdk
+    "NICS_NUM" = var.container_number_map[var.instance_type].nics
+    "INSTALL_URL" =  var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.prod.weka.io/dist/v1/install/4.2.1-2719ddc54a69c9425c81b99ceb1e94d9/4.2.1.10148-e5389916e2a2cb20d2cddf9ea532e3a6"
     "LOG_LEVEL" = var.function_app_log_level
 
     https_only = true

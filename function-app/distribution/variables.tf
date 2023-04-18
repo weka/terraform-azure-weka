@@ -25,7 +25,7 @@ variable "regions" {
   description = "Map of lists of supported regions"
 
   default = {
-    "dev" = ["eastus"],
+    "dev" = ["eastus", "uksouth"],
     "release" = [
       "brazilsouth",
       "canadacentral",

@@ -27,6 +27,7 @@ module "deploy-weka" {
   set_obs_integration   = var.set_obs_integration
   instance_type         = var.instance_type
   cluster_size          = var.cluster_size
+  install_ofed          = var.install_ofed
   tiering_ssd_percent   = var.tiering_ssd_percent
   subscription_id       = var.subscription_id
   custom_image_id       = var.custom_image_id
