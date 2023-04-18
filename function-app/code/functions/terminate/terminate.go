@@ -29,7 +29,7 @@ func instancesToMap(instances []*armcompute.VirtualMachineScaleSetVM) instancesM
 func getDeltaInstancesIds(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, scaleResponse protocol.ScaleResponse) (deltaInstanceIDs []string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("Getting delta instances")
-	netInterfaces, err := common.GetScaleSetVmsNetworkInterfaces(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	netInterfaces, err := common.GetScaleSetVmsNetworkPrimaryNICs(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
 		return
 	}
