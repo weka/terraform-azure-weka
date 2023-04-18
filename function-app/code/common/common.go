@@ -475,7 +475,9 @@ func GetVmsPrivateIps(ctx context.Context, subscriptionId, resourceGroupName, vm
 		vmNameParts := strings.Split(*networkInterface.Properties.VirtualMachine.ID, "/")
 		vmNamePartsLen := len(vmNameParts)
 		vmName := fmt.Sprintf("%s_%s", vmNameParts[vmNamePartsLen-3], vmNameParts[vmNamePartsLen-1])
-		vmsPrivateIps[vmName] = *networkInterface.Properties.IPConfigurations[0].Properties.PrivateIPAddress
+		if _, ok := vmsPrivateIps[vmName]; !ok {
+			vmsPrivateIps[vmName] = *networkInterface.Properties.IPConfigurations[0].Properties.PrivateIPAddress
+		}
 	}
 	return
 }

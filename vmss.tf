@@ -36,13 +36,15 @@ resource "local_file" "private_key" {
 }
 
 locals {
-  ssh_path        = "/tmp/${var.prefix}-${var.cluster_name}"
-  public_ssh_key  = var.ssh_public_key == null ? tls_private_key.ssh_key[0].public_key_openssh : file(var.ssh_public_key)
-  private_ssh_key = var.ssh_private_key == null ? tls_private_key.ssh_key[0].private_key_pem : file(var.ssh_private_key)
-  disk_size       = var.default_disk_size + var.traces_per_ionode * (var.container_number_map[var.instance_type].compute + var.container_number_map[var.instance_type].drive + var.container_number_map[var.instance_type].frontend)
-  private_nic_first_index = var.private_network ? 0 : 1
+  ssh_path                  = "/tmp/${var.prefix}-${var.cluster_name}"
+  public_ssh_key            = var.ssh_public_key == null ? tls_private_key.ssh_key[0].public_key_openssh : file(var.ssh_public_key)
+  private_ssh_key           = var.ssh_private_key == null ? tls_private_key.ssh_key[0].private_key_pem : file(var.ssh_private_key)
+  disk_size                 = var.default_disk_size + var.traces_per_ionode * (var.container_number_map[var.instance_type].compute + var.container_number_map[var.instance_type].drive + var.container_number_map[var.instance_type].frontend)
+  private_nic_first_index   = var.private_network ? 0 : 1
   alphanumeric_cluster_name =  lower(replace(var.cluster_name,"/\\W|_|\\s/",""))
   alphanumeric_prefix_name  = lower(replace(var.prefix,"/\\W|_|\\s/",""))
+  subnet_range              = data.azurerm_subnet.subnets[0].address_prefix
+  nics_numbers              = var.install_cluster_dpdk ? var.container_number_map[var.instance_type].nics : 1
 }
 
 data "template_file" "init" {
@@ -52,8 +54,11 @@ data "template_file" "init" {
     private_ssh_key          = local.private_ssh_key
     user                     = var.vm_username
     ofed_version             = var.ofed_version
-    skip_ofed_installation   = true
+    install_ofed             = var.install_ofed
     install_ofed_url         = var.install_ofed_url
+    install_cluster_dpdk     = var.install_cluster_dpdk
+    subnet_range             = local.subnet_range
+    nics_num                 = local.nics_numbers
     deploy_url               = "https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/deploy"
     report_url               = "https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/report"
     function_app_default_key = data.azurerm_function_app_host_keys.function_keys.default_function_key
@@ -120,16 +125,18 @@ resource "azurerm_linux_virtual_machine_scale_set" "custom_image_vmss" {
   dynamic "network_interface" {
     for_each = range(local.private_nic_first_index)
     content {
-      name                      = "${var.prefix}-${var.cluster_name}-backend-nic"
-      network_security_group_id = var.sg_id
-      primary                   = true
+      name                          = "${var.prefix}-${var.cluster_name}-backend-nic-0"
+      network_security_group_id     = var.sg_id
+      primary                       = true
+      enable_accelerated_networking = var.install_cluster_dpdk
       ip_configuration {
         primary                                = true
-        name                                   = "ipconfig1"
+        name                                   = "ipconfig0"
         subnet_id                              = data.azurerm_subnet.subnets[0].id
         load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
         public_ip_address {
-          name = "${var.prefix}-${var.cluster_name}-public-ip"
+          name              = "${var.prefix}-${var.cluster_name}-public-ip"
+          domain_name_label = "${var.prefix}-${var.cluster_name}-backend"
         }
       }
     }
@@ -137,12 +144,28 @@ resource "azurerm_linux_virtual_machine_scale_set" "custom_image_vmss" {
   dynamic "network_interface" {
     for_each = range(local.private_nic_first_index, 1)
     content {
-      name                      = "${var.prefix}-${var.cluster_name}-backend-nic"
-      network_security_group_id = var.sg_id
-      primary                   = true
+      name                          = "${var.prefix}-${var.cluster_name}-backend-nic-0"
+      network_security_group_id     = var.sg_id
+      primary                       = true
+      enable_accelerated_networking = var.install_cluster_dpdk
       ip_configuration {
         primary                                = true
-        name                                   = "ipconfig1"
+        name                                   = "ipconfig0"
+        subnet_id                              = data.azurerm_subnet.subnets[0].id
+        load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
+      }
+    }
+  }
+  dynamic "network_interface" {
+    for_each = range(1,local.nics_numbers)
+    content {
+      name                          = "${var.prefix}-${var.cluster_name}-backend-nic-${network_interface.value}"
+      network_security_group_id     = var.sg_id
+      primary                       = false
+      enable_accelerated_networking = var.install_cluster_dpdk
+      ip_configuration {
+        primary                                = false
+        name                                   = "ipconfig${network_interface.value}"
         subnet_id                              = data.azurerm_subnet.subnets[0].id
         load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
       }
@@ -200,16 +223,18 @@ resource "azurerm_linux_virtual_machine_scale_set" "default_image_vmss" {
   dynamic "network_interface" {
     for_each = range(local.private_nic_first_index)
     content {
-      name                      = "${var.prefix}-${var.cluster_name}-backend-nic"
-      network_security_group_id = var.sg_id
-      primary                   = true
+      name                          = "${var.prefix}-${var.cluster_name}-backend-nic-0"
+      network_security_group_id     = var.sg_id
+      primary                       = true
+      enable_accelerated_networking = var.install_cluster_dpdk
       ip_configuration {
         primary                                = true
-        name                                   = "ipconfig1"
+        name                                   = "ipconfig0"
         subnet_id                              = data.azurerm_subnet.subnets[0].id
         load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
         public_ip_address {
-          name = "${var.prefix}-${var.cluster_name}-public-ip"
+          name              = "${var.prefix}-${var.cluster_name}-public-ip"
+          domain_name_label = "${var.prefix}-${var.cluster_name}-backend"
         }
       }
     }
@@ -217,12 +242,28 @@ resource "azurerm_linux_virtual_machine_scale_set" "default_image_vmss" {
   dynamic "network_interface" {
     for_each = range(local.private_nic_first_index, 1)
     content {
-      name                      = "${var.prefix}-${var.cluster_name}-backend-nic"
-      network_security_group_id = var.sg_id
-      primary                   = true
+      name                          = "${var.prefix}-${var.cluster_name}-backend-nic-0"
+      network_security_group_id     = var.sg_id
+      primary                       = true
+      enable_accelerated_networking = var.install_cluster_dpdk
       ip_configuration {
         primary                                = true
-        name                                   = "ipconfig1"
+        name                                   = "ipconfig0"
+        subnet_id                              = data.azurerm_subnet.subnets[0].id
+        load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
+      }
+    }
+  }
+  dynamic "network_interface" {
+    for_each = range(1,local.nics_numbers)
+    content {
+      name                          = "${var.prefix}-${var.cluster_name}-backend-nic-${network_interface.value}"
+      network_security_group_id     = var.sg_id
+      primary                       = false
+      enable_accelerated_networking = var.install_cluster_dpdk
+      ip_configuration {
+        primary                                = false
+        name                                   = "ipconfig${network_interface.value}"
         subnet_id                              = data.azurerm_subnet.subnets[0].id
         load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
       }

@@ -71,3 +71,8 @@ variable "cluster_size" {
   type = number
   description = "Weka cluster size"
 }
+
+variable "install_ofed" {
+  type        = bool
+  description = "Install ofed for weka cluster with dpdk configuration"
+}

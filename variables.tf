@@ -137,7 +137,7 @@ variable "private_dns_zone_name" {
 variable "ofed_version" {
   type = string
   description = "The OFED driver version to for ubuntu 18."
-  default = "5.7-1.0.2.0"
+  default = "5.9-0.5.6.0"
 }
 
 variable "install_ofed_url" {
@@ -300,7 +300,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type = string
   description = "Function app code version (hash)"
-  default = "9e01ab504a185c388953c82c51e54b33"
+  default = "88121ef72fed0aac02bfcfb87cf28a7e"
 }
 
 variable "function_app_dist" {
@@ -312,4 +312,16 @@ variable "function_app_dist" {
     condition = contains(["dev", "release"], var.function_app_dist)
     error_message = "Valid value is one of the following: dev, release."
   }
+}
+
+variable "install_cluster_dpdk" {
+  type        = bool
+  default     = true
+  description = "Install weka cluster with DPDK"
+}
+
+variable "install_ofed" {
+  type        = bool
+  default     = true
+  description = "Install ofed for weka cluster with dpdk configuration"
 }
