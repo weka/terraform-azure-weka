@@ -52,7 +52,7 @@ func getFunctionKey(ctx context.Context, keyVaultUri string) (functionAppKey str
 	return
 }
 
-func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, keyVaultUri, functionKey, vm string) (bashScript string, err error) {
+func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, keyVaultUri, functionKey, installDpdk, nicsNum, vm string) (bashScript string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	joinFinalizationUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/join_finalization", prefix, clusterName)
@@ -112,6 +112,20 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 		ip=$(ifconfig eth0 | grep "inet " | awk '{ print $2}')
 	done
 
+	function getNetStrForDpdk() {
+		i=$1
+		j=$2
+		net=" "
+		gateway=$(route -n | grep 0.0.0.0 | grep UG | awk '{print $2}')
+		for ((i; i<$j; i++)); do
+			eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
+			enp=$(ls -l /sys/class/net/eth$i/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}')
+			bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
+			IFS='/' read -ra netmask <<< "$bits"
+			net="$net --net $enp/$eth/${netmask[1]}/$gateway"
+		done
+	}
+
 	curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Installing weka\"}"
 	curl $backend_ip:14000/dist/v1/install | sh
 	curl $REPORT_URL?code="$FUNCTION_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka installation completed\"}"
@@ -120,14 +134,48 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 	weka version prepare $VERSION
 	weka local stop && weka local rm --all -f
 
+	# weka containers setup
+	core_ids=$(cat /sys/devices/system/cpu/cpu*/topology/thread_siblings_list | cut -d "-" -f 1 | sort -u | tr '\n' ' ')
+	core_ids="${core_ids[@]/0}"
+	IFS=', ' read -r -a core_ids <<< "$core_ids"
+	core_idx_begin=0
+	get_core_ids() {
+		core_idx_end=$(($core_idx_begin + $1))
+		res=${core_ids[i]}
+		for (( i=$(($core_idx_begin + 1)); i<$core_idx_end; i++ ))
+		do
+			res=$res,${core_ids[i]}
+		done
+		core_idx_begin=$core_idx_end
+		eval "$2=$res"
+	}
+
 	COMPUTE=%d
 	FRONTEND=%d
 	DRIVES=%d
 	COMPUTE_MEMORY=%d
+	INSTALL_DPDK=%s
+	NICS_NUM=%s
 	IPS=%s
-	weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $IPS --failure-domain "$HASHED_IP" --dedicate
-	weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY"GB --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $IPS --failure-domain "$HASHED_IP" --dedicate
-	weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $IPS --failure-domain "$HASHED_IP" --dedicate`
+
+	get_core_ids $DRIVES drive_core_ids
+	get_core_ids $COMPUTE compute_core_ids
+	get_core_ids $FRONTEND frontend_core_ids
+
+	if [[ $INSTALL_DPDK == true ]]; then
+		getNetStrForDpdk 1 $(($DRIVES+1))
+		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $IPS --failure-domain "$HASHED_IP" --core-ids $drive_core_ids $net --dedicate
+
+		getNetStrForDpdk $((1+$DRIVES)) $((1+$DRIVES+$COMPUTE))
+		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY"GB --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $IPS --failure-domain "$HASHED_IP" --core-ids $compute_core_ids $net --dedicate
+
+		getNetStrForDpdk $(($NICS_NUM-1)) $(($NICS_NUM))
+		sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $IPS --failure-domain "$HASHED_IP" --core-ids $frontend_core_ids $net --dedicate
+	else
+		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $IPS --failure-domain "$HASHED_IP" --dedicate
+		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY"GB --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $IPS --failure-domain "$HASHED_IP" --dedicate
+		sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $IPS --failure-domain "$HASHED_IP" --dedicate
+	fi`
 
 	isReady := `
 	while ! weka debug manhole -s 0 operational_status | grep '"is_ready": true' ; do
@@ -186,7 +234,7 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 
 	bashScriptTemplate += isReady + fmt.Sprintf(addDrives, joinFinalizationUrl)
 
-	bashScript = fmt.Sprintf(bashScriptTemplate, wekaPassword, strings.Join(ips, "\" \""), functionKey, reportUrl, hashedPrivateIp, compute, frontend, drive, mem, strings.Join(ips, ","))
+	bashScript = fmt.Sprintf(bashScriptTemplate, wekaPassword, strings.Join(ips, "\" \""), functionKey, reportUrl, hashedPrivateIp, compute, frontend, drive, mem, installDpdk, nicsNum, strings.Join(ips, ","))
 
 	return
 }
@@ -207,6 +255,9 @@ func GetDeployScript(
 	computeContainerNum string,
 	frontendContainerNum string,
 	driveContainerNum string,
+	installDpdk string,
+	nicsNum string,
+
 ) (bashScript string, err error) {
 	clusterizeUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/clusterize", prefix, clusterName)
 	reportUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/report", prefix, clusterName)
@@ -247,6 +298,8 @@ func GetDeployScript(
 
 		# install script
 		%s
+		INSTALL_DPDK=%s
+		NICS_NUM=%s
 
 		weka local stop
 		weka local rm default --force
@@ -270,10 +323,33 @@ func GetDeployScript(
 		get_core_ids $NUM_DRIVE_CONTAINERS drive_core_ids
 		get_core_ids $NUM_COMPUTE_CONTAINERS compute_core_ids
 		get_core_ids $NUM_FRONTEND_CONTAINERS frontend_core_ids
-	
-		sudo weka local setup container --name drives0 --base-port 14000 --cores $NUM_DRIVE_CONTAINERS --no-frontends --drives-dedicated-cores $NUM_DRIVE_CONTAINERS --failure-domain $hashed_ip --core-ids $drive_core_ids  --dedicate
-		sudo weka local setup container --name compute0 --base-port 15000 --cores $NUM_COMPUTE_CONTAINERS --no-frontends --compute-dedicated-cores $NUM_COMPUTE_CONTAINERS  --memory $COMPUTE_MEMORY --failure-domain $hashed_ip --core-ids $compute_core_ids  --dedicate
-		sudo weka local setup container --name frontend0 --base-port 16000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --allow-protocols true --failure-domain $hashed_ip --core-ids $frontend_core_ids  --dedicate
+
+		function getNetStrForDpdk() {
+			i=$1
+			j=$2
+			net=" "
+			gateway=$(route -n | grep 0.0.0.0 | grep UG | awk '{print $2}')
+			for ((i; i<$j; i++)); do
+				eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
+				enp=$(ls -l /sys/class/net/eth$i/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}')
+				bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
+				IFS='/' read -ra netmask <<< "$bits"
+				net="$net --net $enp/$eth/${netmask[1]}/$gateway"
+			done
+		}
+
+		if [[ $INSTALL_DPDK == true ]]; then
+			getNetStrForDpdk 1 $(($NUM_DRIVE_CONTAINERS+1))
+			sudo weka local setup container --name drives0 --base-port 14000 --cores $NUM_DRIVE_CONTAINERS --no-frontends --drives-dedicated-cores $NUM_DRIVE_CONTAINERS --failure-domain $hashed_ip --core-ids $drive_core_ids $net --dedicate
+			getNetStrForDpdk $((1+$NUM_DRIVE_CONTAINERS)) $((1+$NUM_DRIVE_CONTAINERS+$NUM_COMPUTE_CONTAINERS ))
+			sudo weka local setup container --name compute0 --base-port 15000 --cores $NUM_COMPUTE_CONTAINERS --no-frontends --compute-dedicated-cores $NUM_COMPUTE_CONTAINERS  --memory $COMPUTE_MEMORY --failure-domain $hashed_ip --core-ids $compute_core_ids $net --dedicate
+			getNetStrForDpdk $(($NICS_NUM-1)) $(($NICS_NUM))
+			sudo weka local setup container --name frontend0 --base-port 16000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --allow-protocols true --failure-domain $hashed_ip --core-ids $frontend_core_ids $net --dedicate
+		else
+			sudo weka local setup container --name drives0 --base-port 14000 --cores $NUM_DRIVE_CONTAINERS --no-frontends --drives-dedicated-cores $NUM_DRIVE_CONTAINERS --failure-domain $hashed_ip --core-ids $drive_core_ids  --dedicate
+			sudo weka local setup container --name compute0 --base-port 15000 --cores $NUM_COMPUTE_CONTAINERS --no-frontends --compute-dedicated-cores $NUM_COMPUTE_CONTAINERS  --memory $COMPUTE_MEMORY --failure-domain $hashed_ip --core-ids $compute_core_ids  --dedicate
+			sudo weka local setup container --name frontend0 --base-port 16000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --allow-protocols true --failure-domain $hashed_ip --core-ids $frontend_core_ids  --dedicate
+		fi
 
 		# should not call culusterize untill all 3 containers are up
 		ready_containers=0
@@ -291,10 +367,10 @@ func GetDeployScript(
 		`
 		bashScript = fmt.Sprintf(
 			deployTemplate, clusterizeUrl, protectUrl, functionKey, vm, getHashedIpCommand,
-			computeMemory, computeContainerNum, frontendContainerNum, driveContainerNum, installScript,
+			computeMemory, computeContainerNum, frontendContainerNum, driveContainerNum, installScript, installDpdk, nicsNum,
 		)
 	} else {
-		bashScript, err = GetJoinParams(ctx, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, keyVaultUri, functionKey, vm)
+		bashScript, err = GetJoinParams(ctx, subscriptionId, resourceGroupName, prefix, clusterName, instanceType, keyVaultUri, functionKey, installDpdk, nicsNum, vm)
 		if err != nil {
 			return
 		}
@@ -389,6 +465,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	computeContainerNum := os.Getenv("NUM_COMPUTE_CONTAINERS")
 	frontendContainerNum := os.Getenv("NUM_FRONTEND_CONTAINERS")
 	driveContainerNum := os.Getenv("NUM_DRIVE_CONTAINERS")
+	installDpdk := os.Getenv("INSTALL_DPDK")
+	nicsNum := os.Getenv("NICS_NUM")
 
 	instanceType := os.Getenv("INSTANCE_TYPE")
 	installUrl := os.Getenv("INSTALL_URL")
@@ -446,6 +524,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		computeContainerNum,
 		frontendContainerNum,
 		driveContainerNum,
+		installDpdk,
+		nicsNum,
 	)
 
 	if err != nil {

@@ -46,6 +46,7 @@ type ClusterizationParams struct {
 
 	StateContainerName string
 	StateStorageName   string
+	InstallDpdk        string
 
 	Cluster WekaClusterParams
 	Obs     ObsParams
@@ -56,7 +57,7 @@ type RequestBody struct {
 }
 
 func generateClusterizationScript(
-	ctx context.Context, vmNames, ips, prefix, functionAppKey, wekaPassword string, cluster WekaClusterParams, obs ObsParams,
+	ctx context.Context, vmNames, ips, prefix, functionAppKey, wekaPassword, installDpdk string, cluster WekaClusterParams, obs ObsParams,
 ) (clusterizeScript string) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("Generating clusterization script")
@@ -83,6 +84,7 @@ func generateClusterizationScript(
 	PROTECTION_LEVEL=%d
 	HOTSPARE=%d
 	WEKA_PASSWORD="%s"
+	INSTALL_DPDK=%s
 
 	HOST_IPS=()
 	HOST_NAMES=()
@@ -137,9 +139,13 @@ func generateClusterizationScript(
 	  tiering_percent=$(echo "$full_capacity * 100 / $TIERING_SSD_PERCENT" | bc)
 	  weka fs update default --total-capacity "$tiering_percent"B
 	fi
-	
-	weka alerts mute JumboConnectivity 365d
-	weka alerts mute UdpModePerformanceWarning 365d
+
+	if [[ $INSTALL_DPDK == true ]]; then
+		weka alerts mute NodeRDMANotActive 365d
+	else
+		weka alerts mute JumboConnectivity 365d
+		weka alerts mute UdpModePerformanceWarning 365d
+	fi
 
 	echo "completed successfully" > /tmp/weka_clusterization_completion_validation
 	curl "$report_url?code=$FUNCTION_APP_KEY" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Clusterization completed successfully\"}"
@@ -152,7 +158,7 @@ func generateClusterizationScript(
 		dedent.Dedent(clusterizeScriptTemplate), vmNames, ips, cluster.HostsNum, cluster.NvmesNum, cluster.Name,
 		obs.SetObs, obs.Name, obs.ContainerName, obs.AccessKey, cluster.TieringSsdPercent, prefix, functionAppKey,
 		cluster.DataProtection.StripeWidth, cluster.DataProtection.ProtectionLevel, cluster.DataProtection.Hotspare,
-		wekaPassword,
+		wekaPassword, installDpdk,
 	)
 	return
 }
@@ -243,7 +249,7 @@ func HandleLastClusterVm(ctx context.Context, state common.ClusterState, p Clust
 	vmNames := strings.Join(vmNamesList, " ")
 	ips := strings.Join(ipsList, " ")
 
-	clusterizeScript = generateClusterizationScript(ctx, vmNames, ips, p.Prefix, functionAppKey, wekaPassword, p.Cluster, p.Obs)
+	clusterizeScript = generateClusterizationScript(ctx, vmNames, ips, p.Prefix, functionAppKey, wekaPassword, p.InstallDpdk, p.Cluster, p.Obs)
 	return
 }
 
@@ -316,6 +322,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	stripeWidth, _ := strconv.Atoi(os.Getenv("STRIPE_WIDTH"))
 	protectionLevel, _ := strconv.Atoi(os.Getenv("PROTECTION_LEVEL"))
 	hotspare, _ := strconv.Atoi(os.Getenv("HOTSPARE"))
+	installDpdk := os.Getenv("INSTALL_DPDK")
 
 	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
@@ -353,6 +360,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		KeyVaultUri:        keyVaultUri,
 		StateContainerName: stateContainerName,
 		StateStorageName:   stateStorageName,
+		InstallDpdk:        installDpdk,
 		Cluster: WekaClusterParams{
 			VmName:            data.Vm,
 			HostsNum:          hostsNum,
