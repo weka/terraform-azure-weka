@@ -17,6 +17,7 @@
 
 | Name | Source | Version |
 |------|--------|---------|
+| <a name="module_create-sa"></a> [create-sa](#module\_create-sa) | ./create_sa | n/a |
 | <a name="module_upload-zip"></a> [upload-zip](#module\_upload-zip) | ./upload_zip | n/a |
 
 ## Resources

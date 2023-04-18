@@ -31,6 +31,16 @@ data "azurerm_resource_group" "rg" {
   name = var.resource_group_name
 }
 
+module "create-sa" {
+  source   = "./create_sa"
+  for_each = toset(var.regions["release"])
+
+  rg_name = data.azurerm_resource_group.rg.name
+  region  = each.key
+
+  depends_on = [data.archive_file.function_zip]
+}
+
 module "upload-zip" {
   source   = "./upload_zip"
   for_each = toset(var.regions[var.dist])
@@ -41,5 +51,5 @@ module "upload-zip" {
   function_app_code_hash = local.function_app_code_hash
   dist                   = var.dist
 
-  depends_on = [data.archive_file.function_zip]
+  depends_on = [module.create-sa]
 }
