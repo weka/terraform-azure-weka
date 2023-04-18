@@ -25,7 +25,7 @@ INSTALLATION_PATH="/tmp/weka"
 mkdir -p $INSTALLATION_PATH
 
 # install ofed
-if [[ "${skip_ofed_installation}" == false ]]; then
+if [[ ${install_ofed} == true ]]; then
   curl -i ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"installing ofed\"}"
   OFED_NAME=ofed-${ofed_version}
   if [[ "${install_ofed_url}" ]]; then
@@ -40,6 +40,37 @@ if [[ "${skip_ofed_installation}" == false ]]; then
   /etc/init.d/openibd restart
 
   curl -i ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"ofed installation completed\"}"
+fi
+
+# config network with multi nics
+if [[ ${install_cluster_dpdk} == true ]]; then
+  for(( i=0; i<${nics_num}; i++)); do
+    echo "20$i eth$i-rt" >> /etc/iproute2/rt_tables
+  done
+
+  echo "network:"> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+  echo "  config: disabled" >> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+  gateway=$(ip r | grep default | awk '{print $3}')
+  for(( i=0; i<${nics_num}; i++ )); do
+    eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
+    cat <<-EOF | sed -i "/            set-name: eth$i/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
+            mtu: 3900
+            routes:
+             - to: ${subnet_range}
+               via: $gateway
+               metric: 200
+               table: 20$i
+             - to: 0.0.0.0/0
+               via: $gateway
+               table: 20$i
+            routing-policy:
+             - from: $eth/32
+               table: 20$i
+             - to: $eth/32
+               table: 20$i
+EOF
+  done
+  netplan apply
 fi
 
 apt update -y
