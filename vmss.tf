@@ -90,7 +90,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "custom_image_vmss" {
   custom_data                     = base64encode(data.template_file.init.rendered)
   disable_password_authentication = true
   proximity_placement_group_id    = azurerm_proximity_placement_group.ppg.id
-  tags                            = merge(var.tags_map, {"weka_cluster": var.cluster_name})
+  tags                            = merge(var.tags_map, {"weka_cluster": var.cluster_name,"user_id": data.azurerm_client_config.current.object_id})
   source_image_id                 = var.custom_image_id
 
   os_disk {
@@ -166,7 +166,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "default_image_vmss" {
   custom_data                     = base64encode(data.template_file.init.rendered)
   disable_password_authentication = true
   proximity_placement_group_id    = azurerm_proximity_placement_group.ppg.id
-  tags                            = merge(var.tags_map, {"weka_cluster": var.cluster_name})
+  tags                            = merge(var.tags_map, {"weka_cluster": var.cluster_name,"user_id": data.azurerm_client_config.current.object_id})
   source_image_reference {
     offer     = lookup(var.linux_vm_image, "offer", null)
     publisher = lookup(var.linux_vm_image, "publisher", null)
