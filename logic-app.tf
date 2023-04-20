@@ -8,7 +8,7 @@ resource "azurerm_resource_group_template_deployment" "api_connections_template_
     "contentVersion": "1.0.0.0",
     "parameters": {
         "connections_keyvault_name": {
-            "defaultValue": "keyvault",
+            "defaultValue": "[concat('${azurerm_key_vault.key_vault.name}', '-connection')]",
             "type": "string"
         }
     },
@@ -35,7 +35,7 @@ resource "azurerm_resource_group_template_deployment" "api_connections_template_
             "name": "[parameters('connections_keyvault_name')]",
             "displayName": "Azure Key Vault",
             "description": "Azure Key Vault is a service to securely store and access secrets.",
-            "id": "[concat('/subscriptions/${var.subscription_id}/providers/Microsoft.Web/locations/${data.azurerm_resource_group.rg.location}/managedApis/', parameters('connections_keyvault_name'))]",
+            "id": "/subscriptions/${var.subscription_id}/providers/Microsoft.Web/locations/${data.azurerm_resource_group.rg.location}/managedApis/keyvault",
             "type": "Microsoft.Web/locations/managedApis"
         },
         "testLinks": [
@@ -75,7 +75,7 @@ resource "azurerm_resource_group_template_deployment" "workflow_scale_down_templ
             "type": "String"
         },
         "connections_keyvault_externalid": {
-            "defaultValue": "/subscriptions/${var.subscription_id}/resourceGroups/${data.azurerm_resource_group.rg.name}/providers/Microsoft.Web/connections/keyvault",
+            "defaultValue": "/subscriptions/${var.subscription_id}/resourceGroups/${data.azurerm_resource_group.rg.name}/providers/Microsoft.Web/connections/${azurerm_key_vault.key_vault.name}-connection",
             "type": "String"
         }
     },
@@ -120,7 +120,7 @@ resource "azurerm_resource_group_template_deployment" "workflow_scale_down_templ
                         "value": {
                             "keyvault": {
                                 "connectionId": "[parameters('connections_keyvault_externalid')]",
-                                "connectionName": "keyvault",
+                                "connectionName": "[concat('${azurerm_key_vault.key_vault.name}', '-connection')]",
                                 "connectionProperties": {
                                     "authentication": {
                                         "type": "ManagedServiceIdentity"
@@ -374,7 +374,7 @@ resource "azurerm_resource_group_template_deployment" "workflow_scale_up_templat
             "type": "String"
         },
         "connections_keyvault_externalid": {
-            "defaultValue": "/subscriptions/${var.subscription_id}/resourceGroups/${data.azurerm_resource_group.rg.name}/providers/Microsoft.Web/connections/keyvault",
+            "defaultValue": "/subscriptions/${var.subscription_id}/resourceGroups/${data.azurerm_resource_group.rg.name}/providers/Microsoft.Web/connections/${azurerm_key_vault.key_vault.name}-connection",
             "type": "String"
         }
     },
