@@ -1,0 +1,10 @@
+prefix             = "client"
+rg_name            = "denise"
+clients_name       = "vm"
+clients_size       = 2
+install_ofed       = true
+install_dpdk       = true
+subnet_name        = "d1-subnet-0"
+vnet_name          = "d1-vnet"
+sg_name            = "d1-sg"
+lb_url = "poc-backend.d1.private.net."
