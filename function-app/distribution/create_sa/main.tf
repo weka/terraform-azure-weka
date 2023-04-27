@@ -9,6 +9,10 @@ resource "azurerm_storage_account" "sa" {
   blob_properties {
     last_access_time_enabled = true
   }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "azurerm_storage_container" "container" {
@@ -16,6 +20,10 @@ resource "azurerm_storage_container" "container" {
   storage_account_name  = azurerm_storage_account.sa.name
   container_access_type = "blob"
   depends_on            = [azurerm_storage_account.sa]
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "azurerm_storage_management_policy" "retention_policy" {
