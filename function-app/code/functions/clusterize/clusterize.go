@@ -155,7 +155,11 @@ func generateClusterizationScript(
 	sleep 10s
 	
 	weka user login admin "$WEKA_PASSWORD"
-	
+	if [[ $INSTALL_DPDK == true ]]; then
+		weka debug override add --key allow_uncomputed_backend_checksum
+		weka debug override add --key allow_azure_auto_detection
+	fi
+
 	for (( i=0; i<$HOSTS_NUM; i++ )); do
 		for (( d=0; d<$NVMES_NUM; d++ )); do
 			weka cluster drive add $i "/dev/nvme$d"n1
