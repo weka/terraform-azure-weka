@@ -3,12 +3,13 @@ package debug
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/weka/go-cloud-lib/logging"
 	"net/http"
 	"os"
 	"strconv"
 	"weka-deployment/common"
 	"weka-deployment/functions/clusterize"
+
+	"github.com/weka/go-cloud-lib/logging"
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -127,7 +128,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			result = instances
 		}
 	} else if *function.Function == "interfaces" {
-		interfaces, err1 := common.GetScaleSetVmsNetworkInterfaces(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+		interfaces, err1 := common.GetScaleSetVmsNetworkPrimaryNICs(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 		if err1 != nil {
 			result = err1.Error()
 		} else {

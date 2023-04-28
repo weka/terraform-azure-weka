@@ -402,7 +402,7 @@ func GetKeyVaultValue(ctx context.Context, keyVaultUri, secretName string) (secr
 
 // Gets all network interfaces in a VM scale set
 // see https://learn.microsoft.com/en-us/rest/api/virtualnetwork/network-interface-in-vm-ss/list-virtual-machine-scale-set-network-interfaces
-func GetScaleSetVmsNetworkInterfaces(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (networkInterfaces []*armnetwork.Interface, err error) {
+func getScaleSetVmsNetworkInterfaces(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (networkInterfaces []*armnetwork.Interface, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
@@ -426,6 +426,25 @@ func GetScaleSetVmsNetworkInterfaces(ctx context.Context, subscriptionId, resour
 			return nil, err
 		}
 		networkInterfaces = append(networkInterfaces, nextResult.Value...)
+	}
+	return
+}
+
+func GetScaleSetVmsNetworkPrimaryNICs(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (networkInterfaces []*armnetwork.Interface, err error) {
+	nics, err := getScaleSetVmsNetworkInterfaces(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, ni := range nics {
+		if ni.Properties == nil || ni.Properties.VirtualMachine == nil || len(ni.Properties.IPConfigurations) < 1 {
+			continue
+		}
+		if ni.Properties.Primary == nil || !*ni.Properties.Primary {
+			// get only primary NICs
+			continue
+		}
+		networkInterfaces = append(networkInterfaces, ni)
 	}
 	return
 }
@@ -465,7 +484,7 @@ func GetVmsPrivateIps(ctx context.Context, subscriptionId, resourceGroupName, vm
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("fetching scale set vms private ips")
 
-	networkInterfaces, err := GetScaleSetVmsNetworkInterfaces(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	networkInterfaces, err := GetScaleSetVmsNetworkPrimaryNICs(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
 		return
 	}
@@ -729,7 +748,7 @@ func GetScaleSetInstancesInfo(ctx context.Context, subscriptionId, resourceGroup
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("Getting scale set instances %s info", vmScaleSetName)
 
-	netInterfaces, err := GetScaleSetVmsNetworkInterfaces(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	netInterfaces, err := GetScaleSetVmsNetworkPrimaryNICs(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
 		return
 	}
