@@ -3,28 +3,14 @@ package join
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"strings"
-	"time"
-
 	bf "weka-deployment/lib/bash_functions"
 	fd "weka-deployment/lib/functions_def"
 
 	"github.com/lithammer/dedent"
+	"github.com/weka/go-cloud-lib/common"
+	"github.com/weka/go-cloud-lib/protocol"
 )
-
-func ShuffleSlice(slice []string) {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	r.Shuffle(len(slice), func(i, j int) { slice[i], slice[j] = slice[j], slice[i] })
-}
-
-type BackendCoreCount struct {
-	Total     int
-	Frontend  int
-	Drive     int
-	Converged bool
-	Memory    int
-}
 
 type JoinParams struct {
 	VMName         string
@@ -33,7 +19,7 @@ type JoinParams struct {
 	WekaPassword   string
 	InstallDpdk    bool
 	NicsNum        string
-	InstanceParams BackendCoreCount
+	InstanceParams protocol.BackendCoreCount
 }
 
 type JoinScriptGenerator struct {
@@ -51,7 +37,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	getNetStrForDpdkFunc := bf.GetNetStrForDpdk()
 
 	ips := j.Params.IPs
-	ShuffleSlice(ips)
+	common.ShuffleSlice(ips)
 
 	bashScriptTemplate := `
 	#!/bin/bash
