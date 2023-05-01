@@ -105,13 +105,13 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 		mgmt_ip=$(hostname -I | awk '{print $1}')
 
 		getNetStrForDpdk 1 $(($DRIVES+1))
-		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $IPS --failure-domain "$HASHED_IP" --core-ids $drive_core_ids $net --management-ips $mgmt_ip --dedicate
+		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $drive_core_ids $net --management-ips $mgmt_ip --dedicate
 
 		getNetStrForDpdk $((1+$DRIVES)) $((1+$DRIVES+$COMPUTE))
-		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY"GB --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $IPS --failure-domain "$HASHED_IP" --core-ids $compute_core_ids $net --management-ips $mgmt_ip --dedicate
+		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY"GB --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $compute_core_ids $net --management-ips $mgmt_ip --dedicate
 
 		getNetStrForDpdk $(($NICS_NUM-1)) $(($NICS_NUM))
-		sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $IPS --failure-domain "$HASHED_IP" --core-ids $frontend_core_ids $net --management-ips $mgmt_ip --dedicate
+		sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $host_ips --failure-domain "$HASHED_IP" --core-ids $frontend_core_ids $net --management-ips $mgmt_ip --dedicate
 	else
 		sudo weka local setup container --name drives0 --base-port 14000 --cores $DRIVES --no-frontends --drives-dedicated-cores $DRIVES --join-ips $host_ips --failure-domain "$HASHED_IP" --dedicate
 		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY"GB --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $host_ips --failure-domain "$HASHED_IP" --dedicate
