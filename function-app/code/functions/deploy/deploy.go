@@ -155,9 +155,25 @@ func GetDeployScript(
 			NicsNum:        nicsNum,
 			InstanceParams: instanceParams,
 		}
+
+		scriptBase := `
+		#!/bin/bash
+		set -ex
+		`
+
+		findDrivesScript := `
+		import json
+		import sys
+		for d in json.load(sys.stdin)['disks']:
+			if d['isRotational']: continue
+			print(d['devPath'])
+		`
+
 		joinScriptGenerator := join.JoinScriptGenerator{
 			FailureDomainCmd:   getHashedIpCommand,
 			GetInstanceNameCmd: getAzureInstanceNameCmd(),
+			FindDrivesScript:   dedent.Dedent(findDrivesScript),
+			ScriptBase:         dedent.Dedent(scriptBase),
 			Params:             joinParams,
 			FuncDef:            funcDef,
 		}
