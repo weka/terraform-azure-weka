@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/weka/go-cloud-lib/protocol"
 	"net/http"
 	"os"
 	"strconv"
 	"weka-deployment/common"
+	bf "weka-deployment/lib/bash_functions"
 	"weka-deployment/lib/deploy"
 	fd "weka-deployment/lib/functions_def"
 	"weka-deployment/lib/join"
@@ -21,18 +23,18 @@ func getAzureInstanceNameCmd() string {
 	return "curl -s -H Metadata:true --noproxy * http://169.254.169.254/metadata/instance?api-version=2021-02-01 | jq '.compute.name' | cut -c2- | rev | cut -c2- | rev"
 }
 
-func GetBackendCoreCount(instanceType string) (backendCoreCount join.BackendCoreCount, err error) {
+func GetBackendCoreCount(instanceType string) (backendCoreCount protocol.BackendCoreCount, err error) {
 	switch instanceType {
 	case "Standard_L8s_v3":
-		backendCoreCount = join.BackendCoreCount{Total: 4, Frontend: 1, Drive: 1, Memory: 31}
+		backendCoreCount = protocol.BackendCoreCount{Total: 4, Frontend: 1, Drive: 1, Memory: "31GB"}
 	case "Standard_L16s_v3":
-		backendCoreCount = join.BackendCoreCount{Total: 8, Frontend: 1, Drive: 2, Memory: 72}
+		backendCoreCount = protocol.BackendCoreCount{Total: 8, Frontend: 1, Drive: 2, Memory: "72GB"}
 	case "Standard_L32s_v3":
-		backendCoreCount = join.BackendCoreCount{Total: 8, Frontend: 1, Drive: 2, Memory: 189}
+		backendCoreCount = protocol.BackendCoreCount{Total: 8, Frontend: 1, Drive: 2, Memory: "189GB"}
 	case "Standard_L48s_v3":
-		backendCoreCount = join.BackendCoreCount{Total: 8, Frontend: 1, Drive: 3, Memory: 306}
+		backendCoreCount = protocol.BackendCoreCount{Total: 8, Frontend: 1, Drive: 3, Memory: "306GB"}
 	case "Standard_L64s_v3":
-		backendCoreCount = join.BackendCoreCount{Total: 8, Frontend: 1, Drive: 2, Memory: 418}
+		backendCoreCount = protocol.BackendCoreCount{Total: 8, Frontend: 1, Drive: 2, Memory: "418GB"}
 	default:
 		err = fmt.Errorf("unsupported instance type: %s", instanceType)
 	}
@@ -85,7 +87,7 @@ func GetDeployScript(
 	funcDef := fd.NewFuncDef(baseFunctionUrl, functionKey)
 
 	// used for getting failure domain
-	getHashedIpCommand := common.GetHashedPrivateIpBashCmd()
+	getHashedIpCommand := bf.GetHashedPrivateIpBashCmd()
 
 	if !state.Clusterized {
 		var token string
@@ -147,12 +149,10 @@ func GetDeployScript(
 		}
 
 		joinParams := join.JoinParams{
-			VMName:         vm,
 			WekaUsername:   "admin",
 			WekaPassword:   wekaPassword,
 			IPs:            ips,
 			InstallDpdk:    installDpdk,
-			NicsNum:        nicsNum,
 			InstanceParams: instanceParams,
 		}
 
