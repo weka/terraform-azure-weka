@@ -25,6 +25,8 @@ type JoinParams struct {
 type JoinScriptGenerator struct {
 	FailureDomainCmd   string
 	GetInstanceNameCmd string
+	FindDrivesScript   string
+	ScriptBase         string
 	Params             JoinParams
 	FuncDef            fd.FunctionDef
 }
@@ -40,8 +42,6 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	common.ShuffleSlice(ips)
 
 	bashScriptTemplate := `
-	#!/bin/bash
-	set -ex
 	export WEKA_USERNAME="%s"
 	export WEKA_PASSWORD="%s"
 	export WEKA_RUN_CREDS="-e WEKA_USERNAME=$WEKA_USERNAME -e WEKA_PASSWORD=$WEKA_PASSWORD"
@@ -154,11 +154,7 @@ func (j *JoinScriptGenerator) getAddDrivesScript() string {
 	host_id=$(weka local run --container compute0 $WEKA_RUN_CREDS manhole getServerInfo | grep hostIdValue: | awk '{print $2}')
 	mkdir -p /opt/weka/tmp
 	cat >/opt/weka/tmp/find_drives.py <<EOL
-	import json
-	import sys
-	for d in json.load(sys.stdin)['disks']:
-		if d['isRotational']: continue
-		print(d['devPath'])
+	%s
 	EOL
 	devices=$(weka local run --container compute0 $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
 	for device in $devices; do
@@ -182,5 +178,5 @@ func (j *JoinScriptGenerator) getAddDrivesScript() string {
 	echo "completed successfully" > /tmp/weka_join_completion_validation
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Join completed successfully\"}"
 	`
-	return dedent.Dedent(fmt.Sprintf(s, j.GetInstanceNameCmd))
+	return dedent.Dedent(fmt.Sprintf(s, j.GetInstanceNameCmd, j.FindDrivesScript))
 }
