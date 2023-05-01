@@ -3,11 +3,10 @@ package deploy
 import (
 	"fmt"
 	"strings"
-
-	bf "weka-deployment/lib/bash_functions"
 	fd "weka-deployment/lib/functions_def"
 
 	"github.com/lithammer/dedent"
+	bf "weka-deployment/lib/bash_functions"
 )
 
 type DeploymentParams struct {
