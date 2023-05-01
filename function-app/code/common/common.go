@@ -3,7 +3,6 @@ package common
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -963,10 +962,6 @@ func UpdateStateReportingWithoutLocking(ctx context.Context, stateContainerName,
 		return
 	}
 	return
-}
-
-func GetHashedPrivateIp(privateIp string) string {
-	return fmt.Sprintf("%x", sha256.Sum256([]byte(privateIp)))[:16]
 }
 
 func GetHashedPrivateIpBashCmd() string {
