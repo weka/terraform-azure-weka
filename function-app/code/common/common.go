@@ -963,7 +963,3 @@ func UpdateStateReportingWithoutLocking(ctx context.Context, stateContainerName,
 	}
 	return
 }
-
-func GetHashedPrivateIpBashCmd() string {
-	return "printf $(hostname -I) | sha256sum | tr -d '-' | cut -c1-16"
-}
