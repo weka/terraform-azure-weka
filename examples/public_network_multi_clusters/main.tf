@@ -30,6 +30,8 @@ module "deploy-weka" {
   tiering_ssd_percent   = var.tiering_ssd_percent
   cluster_name          = var.clusters_list[count.index]
   subscription_id       = var.subscription_id
+  install_ofed = false
+  custom_image_id = "/subscriptions/d2f248b9-d054-477f-b7e8-413921532c2a/resourceGroups/weka-tf/providers/Microsoft.Compute/images/weka-custome-image-ofed-5.6-image"
   private_dns_zone_name = module.create-network.private-dns-zone-name
   depends_on            = [module.create-network]
 }

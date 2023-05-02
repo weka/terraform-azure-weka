@@ -29,6 +29,8 @@ module "deploy-weka" {
   cluster_size          = var.cluster_size
   tiering_ssd_percent   = var.tiering_ssd_percent
   subscription_id       = var.subscription_id
+  install_cluster_dpdk  = false
+  install_ofed          = false
   private_dns_zone_name = module.create-network.private-dns-zone-name
   depends_on            = [module.create-network]
 }
