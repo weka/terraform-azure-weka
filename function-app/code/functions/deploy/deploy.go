@@ -116,12 +116,13 @@ func GetJoinParams(ctx context.Context, subscriptionId, resourceGroupName, prefi
 		i=$1
 		j=$2
 		net=" "
-		gateway=$(route -n | grep 0.0.0.0 | grep UG | awk '{print $2}')
 		for ((i; i<$j; i++)); do
 			eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
 			enp=$(ls -l /sys/class/net/eth$i/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}')
 			bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
 			IFS='/' read -ra netmask <<< "$bits"
+			gateway=${eth%%.*}
+			gateway+=".1"
 			net="$net --net $enp/$eth/${netmask[1]}/$gateway"
 		done
 	}
@@ -330,12 +331,13 @@ func GetDeployScript(
 			i=$1
 			j=$2
 			net=" "
-			gateway=$(route -n | grep 0.0.0.0 | grep UG | awk '{print $2}')
 			for ((i; i<$j; i++)); do
 				eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
 				enp=$(ls -l /sys/class/net/eth$i/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}')
 				bits=$(ip -o -f inet addr show eth$i | awk '{print $4}')
 				IFS='/' read -ra netmask <<< "$bits"
+				gateway=${eth%%.*}
+				gateway+=".1"
 				net="$net --net $enp/$eth/${netmask[1]}/$gateway"
 			done
 		}

@@ -132,7 +132,7 @@ variable "private_dns_zone_name" {
 variable "ofed_version" {
   type = string
   description = "The OFED driver version to for ubuntu 18."
-  default = "5.9-0.5.6.0"
+  default = "5.6-1.0.3.3"
 }
 
 variable "install_ofed_url" {
@@ -295,7 +295,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type = string
   description = "Function app code version (hash)"
-  default = "22eb25319b2833f168f997031c70ec5c"
+  default = "c2e62d55e8095983887ab987d48b8490"
 }
 
 variable "function_app_dist" {
