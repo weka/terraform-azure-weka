@@ -34,7 +34,7 @@ func GetNetStrForDpdk() string {
 		for ((i; i<$j; i++)); do
 			eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
 			if [ -z "$eth" ];then
-				net=""
+				net="$net"
 				break
 			fi
 			enp=$(ls -l /sys/class/net/eth$i/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}')
