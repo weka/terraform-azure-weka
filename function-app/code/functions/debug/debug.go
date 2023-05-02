@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"weka-deployment/common"
 	clusterizeFunc "weka-deployment/functions/clusterize"
-	"weka-deployment/lib/clusterize"
 
+	"github.com/weka/go-cloud-lib/clusterize"
 	"github.com/weka/go-cloud-lib/logging"
 )
 
