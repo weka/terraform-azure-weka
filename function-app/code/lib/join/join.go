@@ -114,6 +114,15 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY" --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $host_ips --failure-domain "$HASHED_IP" --dedicate
 		sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $host_ips --failure-domain "$HASHED_IP" --dedicate
 	fi
+
+	# should not go further untill all 3 containers are up
+	ready_containers=0
+	while [ $ready_containers -ne 3 ];
+	do
+		sleep 10
+		ready_containers=$( weka local ps | grep -i 'running' | grep -i 'ready' | wc -l )
+		echo "Running containers: $ready_containers"
+	done
 	`
 
 	frontend := j.Params.InstanceParams.Frontend
