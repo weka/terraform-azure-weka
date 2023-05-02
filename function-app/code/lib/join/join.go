@@ -3,12 +3,13 @@ package join
 import (
 	"context"
 	"fmt"
-	"github.com/lithammer/dedent"
-	"github.com/weka/go-cloud-lib/common"
-	"github.com/weka/go-cloud-lib/protocol"
 	"strings"
 	bf "weka-deployment/lib/bash_functions"
 	fd "weka-deployment/lib/functions_def"
+
+	"github.com/lithammer/dedent"
+	"github.com/weka/go-cloud-lib/common"
+	"github.com/weka/go-cloud-lib/protocol"
 )
 
 type JoinParams struct {
@@ -114,15 +115,6 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 		sudo weka local setup container --name compute0 --base-port 15000 --cores $COMPUTE --memory "$COMPUTE_MEMORY" --no-frontends --compute-dedicated-cores $COMPUTE --join-ips $host_ips --failure-domain "$HASHED_IP" --dedicate
 		sudo weka local setup container --name frontend0 --base-port 16000 --cores $FRONTEND --allow-protocols true --frontend-dedicated-cores $FRONTEND --join-ips $host_ips --failure-domain "$HASHED_IP" --dedicate
 	fi
-
-	# should not go further untill all 3 containers are up
-	ready_containers=0
-	while [ $ready_containers -ne 3 ];
-	do
-		sleep 10
-		ready_containers=$( weka local ps | grep -i 'running' | grep -i 'ready' | wc -l )
-		echo "Running containers: $ready_containers"
-	done
 	`
 
 	frontend := j.Params.InstanceParams.Frontend
@@ -133,7 +125,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 	isReady := j.getIsReadyScript()
 	addDrives := j.getAddDrivesScript()
 
-	bashScriptTemplate = dedent.Dedent(bashScriptTemplate)
+	bashScriptTemplate = j.ScriptBase + dedent.Dedent(bashScriptTemplate)
 	bashScriptTemplate += isReady + addDrives
 	bashScript := fmt.Sprintf(
 		bashScriptTemplate, j.Params.WekaUsername, j.Params.WekaPassword, strings.Join(ips, " "), j.FailureDomainCmd,
@@ -160,9 +152,9 @@ func (j *JoinScriptGenerator) getAddDrivesScript() string {
 
 	host_id=$(weka local run --container compute0 $WEKA_RUN_CREDS manhole getServerInfo | grep hostIdValue: | awk '{print $2}')
 	mkdir -p /opt/weka/tmp
-	cat >/opt/weka/tmp/find_drives.py <<EOL
-	%s
-	EOL
+
+	# write down find_drives script (another string input for this template)
+	cat >/opt/weka/tmp/find_drives.py <<EOL%sEOL
 	devices=$(weka local run --container compute0 $WEKA_RUN_CREDS bash -ce 'wapi machine-query-info --info-types=DISKS -J | python3 /opt/weka/tmp/find_drives.py')
 	for device in $devices; do
 		weka local exec --container drives0 /weka/tools/weka_sign_drive $device
@@ -185,5 +177,6 @@ func (j *JoinScriptGenerator) getAddDrivesScript() string {
 	echo "completed successfully" > /tmp/weka_join_completion_validation
 	report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Join completed successfully\"}"
 	`
-	return dedent.Dedent(fmt.Sprintf(s, j.GetInstanceNameCmd, j.FindDrivesScript))
+	s = dedent.Dedent(s)
+	return fmt.Sprintf(s, j.GetInstanceNameCmd, j.FindDrivesScript)
 }

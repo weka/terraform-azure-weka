@@ -33,7 +33,7 @@ func GetNetStrForDpdk() string {
 		gateway=$(route -n | grep 0.0.0.0 | grep UG | awk '{print $2}')
 		for ((i; i<$j; i++)); do
 			eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
-			if [ $eth eq "" ];then
+			if [ -z "$eth" ];then
 				net=""
 				break
 			fi
