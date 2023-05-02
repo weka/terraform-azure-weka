@@ -27,15 +27,15 @@ func getAzureInstanceNameCmd() string {
 func GetBackendCoreCount(instanceType string) (backendCoreCount protocol.BackendCoreCount, err error) {
 	switch instanceType {
 	case "Standard_L8s_v3":
-		backendCoreCount = protocol.BackendCoreCount{Total: 4, Frontend: 1, Drive: 1, Memory: "31GB"}
+		backendCoreCount = protocol.BackendCoreCount{Total: 3, Frontend: 1, Drive: 1, Memory: "31GB"}
 	case "Standard_L16s_v3":
-		backendCoreCount = protocol.BackendCoreCount{Total: 8, Frontend: 1, Drive: 2, Memory: "72GB"}
+		backendCoreCount = protocol.BackendCoreCount{Total: 7, Frontend: 1, Drive: 2, Memory: "72GB"}
 	case "Standard_L32s_v3":
-		backendCoreCount = protocol.BackendCoreCount{Total: 8, Frontend: 1, Drive: 2, Memory: "189GB"}
+		backendCoreCount = protocol.BackendCoreCount{Total: 7, Frontend: 1, Drive: 2, Memory: "189GB"}
 	case "Standard_L48s_v3":
-		backendCoreCount = protocol.BackendCoreCount{Total: 8, Frontend: 1, Drive: 3, Memory: "306GB"}
+		backendCoreCount = protocol.BackendCoreCount{Total: 7, Frontend: 1, Drive: 3, Memory: "306GB"}
 	case "Standard_L64s_v3":
-		backendCoreCount = protocol.BackendCoreCount{Total: 8, Frontend: 1, Drive: 2, Memory: "418GB"}
+		backendCoreCount = protocol.BackendCoreCount{Total: 7, Frontend: 1, Drive: 2, Memory: "418GB"}
 	default:
 		err = fmt.Errorf("unsupported instance type: %s", instanceType)
 	}

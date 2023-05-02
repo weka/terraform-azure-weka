@@ -127,7 +127,7 @@ func (j *JoinScriptGenerator) GetJoinScript(ctx context.Context) string {
 
 	frontend := j.Params.InstanceParams.Frontend
 	drive := j.Params.InstanceParams.Drive
-	compute := j.Params.InstanceParams.Total - frontend - drive - 1
+	compute := j.Params.InstanceParams.Total - frontend - drive
 	mem := j.Params.InstanceParams.Memory
 
 	isReady := j.getIsReadyScript()
