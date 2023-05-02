@@ -4,18 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/weka/go-cloud-lib/protocol"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"weka-deployment/common"
-	bf "weka-deployment/lib/bash_functions"
-	"weka-deployment/lib/deploy"
-	fd "weka-deployment/lib/functions_def"
-	"weka-deployment/lib/join"
+	"weka-deployment/functions/azure_functions_def"
 
+	"github.com/weka/go-cloud-lib/bash_functions"
+	"github.com/weka/go-cloud-lib/deploy"
+	"github.com/weka/go-cloud-lib/join"
 	"github.com/weka/go-cloud-lib/logging"
+	"github.com/weka/go-cloud-lib/protocol"
 
 	"github.com/lithammer/dedent"
 )
@@ -85,10 +85,10 @@ func GetDeployScript(
 		return
 	}
 	baseFunctionUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/", prefix, clusterName)
-	funcDef := fd.NewFuncDef(baseFunctionUrl, functionKey)
+	funcDef := azure_functions_def.NewFuncDef(baseFunctionUrl, functionKey)
 
 	// used for getting failure domain
-	getHashedIpCommand := bf.GetHashedPrivateIpBashCmd()
+	getHashedIpCommand := bash_functions.GetHashedPrivateIpBashCmd()
 
 	if !state.Clusterized {
 		var token string

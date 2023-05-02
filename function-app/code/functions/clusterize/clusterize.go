@@ -9,12 +9,11 @@ import (
 	"strconv"
 	"strings"
 	"weka-deployment/common"
-	"weka-deployment/lib/clusterize"
-	fd "weka-deployment/lib/functions_def"
-
-	"github.com/weka/go-cloud-lib/logging"
+	"weka-deployment/functions/azure_functions_def"
 
 	"github.com/lithammer/dedent"
+	"github.com/weka/go-cloud-lib/clusterize"
+	"github.com/weka/go-cloud-lib/logging"
 )
 
 type AzureObsParams struct {
@@ -39,6 +38,14 @@ func GetObsScript(obsParams AzureObsParams) string {
 	return fmt.Sprintf(
 		dedent.Dedent(template), obsParams.TieringSsdPercent, obsParams.Name, obsParams.ContainerName, obsParams.AccessKey,
 	)
+}
+
+func GetWekaDebugOverrideCmds() string {
+	s := `
+	weka debug override add --key allow_uncomputed_backend_checksum
+	weka debug override add --key allow_azure_auto_detection
+	`
+	return dedent.Dedent(s)
 }
 
 type ClusterizationParams struct {
@@ -151,12 +158,13 @@ func HandleLastClusterVm(ctx context.Context, state common.ClusterState, p Clust
 	clusterParams.VMNames = vmNamesList
 	clusterParams.IPs = ipsList
 	clusterParams.ObsScript = GetObsScript(p.Obs)
+	clusterParams.DebugOverrideCmds = GetWekaDebugOverrideCmds()
 	clusterParams.WekaPassword = wekaPassword
 	clusterParams.WekaUsername = "admin"
 	clusterParams.InstallDpdk = p.InstallDpdk
 
 	baseFunctionUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/", p.Prefix, p.Cluster.ClusterName)
-	funcDef := fd.NewFuncDef(baseFunctionUrl, functionAppKey)
+	funcDef := azure_functions_def.NewFuncDef(baseFunctionUrl, functionAppKey)
 
 	scriptGenerator := clusterize.ClusterizeScriptGenerator{
 		Params:  clusterParams,
