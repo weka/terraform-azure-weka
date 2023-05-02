@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"weka-deployment/common"
 	bf "weka-deployment/lib/bash_functions"
 	"weka-deployment/lib/deploy"
@@ -127,12 +128,13 @@ func GetDeployScript(
 			return "", err
 		}
 
+		vmNameParts := strings.Split(vm, ":")
+		vmName := vmNameParts[0]
+
 		var ips []string
 		for ipVmName, ip := range vmsPrivateIps {
 			// exclude ip of the machine itself
-			logger.Info().Msgf("ipVmName: %v", ipVmName)
-			logger.Info().Msgf("vm: %v", vm)
-			if ipVmName != vm {
+			if ipVmName != vmName {
 				ips = append(ips, ip)
 			}
 		}
