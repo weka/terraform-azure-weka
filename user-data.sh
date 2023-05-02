@@ -42,6 +42,12 @@ if [[ ${install_ofed} == true ]]; then
   curl -i ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"ofed installation completed\"}"
 fi
 
+for(( i=0; i<${nics_num}; i++ )); do
+    cat <<-EOF | sed -i "/            set-name: eth$i/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
+            mtu: 3900
+EOF
+done
+
 # config network with multi nics
 if [[ ${install_cluster_dpdk} == true ]]; then
   for(( i=0; i<${nics_num}; i++)); do
@@ -53,8 +59,7 @@ if [[ ${install_cluster_dpdk} == true ]]; then
   gateway=$(ip r | grep default | awk '{print $3}')
   for(( i=0; i<${nics_num}; i++ )); do
     eth=$(ifconfig | grep eth$i -C2 | grep 'inet ' | awk '{print $2}')
-    cat <<-EOF | sed -i "/            set-name: eth$i/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
-            mtu: 3900
+    cat <<-EOF | sed -i "/            mtu: 3900" /etc/netplan/50-cloud-init.yaml
             routes:
              - to: ${subnet_range}
                via: $gateway
@@ -75,6 +80,7 @@ fi
 
 apt update -y
 apt install -y jq
+apt install -y fio
 
 # attache disk
 wekaiosw_device=/dev/"$(lsblk | grep ${disk_size}G | awk '{print $1}')"
