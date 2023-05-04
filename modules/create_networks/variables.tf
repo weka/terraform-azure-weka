@@ -21,11 +21,6 @@ variable "subnet_prefixes" {
   default = []
 }
 
-variable "subnet_delegation" {
-  type = string
-  description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service"
-}
-
 variable "tags_map" {
   type = map(string)
   default = {"env": "dev", "creator": "tf"}
