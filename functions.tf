@@ -56,6 +56,20 @@ resource "azurerm_monitor_diagnostic_setting" "function_diagnostic_setting" {
   depends_on = [azurerm_linux_function_app.function_app,azurerm_log_analytics_workspace.la_workspace]
 }
 
+resource "azurerm_subnet" "subnet-delegation" {
+  name                 = "${var.prefix}-${var.cluster_name}-subnet-delegation"
+  resource_group_name  = var.rg_name
+  virtual_network_name = data.azurerm_virtual_network.vnet.name
+  address_prefixes     = [var.subnet_delegation]
+
+  delegation {
+    name = "subnet-delegation"
+    service_delegation {
+      name    = "Microsoft.Web/serverFarms"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
+    }
+  }
+}
 
 resource "azurerm_service_plan" "app_service_plan" {
   name                = "${var.prefix}-${var.cluster_name}-app-service-plan"
@@ -94,13 +108,12 @@ resource "azurerm_linux_function_app" "function_app" {
   storage_account_name       = azurerm_storage_account.deployment_sa.name
   storage_account_access_key = azurerm_storage_account.deployment_sa.primary_access_key
   https_only                 = true
-  virtual_network_subnet_id  = var.subnet_delegation_id
+  virtual_network_subnet_id  = azurerm_subnet.subnet-delegation.id
   site_config {
     vnet_route_all_enabled = true
   }
 
   app_settings = {
-    "FUNCTIONS_WORKER_RUNTIME" = "custom"
     "APPINSIGHTS_INSTRUMENTATIONKEY" = azurerm_application_insights.application_insights.instrumentation_key
     "STATE_STORAGE_NAME" = azurerm_storage_account.deployment_sa.name
     "STATE_CONTAINER_NAME" = azurerm_storage_container.deployment.name
@@ -131,7 +144,7 @@ resource "azurerm_linux_function_app" "function_app" {
     "INSTALL_URL" =  var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.prod.weka.io/dist/v1/install/4.2.1-3d10be9f40c27bf083d68c2d16253163/4.2.1.10852-1f5e36232a39f9b56954e93fe5a426b1"
     "LOG_LEVEL" = var.function_app_log_level
 
-    https_only = true
+    https_only               = true
     FUNCTIONS_WORKER_RUNTIME = "custom"
     FUNCTION_APP_EDIT_MODE   = "readonly"
     HASH                     = var.function_app_version
@@ -151,7 +164,7 @@ resource "azurerm_linux_function_app" "function_app" {
     ignore_changes = [site_config,tags]
   }
 
-  depends_on = [azurerm_storage_account.deployment_sa]
+  depends_on = [azurerm_storage_account.deployment_sa, azurerm_subnet.subnet-delegation]
 }
 
 data "azurerm_subscription" "primary" {}
