@@ -22,9 +22,9 @@ variable "subnet_prefixes" {
   description = "List of address prefixes to use for the subnet"
 }
 
-variable "subnet_delegation" {
-  type = string
-  description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service"
+variable "subnets_delegation" {
+  type = list(string)
+  description = "List of subnet delegation enables you to designate a specific subnet for an Azure PaaS service for each cluster"
 }
 
 variable "private_network" {
@@ -46,7 +46,7 @@ variable "clusters_list" {
   type = list(string)
   description = "list of clusters name"
   validation {
-    condition     = can(regex("^[a-zA-Z][a-zA-Z\\-\\_0-9]{1,64}$", var.clusters_list))
+    condition     = length([for c in var.clusters_list : true if can(regex("^[a-zA-Z][a-zA-Z\\-\\_0-9]{1,64}$", c))]) == length(var.clusters_list)
     error_message = "Cluster name must start with letter, only contain letters, numbers, dashes, or underscores."
   }
 }

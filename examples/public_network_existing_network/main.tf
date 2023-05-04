@@ -10,7 +10,6 @@ module "create-network" {
   prefix            = var.prefix
   rg_name           = var.rg_name
   vnet_name         = var.vnet_name
-  subnet_delegation = var.subnet_delegation
   subnets_name_list = var.subnets_name_list
 }
 
@@ -21,7 +20,7 @@ module "deploy-weka" {
   vnet_name             = module.create-network.vnet-name
   subnets               = module.create-network.subnets-name
   sg_id                 = module.create-network.sg-id
-  subnet_delegation_id  = module.create-network.subnet-delegation-id
+  subnet_delegation     = var.subnet_delegation
   get_weka_io_token     = var.get_weka_io_token
   cluster_name          = var.cluster_name
   instance_type         = var.instance_type
