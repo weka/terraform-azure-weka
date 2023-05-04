@@ -44,21 +44,6 @@ resource "azurerm_subnet" "subnet" {
   depends_on           = [data.azurerm_resource_group.rg,azurerm_virtual_network.vnet]
 }
 
-resource "azurerm_subnet" "subnet-delegation" {
-  name                 = "${var.prefix}-subnet-delegation"
-  resource_group_name  = local.vnet_rg
-  virtual_network_name = local.vnet_name
-  address_prefixes     = [var.subnet_delegation]
-
-  delegation {
-    name = "subnet-delegation"
-    service_delegation {
-      name    = "Microsoft.Web/serverFarms"
-      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
-    }
-  }
-}
-
 data "azurerm_subnet" "subnets_data" {
   count                = length(var.subnets_name_list) > 0 ? length(var.subnets_name_list) : 0
   name                 = var.subnets_name_list[count.index]

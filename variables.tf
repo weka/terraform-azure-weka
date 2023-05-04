@@ -69,9 +69,9 @@ variable "sg_id" {
   description = "The security group id."
 }
 
-variable "subnet_delegation_id" {
+variable "subnet_delegation" {
   type = string
-  description = "Subnet delegation id"
+  description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service"
 }
 
 variable "weka_version" {
