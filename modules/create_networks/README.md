@@ -93,6 +93,7 @@ No modules.
 | [azurerm_subnet_route_table_association.rt-association](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet_route_table_association) | resource |
 | [azurerm_virtual_network.vnet](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/virtual_network) | resource |
 | [azurerm_resource_group.rg](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/resource_group) | data source |
+| [azurerm_resource_group.vnet_rg](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/resource_group) | data source |
 | [azurerm_subnet.subnets_data](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/subnet) | data source |
 | [azurerm_virtual_network.vnet_data](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/virtual_network) | data source |
 
@@ -110,6 +111,7 @@ No modules.
 | <a name="input_subnets_name_list"></a> [subnets\_name\_list](#input\_subnets\_name\_list) | A list of subnet names, if exist. | `list(string)` | `[]` | no |
 | <a name="input_tags_map"></a> [tags\_map](#input\_tags\_map) | A map of tags to assign the same metadata to all resources in the environment. Format: key:value. | `map(string)` | <pre>{<br>  "creator": "tf",<br>  "env": "dev"<br>}</pre> | no |
 | <a name="input_vnet_name"></a> [vnet\_name](#input\_vnet\_name) | The VNet name, if exists. | `string` | `null` | no |
+| <a name="input_vnet_rg_name"></a> [vnet\_rg\_name](#input\_vnet\_rg\_name) | Resource group name of vnet | `string` | `null` | no |
 
 ## Outputs
 
@@ -120,4 +122,5 @@ No modules.
 | <a name="output_subnet-delegation-id"></a> [subnet-delegation-id](#output\_subnet-delegation-id) | n/a |
 | <a name="output_subnets-name"></a> [subnets-name](#output\_subnets-name) | Displays the subnet names list. |
 | <a name="output_vnet-name"></a> [vnet-name](#output\_vnet-name) | Displays the VNet name. |
+| <a name="output_vnet_rg_name"></a> [vnet\_rg\_name](#output\_vnet\_rg\_name) | Resource group name of vnet. |
 <!-- END_TF_DOCS -->
