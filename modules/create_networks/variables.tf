@@ -55,3 +55,9 @@ variable "sg_public_ssh_ips" {
   description = "A list of IP addresses that can use ssh connection with a public network deployment."
   default = ["0.0.0.0/0"]
 }
+
+variable "vnet_rg_name" {
+  type = string
+  default = null
+  description = "Resource group name of vnet"
+}

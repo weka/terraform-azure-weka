@@ -19,6 +19,7 @@ module "deploy-weka" {
   prefix                = var.prefix
   rg_name               = var.rg_name
   vnet_name             = module.create-network.vnet-name
+  vnet_rg_name          = module.create-network.vnet_rg_name
   subnets               = module.create-network.subnets-name
   sg_id                 = module.create-network.sg-id
   get_weka_io_token     = var.get_weka_io_token

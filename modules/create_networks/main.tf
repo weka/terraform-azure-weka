@@ -2,10 +2,21 @@ data "azurerm_resource_group" "rg" {
   name  = var.rg_name
 }
 
+data "azurerm_resource_group" "vnet_rg" {
+  count = var.vnet_rg_name != null ? 1 : 0
+  name  = var.vnet_rg_name
+}
+
+locals {
+  vnet_rg          = var.vnet_rg_name == null ? data.azurerm_resource_group.rg.name : var.vnet_rg_name
+  vnet_rg_location = var.vnet_rg_name == null ? data.azurerm_resource_group.rg.location : data.azurerm_resource_group.vnet_rg[0].location
+  vnet_name        = var.vnet_name == null ? azurerm_virtual_network.vnet[0].name : data.azurerm_virtual_network.vnet_data[0].name
+}
+
 resource "azurerm_virtual_network" "vnet" {
   count               = var.vnet_name == null ? 1 : 0
-  resource_group_name = data.azurerm_resource_group.rg.name
-  location            = data.azurerm_resource_group.rg.location
+  resource_group_name = local.vnet_rg
+  location            = local.vnet_rg_location
   name                = "${var.prefix}-vnet"
   address_space       = [var.address_space]
   tags                = merge(var.tags_map)
@@ -15,15 +26,15 @@ resource "azurerm_virtual_network" "vnet" {
 data "azurerm_virtual_network" "vnet_data" {
   count               = var.vnet_name != null  ? 1 : 0
   name                = var.vnet_name
-  resource_group_name = data.azurerm_resource_group.rg.name
+  resource_group_name = local.vnet_rg
 }
 
 resource "azurerm_subnet" "subnet" {
   count                = length(var.subnets_name_list) == 0 ? length(var.subnet_prefixes) : 0
-  resource_group_name  = data.azurerm_resource_group.rg.name
+  resource_group_name  = local.vnet_rg
   name                 = "${var.prefix}-subnet-${count.index}"
   address_prefixes     = [var.subnet_prefixes[count.index]]
-  virtual_network_name = var.vnet_name != null ? data.azurerm_virtual_network.vnet_data[0].name : azurerm_virtual_network.vnet[0].name
+  virtual_network_name = local.vnet_name
   lifecycle {
     ignore_changes = [service_endpoint_policy_ids,service_endpoints]
   }
@@ -32,8 +43,8 @@ resource "azurerm_subnet" "subnet" {
 
 resource "azurerm_subnet" "subnet-delegation" {
   name                 = "${var.prefix}-subnet-delegation"
-  resource_group_name  = var.rg_name
-  virtual_network_name = var.vnet_name != null ? data.azurerm_virtual_network.vnet_data[0].name : azurerm_virtual_network.vnet[0].name
+  resource_group_name  = local.vnet_rg
+  virtual_network_name = local.vnet_name
   address_prefixes     = [var.subnet_delegation]
 
   delegation {
@@ -48,7 +59,7 @@ resource "azurerm_subnet" "subnet-delegation" {
 data "azurerm_subnet" "subnets_data" {
   count                = length(var.subnets_name_list) > 0 ? length(var.subnets_name_list) : 0
   name                 = var.subnets_name_list[count.index]
-  resource_group_name  = data.azurerm_resource_group.rg.name
+  resource_group_name  = local.vnet_rg
   virtual_network_name = var.vnet_name != null ? var.vnet_name : azurerm_virtual_network.vnet[0].name
 }
 
