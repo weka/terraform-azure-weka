@@ -9,6 +9,11 @@ variable "rg_name" {
   description = "A predefined resource group in the Azure subscription."
 }
 
+variable "vnet_rg_name" {
+  type = string
+  description = "Resource group name of vnet"
+}
+
 variable "vm_username" {
   type = string
   description = "The user name for logging in to the virtual machines."

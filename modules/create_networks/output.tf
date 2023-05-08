@@ -21,3 +21,8 @@ output "private-dns-zone-name" {
 output "subnet-delegation-id" {
   value = azurerm_subnet.subnet-delegation.id
 }
+
+output "vnet_rg_name" {
+  value = var.vnet_rg_name == null ? var.rg_name : var.vnet_rg_name
+  description = "Resource group name of vnet."
+}
