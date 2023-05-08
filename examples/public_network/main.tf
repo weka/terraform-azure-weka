@@ -17,6 +17,7 @@ module "deploy-weka" {
   source                = "../.."
   prefix                = var.prefix
   rg_name               = var.rg_name
+  rg_location           = module.create-network.location
   vnet_name             = module.create-network.vnet-name
   subnets               = module.create-network.subnets-name
   sg_id                 = module.create-network.sg-id
