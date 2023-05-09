@@ -10,7 +10,7 @@ module "create-network" {
   prefix            = var.prefix
   rg_name           = var.rg_name
   address_space     = var.address_space
-  subnet_delegation = var.subnet_delegation
+  subnet_prefixes   = var.subnet_prefixes
 }
 
 module "deploy-weka" {
