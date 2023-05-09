@@ -11,6 +11,9 @@ resource "azurerm_lb" "ui_lb" {
     private_ip_address_version    = "IPv4"
   }
   tags               = merge(var.tags_map, {"weka_cluster": var.cluster_name})
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 resource "azurerm_lb_backend_address_pool" "ui_lb_backend_pool" {
@@ -55,6 +58,9 @@ resource "azurerm_lb" "backend-lb" {
     private_ip_address_allocation = "Dynamic"
     private_ip_address_version    = "IPv4"
   }
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 resource "azurerm_lb_backend_address_pool" "lb_backend_pool" {
@@ -94,4 +100,7 @@ resource "azurerm_private_dns_a_record" "dns_a_record_backend_lb" {
   records             = [azurerm_lb.backend-lb.frontend_ip_configuration[0].private_ip_address]
   tags                = merge(var.tags_map, {"weka_cluster": var.cluster_name})
   depends_on          = [azurerm_lb.backend-lb]
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
