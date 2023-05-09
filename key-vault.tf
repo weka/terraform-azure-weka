@@ -14,6 +14,9 @@ resource "azurerm_key_vault" "key_vault" {
   purge_protection_enabled    = false
   sku_name = "standard"
   tags = merge(var.tags_map, {"weka_cluster": var.cluster_name})
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 resource "azurerm_key_vault_access_policy" "function-app-get-secret-permission" {
@@ -53,7 +56,7 @@ resource "azurerm_key_vault_secret" "public-ssh-keys" {
   key_vault_id = azurerm_key_vault.key_vault.id
   tags         = merge(var.tags_map, {"weka_cluster": var.cluster_name})
   lifecycle {
-    ignore_changes  = [value]
+    ignore_changes  = [value,tags]
   }
   depends_on   = [azurerm_key_vault.key_vault, tls_private_key.ssh_key, azurerm_key_vault_access_policy.key_vault_access_policy]
 }
@@ -65,7 +68,7 @@ resource "azurerm_key_vault_secret" "private-ssh-keys" {
   key_vault_id = azurerm_key_vault.key_vault.id
   tags         = merge(var.tags_map, {"weka_cluster": var.cluster_name})
   lifecycle {
-    ignore_changes  = [value]
+    ignore_changes  = [value,tags]
   }
   depends_on   = [azurerm_key_vault.key_vault, tls_private_key.ssh_key, azurerm_key_vault_access_policy.key_vault_access_policy]
 }
@@ -82,6 +85,9 @@ resource "azurerm_key_vault_secret" "function_app_default_key" {
   key_vault_id = azurerm_key_vault.key_vault.id
   tags         = merge(var.tags_map, {"weka_cluster": var.cluster_name})
   depends_on   = [azurerm_key_vault.key_vault, azurerm_key_vault_access_policy.key_vault_access_policy]
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 resource "azurerm_key_vault_secret" "get_weka_io_token" {
@@ -90,6 +96,9 @@ resource "azurerm_key_vault_secret" "get_weka_io_token" {
   key_vault_id = azurerm_key_vault.key_vault.id
   tags         = merge(var.tags_map, {"weka_cluster": var.cluster_name})
   depends_on   = [azurerm_key_vault.key_vault, azurerm_key_vault_access_policy.key_vault_access_policy]
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 resource "random_password" "weka_password" {
@@ -109,7 +118,7 @@ resource "azurerm_key_vault_secret" "weka_password_secret" {
   key_vault_id = azurerm_key_vault.key_vault.id
   tags         = merge(var.tags_map, {"weka_cluster": var.cluster_name})
   lifecycle {
-    ignore_changes = [value]
+    ignore_changes = [value,tags]
   }
   depends_on   = [azurerm_key_vault.key_vault, random_password.weka_password,azurerm_key_vault_access_policy.key_vault_access_policy]
 }

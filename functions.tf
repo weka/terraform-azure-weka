@@ -4,6 +4,9 @@ resource "azurerm_log_analytics_workspace" "la_workspace" {
   resource_group_name = data.azurerm_resource_group.rg.name
   sku                 = "PerGB2018"
   retention_in_days   = 30
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 resource "azurerm_application_insights" "application_insights" {
@@ -12,7 +15,11 @@ resource "azurerm_application_insights" "application_insights" {
   resource_group_name = data.azurerm_resource_group.rg.name
   workspace_id        = azurerm_log_analytics_workspace.la_workspace.id
   application_type    = "web"
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
+
 resource "azurerm_monitor_diagnostic_setting" "insights_diagnostic_setting" {
   name                       = "${var.prefix}-${var.cluster_name}-insights-diagnostic-setting"
   target_resource_id         = azurerm_application_insights.application_insights.id
@@ -56,6 +63,9 @@ resource "azurerm_service_plan" "app_service_plan" {
   location            = data.azurerm_resource_group.rg.location
   os_type             = "Linux"
   sku_name            = "EP2"
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 locals {
@@ -136,6 +146,7 @@ resource "azurerm_linux_function_app" "function_app" {
       condition     = var.function_app_version == local.function_app_code_hash
       error_message = "Please update function app code version."
     }
+    ignore_changes = [tags]
   }
 
   depends_on = [azurerm_storage_account.deployment_sa]

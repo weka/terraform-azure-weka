@@ -74,6 +74,9 @@ resource "azurerm_proximity_placement_group" "ppg" {
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = var.rg_name
   tags                = merge(var.tags_map, {"weka_cluster": var.cluster_name})
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 resource "azurerm_linux_virtual_machine_scale_set" "custom_image_vmss" {
@@ -146,7 +149,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "custom_image_vmss" {
     }
   }
   lifecycle {
-    ignore_changes = [ instances, custom_data ]
+    ignore_changes = [ instances, custom_data, tags ]
   }
   depends_on = [azurerm_lb_backend_address_pool.lb_backend_pool,azurerm_lb_probe.backend_lb_probe,azurerm_proximity_placement_group.ppg, azurerm_lb_rule.backend_lb_rule, azurerm_lb_rule.ui_lb_rule]
 }
@@ -226,7 +229,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "default_image_vmss" {
     }
   }
   lifecycle {
-    ignore_changes = [ instances, custom_data ]
+    ignore_changes = [ instances, custom_data,tags ]
   }
   depends_on = [azurerm_lb_backend_address_pool.lb_backend_pool,azurerm_lb_probe.backend_lb_probe,azurerm_proximity_placement_group.ppg, azurerm_lb_rule.backend_lb_rule, azurerm_lb_rule.ui_lb_rule]
 }

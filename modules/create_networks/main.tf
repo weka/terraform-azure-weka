@@ -21,6 +21,9 @@ resource "azurerm_virtual_network" "vnet" {
   address_space       = [var.address_space]
   tags                = merge(var.tags_map)
   depends_on          = [data.azurerm_resource_group.rg]
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 data "azurerm_virtual_network" "vnet_data" {
@@ -70,6 +73,9 @@ resource "azurerm_route_table" "rt" {
   location                      = data.azurerm_resource_group.rg.location
   disable_bgp_route_propagation = false
   tags                          = merge(var.tags_map)
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 resource "azurerm_subnet_route_table_association" "rt-association" {
@@ -138,6 +144,10 @@ resource "azurerm_network_security_group" "sg" {
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = data.azurerm_resource_group.rg.name
   tags                = merge(var.tags_map)
+
+  lifecycle {
+    ignore_changes = [tags]
+  }
   depends_on          = [data.azurerm_resource_group.rg]
 }
 
@@ -153,6 +163,9 @@ resource "azurerm_private_dns_zone" "dns" {
   name                = "${var.prefix}.private.net"
   resource_group_name = data.azurerm_resource_group.rg.name
   tags                = merge(var.tags_map)
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "dns_vnet_link" {
@@ -161,4 +174,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "dns_vnet_link" {
   private_dns_zone_name = azurerm_private_dns_zone.dns.name
   virtual_network_id    = var.vnet_name != null ? data.azurerm_virtual_network.vnet_data[0].id : azurerm_virtual_network.vnet[0].id
   registration_enabled  = true
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
