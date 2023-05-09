@@ -6,6 +6,9 @@ resource "azurerm_storage_account" "deployment_sa" {
   account_tier             = "Standard"
   account_replication_type = "ZRS"
   tags                     = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 resource "azurerm_storage_container" "deployment" {
