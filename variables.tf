@@ -64,9 +64,9 @@ variable "sg_id" {
   description = "The security group id."
 }
 
-variable "subnet_delegation" {
+variable "subnet_delegation_id" {
   type = string
-  description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service"
+  description = "Subnet delegation id"
 }
 
 variable "weka_version" {
@@ -132,7 +132,7 @@ variable "private_dns_zone_name" {
 variable "ofed_version" {
   type = string
   description = "The OFED driver version to for ubuntu 18."
-  default = "5.9-0.5.6.0"
+  default = "5.6-1.0.3.3"
 }
 
 variable "install_ofed_url" {
@@ -295,7 +295,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type = string
   description = "Function app code version (hash)"
-  default = "d792db07796fc4bf1d5ffa2b15b1992a"
+  default = "ac0022323a159a7f75a8f1dae613dab0"
 }
 
 variable "function_app_dist" {
