@@ -118,7 +118,7 @@ resource "azurerm_linux_function_app" "function_app" {
     "INSTANCE_TYPE" = var.instance_type
     "INSTALL_DPDK" = var.install_cluster_dpdk
     "NICS_NUM" = var.container_number_map[var.instance_type].nics
-    "INSTALL_URL" =  var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.prod.weka.io/dist/v1/install/4.2.1-783b1834d3a44a16f65fe63a58318e88/4.2.1.11403-ae23a095dda862fb0633c8d3674c6e18"
+    "INSTALL_URL" =  var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.prod.weka.io/dist/v1/install/4.2.1-783b1834d3a44a16f65fe63a58318e88/4.2.1.11442-7b94ffd18c5c3936edb94271c49004cf"
     "LOG_LEVEL" = var.function_app_log_level
 
     https_only = true
