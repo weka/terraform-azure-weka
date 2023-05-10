@@ -73,7 +73,7 @@ func leaseContainer(ctx context.Context, subscriptionId, resourceGroupName, stor
 					return
 				}
 				logger.Debug().Msg("lease in use, will retry in 1 sec")
-				time.Sleep(time.Second)
+				time.Sleep(time.Second * 5)
 			} else {
 				logger.Error().Err(err).Send()
 				return
