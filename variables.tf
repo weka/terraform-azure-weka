@@ -64,9 +64,9 @@ variable "sg_id" {
   description = "The security group id."
 }
 
-variable "subnet_delegation_id" {
+variable "subnet_delegation" {
   type = string
-  description = "Subnet delegation id"
+  description = "Subnet delegation range"
 }
 
 variable "weka_version" {
@@ -295,7 +295,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type = string
   description = "Function app code version (hash)"
-  default = "ac0022323a159a7f75a8f1dae613dab0"
+  default = "eaaab89b2f2ec7aae98aa3947c5fe9b4"
 }
 
 variable "function_app_dist" {
