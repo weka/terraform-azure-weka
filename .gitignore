@@ -10,3 +10,4 @@
 weka-deployment
 
 .DS_Store
+.tf-function-app/
