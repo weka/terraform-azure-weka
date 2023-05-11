@@ -8,3 +8,5 @@
 .idea/
 .*/backend.tf
 weka-deployment
+
+.tf-function-app/

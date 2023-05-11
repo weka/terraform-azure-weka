@@ -6,10 +6,10 @@ on:
     types: [published]
   workflow_dispatch:
     inputs:
-      regions:
+      dist:
         required: true
-        description: Azure regions list
-        default: '{"dev"=["eastus"]}'
+        description: Distribution type
+        default: dev
 
 concurrency: ci
 
@@ -33,10 +33,6 @@ jobs:
     name: Function app code distribution
     runs-on: ubuntu-latest
     env:
-      ARM_CLIENT_ID: ${{ secrets.RND_CLIENT_ID }}
-      ARM_CLIENT_SECRET: ${{ secrets.RND_CLIENT_SECRET }}
-      ARM_SUBSCRIPTION_ID: ${{ secrets.RND_SUBSCRIPTION_ID }}
-      ARM_TENANT_ID: ${{ secrets.RND_TENANT_ID }}
       DIST: ${{ github.event_name == 'release' && 'release' || 'dev' }}
     defaults:
       run:
@@ -45,12 +41,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v1
-        with:
-          # add to be able to refer to the output correctly
-          terraform_wrapper: false
 
       - name: Setup Go
         uses: actions/setup-go@v4
@@ -58,26 +48,25 @@ jobs:
           go-version: '1.20'
           cache-dependency-path: function-app/code/go.mod
 
-      - name: Terraform Format
-        run: terraform fmt -check
+      - name: Install Task
+        uses: arduino/setup-task@v1
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+        
+      - name: Authenticate to Azure Cloud
+        uses: azure/login@v1
+        with:
+          # see https://github.com/Azure/login#configure-a-service-principal-with-a-secret
+          creds: ${{ secrets.RND_AZURE_CREDENTIALS }}
 
-      - name: Terraform Init
-        run: terraform init
-
-      - name: Terraform Apply
+      - name: Run create_and_upload_zip
         if: github.event_name != 'workflow_dispatch'
-        run: terraform apply -auto-approve -var='subscription_id=${{ secrets.RND_SUBSCRIPTION_ID }}' -var="dist=$DIST"
+        run: task create_and_upload_zip DIST=$DIST
      
-      - name: Terraform Apply (only selected regions)
+      - name: Run create_and_upload_zip (workflow_dispatch)
         if: github.event_name == 'workflow_dispatch'
-        run: terraform apply -auto-approve -var='subscription_id=${{ secrets.RND_SUBSCRIPTION_ID }}' -var='regions=${{ inputs.regions }}'
-
-      - name: Update Function App Zip Version
-        run: |
-          new_function_app_zip_version=$(terraform output function_app_zip_md5)
-          cd ../../
-          old_function_app_zip_version=$(awk '/Function app code version/{getline;print $NF;}' variables.tf)
-          sed -i "s/$old_function_app_zip_version/$new_function_app_zip_version/" variables.tf
+        run: task create_and_upload_zip DIST=${{ inputs.dist }}
 
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v4
