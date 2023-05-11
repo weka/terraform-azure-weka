@@ -37,32 +37,6 @@ data "azurerm_subnet" "subnets_data" {
   virtual_network_name = var.vnet_name != null ? var.vnet_name : azurerm_virtual_network.vnet[0].name
 }
 
-# =================== Public RT ======================== #
-resource "azurerm_route_table" "rt" {
-  name                          = "${var.prefix}-rt"
-  resource_group_name           = data.azurerm_resource_group.rg.name
-  location                      = data.azurerm_resource_group.rg.location
-  disable_bgp_route_propagation = false
-  tags                          = merge(var.tags_map)
-}
-
-resource "azurerm_subnet_route_table_association" "rt-association" {
-  count          = length(var.subnets_name_list) > 0 ? length(var.subnets_name_list) : length(var.subnet_prefixes)
-  subnet_id      = length(var.subnets_name_list) > 0 ? data.azurerm_subnet.subnets_data[count.index].id : azurerm_subnet.subnet[count.index].id
-  route_table_id = azurerm_route_table.rt.id
-  depends_on     = [azurerm_route_table.rt]
-}
-
-resource "azurerm_route" "public_route" {
-  count               = var.private_network ? 0 : 1
-  resource_group_name = data.azurerm_resource_group.rg.name
-  name                = "${var.prefix}-route"
-  route_table_name    = azurerm_route_table.rt.name
-  address_prefix      = "0.0.0.0/0"
-  next_hop_type       = "Internet"
-  depends_on          = [azurerm_route_table.rt]
-}
-
 # ====================== sg ssh ========================== #
 resource "azurerm_network_security_rule" "sg_public_ssh" {
   count                       = var.private_network ? 0 : length(var.sg_public_ssh_ips)
@@ -93,18 +67,6 @@ resource "azurerm_network_security_rule" "sg_weka_ui" {
   source_address_prefix       = "*"
   destination_address_prefix  = "*"
   network_security_group_name = azurerm_network_security_group.sg.name
-}
-
-
-# ====================== Private RT =========================== #
-resource "azurerm_route" "private-route" {
-  count               = var.private_network ? 1 : 0
-  address_prefix      = var.vnet_name == null ? var.address_space : data.azurerm_virtual_network.vnet_data[count.index].address_space
-  name                = "${var.prefix}-internal-rt"
-  next_hop_type       = "VnetLocal"
-  resource_group_name = data.azurerm_resource_group.rg.name
-  route_table_name    = azurerm_route_table.rt.name
-  depends_on          = [azurerm_route_table.rt]
 }
 
 resource "azurerm_network_security_group" "sg" {
