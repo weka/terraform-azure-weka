@@ -58,8 +58,8 @@ variable "linux_vm_image" {
   description = "The default azure vm image reference."
   default     = {
     publisher = "Canonical"
-    offer     = "UbuntuServer"
-    sku       = "18.04-LTS"
+    offer     = "0001-com-ubuntu-server-focal"
+    sku       = "20_04-lts-gen2"
     version   = "latest"
   }
 }
@@ -137,7 +137,7 @@ variable "private_dns_zone_name" {
 variable "ofed_version" {
   type = string
   description = "The OFED driver version to for ubuntu 18."
-  default = "5.9-0.5.6.0"
+  default = "5.8-1.1.2.1"
 }
 
 variable "install_ofed_url" {
