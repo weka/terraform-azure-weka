@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -70,6 +71,7 @@ func GetDeployScript(
 	driveContainerNum string,
 	installDpdk bool,
 	nicsNum string,
+	gateways []string,
 
 ) (bashScript string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
@@ -107,6 +109,7 @@ func GetDeployScript(
 			WekaToken:            token,
 			InstallDpdk:          installDpdk,
 			NicsNum:              nicsNum,
+			Gateways:             gateways,
 		}
 		deployScriptGenerator := deploy.DeployScriptGenerator{
 			FuncDef:          funcDef,
@@ -202,6 +205,25 @@ func writeResponse(w http.ResponseWriter, outputs, resData map[string]interface{
 	w.Write(responseJson)
 }
 
+func getGateway(subnet string) string {
+	ip, ipNet, _ := net.ParseCIDR(subnet)
+	ip = ip.Mask(ipNet.Mask)
+	for i := len(ip) - 1; i >= 0; i-- {
+		ip[i]++
+		if ip[i] > 0 {
+			break
+		}
+	}
+	return ip.String()
+}
+
+func getGateways(subnets []string) (gateways []string) {
+	for _, subnet := range subnets {
+		gateways = append(gateways, getGateway(subnet))
+	}
+	return
+}
+
 func Handler(w http.ResponseWriter, r *http.Request) {
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
@@ -216,6 +238,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	driveContainerNum := os.Getenv("NUM_DRIVE_CONTAINERS")
 	installDpdk, _ := strconv.ParseBool(os.Getenv("INSTALL_DPDK"))
 	nicsNum := os.Getenv("NICS_NUM")
+	subnets := os.Getenv("SUBNETS")
 
 	instanceType := os.Getenv("INSTANCE_TYPE")
 	installUrl := os.Getenv("INSTALL_URL")
@@ -275,6 +298,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		driveContainerNum,
 		installDpdk,
 		nicsNum,
+		getGateways(strings.Split(subnets, ",")),
 	)
 
 	if err != nil {
