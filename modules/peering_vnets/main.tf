@@ -16,6 +16,9 @@ resource "azurerm_virtual_network_peering" "peering" {
   virtual_network_name         = var.vnet_name
   allow_virtual_network_access = true
   remote_virtual_network_id    = data.azurerm_virtual_network.remote_vnet_ids[count.index].id
+  lifecycle {
+    ignore_changes = [remote_virtual_network_id]
+  }
 }
 
 
@@ -26,4 +29,7 @@ resource "azurerm_virtual_network_peering" "peering2" {
   virtual_network_name      = data.azurerm_virtual_network.remote_vnet_ids[count.index].name
   remote_virtual_network_id = data.azurerm_virtual_network.vnet_id.id
   allow_virtual_network_access = true
+  lifecycle {
+    ignore_changes = [remote_virtual_network_id]
+  }
 }

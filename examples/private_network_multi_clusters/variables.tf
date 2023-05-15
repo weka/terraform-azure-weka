@@ -22,9 +22,9 @@ variable "subnet_prefixes" {
   description = "List of address prefixes to use for the subnet"
 }
 
-variable "subnets_delegation" {
+variable "subnets_delegation_prefixes" {
   type = list(string)
-  description = "List of subnet delegation enables you to designate a specific subnet for an Azure PaaS service for each cluster"
+  description = "List of subnets delegation range to enables designate a specific subnet for an Azure PaaS service"
 }
 
 variable "private_network" {

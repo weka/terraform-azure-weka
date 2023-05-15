@@ -32,9 +32,9 @@ variable "subnets_name_list" {
   description = "Names of existing subnets list"
 }
 
-variable "subnet_delegation" {
-  type = string
-  description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service"
+variable "subnets_delegation_names" {
+  type        = list(string)
+  description = "List of subnet delegation names"
 }
 
 variable "install_weka_url" {

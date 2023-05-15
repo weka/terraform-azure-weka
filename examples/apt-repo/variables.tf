@@ -5,7 +5,7 @@ variable "location" {
 
 variable "prefix" {
   type = string
-  default = "weka"
+  default = "ubuntu20"
 }
 
 variable "address_space" {
