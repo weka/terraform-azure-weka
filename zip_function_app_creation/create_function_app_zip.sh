@@ -35,6 +35,9 @@ echo "Function code built."
 echo "Creating zip archive..."
 
 # Create the zip archive
-zip -r $function_zip_path $function_triggers_path
+old_dir=$(pwd)
+cd $function_triggers_path
+zip -r $function_zip_path *
+cd $old_dir
 
 echo "Zip archive created: $function_zip_path"
