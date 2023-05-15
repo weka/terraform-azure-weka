@@ -143,6 +143,7 @@ resource "azurerm_linux_function_app" "function_app" {
     "NICS_NUM" = var.container_number_map[var.instance_type].nics
     "INSTALL_URL" =  var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.prod.weka.io/dist/v1/install/4.2.1-783b1834d3a44a16f65fe63a58318e88/4.2.1.11442-7b94ffd18c5c3936edb94271c49004cf"
     "LOG_LEVEL" = var.function_app_log_level
+    "SUBNETS" = join("," , data.azurerm_subnet.subnets.*.address_prefix)
 
     https_only               = true
     FUNCTIONS_WORKER_RUNTIME = "custom"
