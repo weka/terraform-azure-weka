@@ -161,6 +161,8 @@ func GetDeployScript(
 			IPs:            ips,
 			InstallDpdk:    installDpdk,
 			InstanceParams: instanceParams,
+			Gateways:       gateways,
+			Subnets:        subnets,
 		}
 
 		scriptBase := `
