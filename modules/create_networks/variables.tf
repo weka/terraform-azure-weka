@@ -56,3 +56,9 @@ variable "vnet_rg_name" {
   default = null
   description = "Resource group name of vnet"
 }
+
+variable "create_private_dns_zone" {
+  type = bool
+  default = true
+  description = "Should create private dns zone"
+}
