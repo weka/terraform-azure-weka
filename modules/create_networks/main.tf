@@ -1,5 +1,5 @@
 data "azurerm_resource_group" "rg" {
-  name  = var.rg_name
+  name = var.rg_name
 }
 
 data "azurerm_resource_group" "vnet_rg" {
@@ -39,9 +39,9 @@ resource "azurerm_subnet" "subnet" {
   address_prefixes     = [var.subnet_prefixes[count.index]]
   virtual_network_name = local.vnet_name
   lifecycle {
-    ignore_changes = [service_endpoint_policy_ids,service_endpoints]
+    ignore_changes = [service_endpoint_policy_ids, service_endpoints]
   }
-  depends_on           = [data.azurerm_resource_group.rg,azurerm_virtual_network.vnet]
+  depends_on = [data.azurerm_resource_group.rg, azurerm_virtual_network.vnet]
 }
 
 data "azurerm_subnet" "subnets_data" {
@@ -92,7 +92,7 @@ resource "azurerm_network_security_group" "sg" {
   lifecycle {
     ignore_changes = [tags]
   }
-  depends_on          = [data.azurerm_resource_group.rg]
+  depends_on = [data.azurerm_resource_group.rg]
 }
 
 resource "azurerm_subnet_network_security_group_association" "sg-association" {
@@ -104,6 +104,7 @@ resource "azurerm_subnet_network_security_group_association" "sg-association" {
 
 # ================== Private DNS ========================= #
 resource "azurerm_private_dns_zone" "dns" {
+  count               = var.create_private_dns_zone ? 1 : 0
   name                = "${var.prefix}.private.net"
   resource_group_name = data.azurerm_resource_group.rg.name
   tags                = merge(var.tags_map)
@@ -113,9 +114,10 @@ resource "azurerm_private_dns_zone" "dns" {
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "dns_vnet_link" {
+  count                 = var.create_private_dns_zone ? 1 : 0
   name                  = "${var.prefix}-private-network-link"
   resource_group_name   = data.azurerm_resource_group.rg.name
-  private_dns_zone_name = azurerm_private_dns_zone.dns.name
+  private_dns_zone_name = azurerm_private_dns_zone.dns[0].name
   virtual_network_id    = var.vnet_name != null ? data.azurerm_virtual_network.vnet_data[0].id : azurerm_virtual_network.vnet[0].id
   registration_enabled  = true
   lifecycle {

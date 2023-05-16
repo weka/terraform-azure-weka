@@ -132,6 +132,7 @@ variable "apt_repo_url" {
 variable "private_dns_zone_name" {
   type = string
   description = "The private DNS zone name."
+  default = null
 }
 
 variable "ofed_version" {
