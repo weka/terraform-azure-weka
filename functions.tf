@@ -1,5 +1,5 @@
 resource "azurerm_log_analytics_workspace" "la_workspace" {
-  name                = "${var.prefix}-${var.cluster_name}-workspace"
+  name                = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-workspace"
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = data.azurerm_resource_group.rg.name
   sku                 = "PerGB2018"
