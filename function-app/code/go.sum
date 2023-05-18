@@ -61,6 +61,8 @@ github.com/weka/go-cloud-lib v0.0.0-20230515122449-0411cbd293e1 h1:wpsYxU5OeENfw
 github.com/weka/go-cloud-lib v0.0.0-20230515122449-0411cbd293e1/go.mod h1:lT0kVeV0d4HznnITUHbHN6JunpqyL4q9McAYr78YNm4=
 github.com/weka/go-cloud-lib v0.0.0-20230518140450-a43b047b4369 h1:VRjWVqxzXQ6Jb7hpdnDciGbBoBmjijGzATbKrGvyCu0=
 github.com/weka/go-cloud-lib v0.0.0-20230518140450-a43b047b4369/go.mod h1:lT0kVeV0d4HznnITUHbHN6JunpqyL4q9McAYr78YNm4=
+github.com/weka/go-cloud-lib v0.0.0-20230518184948-b5568512d744 h1:9iUAczo3EtBaA22xrJJK9hHgd/JFPk6wpUXVrS15k5c=
+github.com/weka/go-cloud-lib v0.0.0-20230518184948-b5568512d744/go.mod h1:lT0kVeV0d4HznnITUHbHN6JunpqyL4q9McAYr78YNm4=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.6.0 h1:qfktjS5LUO+fFKeJXZ+ikTRijMmljikvG68fpMMruSc=
 golang.org/x/crypto v0.6.0/go.mod h1:OFC/31mSvZgRz0V1QTNCzfAI1aIRzbiufJtkMIlEp58=
