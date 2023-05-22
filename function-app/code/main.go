@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"os"
+	"time"
 	"weka-deployment/functions/clusterize"
 	"weka-deployment/functions/clusterize_finalization"
 	"weka-deployment/functions/debug"
@@ -18,6 +21,9 @@ import (
 	"weka-deployment/functions/terminate"
 	"weka-deployment/functions/transient"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/rs/zerolog/hlog"
 	"github.com/weka/go-cloud-lib/logging"
 )
 
@@ -29,26 +35,62 @@ func init() {
 	logger = logging.NewLogger()
 }
 
+func InitRouter(ctx context.Context) chi.Router {
+	r := chi.NewRouter()
+	useMiddlewares(r)
+	return r
+}
+
+func useMiddlewares(r chi.Router) {
+	r.Use(hlog.NewHandler(*logger.Logger))
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(hlog.AccessHandler(func(r *http.Request, status, size int, duration time.Duration) {
+		hlog.FromRequest(r).Info().
+			Str("method", r.Method).
+			Stringer("url", r.URL).
+			Int("status", status).
+			Int("size", size).
+			Dur("duration", duration).
+			Send()
+	}))
+	r.Use(logging.FuncNameHandler("function"))
+	r.Use(hlog.RequestIDHandler("req_id", "Request-Id"))
+	r.Use(middleware.Recoverer)
+}
+
 func main() {
-	customHandlerPort, exists := os.LookupEnv("FUNCTIONS_CUSTOMHANDLER_PORT")
+	ctx := context.Background()
+
+	r := InitRouter(ctx)
+	r.Post("/clusterize", clusterize.Handler)
+	r.Post("/deploy", deploy.Handler)
+	r.Post("/clusterize_finalization", clusterize_finalization.Handler)
+	r.Post("/status", status.Handler)
+	r.Post("/debug", debug.Handler)
+	r.Post("/scale_up", scale_up.Handler)
+	r.Post("/fetch", fetch.Handler)
+	r.Post("/join_finalization", join_finalization.Handler)
+	r.Post("/scale_down", scale_down.Handler)
+	r.Post("/terminate", terminate.Handler)
+	r.Post("/transient", transient.Handler)
+	r.Post("/resize", resize.Handler)
+	r.Post("/report", report.Handler)
+	r.Post("/protect", protect.Handler)
+
+	host, exists := os.LookupEnv("HTTP_SERVER_HOST")
 	if !exists {
-		customHandlerPort = "8080"
+		host = "localhost"
+		os.Setenv("HTTP_SERVER_HOST", host)
 	}
-	mux := http.NewServeMux()
-	mux.Handle("/clusterize", logging.LoggingMiddleware(clusterize.Handler))
-	mux.Handle("/clusterize_finalization", logging.LoggingMiddleware(clusterize_finalization.Handler))
-	mux.Handle("/status", logging.LoggingMiddleware(status.Handler))
-	mux.Handle("/debug", logging.LoggingMiddleware(debug.Handler))
-	mux.Handle("/scale_up", logging.LoggingMiddleware(scale_up.Handler))
-	mux.Handle("/fetch", logging.LoggingMiddleware(fetch.Handler))
-	mux.Handle("/deploy", logging.LoggingMiddleware(deploy.Handler))
-	mux.Handle("/join_finalization", logging.LoggingMiddleware(join_finalization.Handler))
-	mux.Handle("/scale_down", logging.LoggingMiddleware(scale_down.Handler))
-	mux.Handle("/terminate", logging.LoggingMiddleware(terminate.Handler))
-	mux.Handle("/transient", logging.LoggingMiddleware(transient.Handler))
-	mux.Handle("/resize", logging.LoggingMiddleware(resize.Handler))
-	mux.Handle("/report", logging.LoggingMiddleware(report.Handler))
-	mux.Handle("/protect", logging.LoggingMiddleware(protect.Handler))
-	logger.Info().Msgf("Go server Listening on: %v", customHandlerPort)
-	logger.Fatal().Err(http.ListenAndServe(":"+customHandlerPort, mux)).Send()
+	port, exists := os.LookupEnv("HTTP_SERVER_PORT")
+	if !exists {
+		port = "8080"
+		os.Setenv("HTTP_SERVER_PORT", port)
+	}
+	logger.Info().Msgf("Go server Listening on: %v", port)
+	err := http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), r)
+	if err != nil {
+		logger.Fatal().Err(err).Send()
+	}
 }

@@ -82,13 +82,7 @@ func GetDeployScript(
 		return
 	}
 
-	// create Function Definer
-	functionKey, err := getFunctionKey(ctx, keyVaultUri)
-	if err != nil {
-		return
-	}
-	baseFunctionUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/", prefix, clusterName)
-	funcDef := azure_functions_def.NewFuncDef(baseFunctionUrl, functionKey)
+	funcDef := azure_functions_def.NewFuncDef()
 
 	// used for getting failure domain
 	getHashedIpCommand := bash_functions.GetHashedPrivateIpBashCmd()

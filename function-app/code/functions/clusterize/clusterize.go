@@ -125,12 +125,6 @@ func HandleLastClusterVm(ctx context.Context, state common.ClusterState, p Clust
 		}
 	}
 
-	functionAppKey, err := common.GetKeyVaultValue(ctx, p.KeyVaultUri, "function-app-default-key")
-	if err != nil {
-		clusterizeScript = GetErrorScript(err)
-		return
-	}
-
 	wekaPassword, err := common.GetWekaClusterPassword(ctx, p.KeyVaultUri)
 	if err != nil {
 		clusterizeScript = GetErrorScript(err)
@@ -163,8 +157,7 @@ func HandleLastClusterVm(ctx context.Context, state common.ClusterState, p Clust
 	clusterParams.WekaUsername = "admin"
 	clusterParams.InstallDpdk = p.InstallDpdk
 
-	baseFunctionUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/", p.Prefix, p.Cluster.ClusterName)
-	funcDef := azure_functions_def.NewFuncDef(baseFunctionUrl, functionAppKey)
+	funcDef := azure_functions_def.NewFuncDef()
 
 	scriptGenerator := clusterize.ClusterizeScriptGenerator{
 		Params:  clusterParams,
@@ -251,6 +244,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	err := d.Decode(&invokeRequest)
 	if err != nil {
 		logger.Error().Msg("Bad request")
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -258,6 +252,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
 	if err != nil {
 		logger.Error().Msg("Bad request")
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -265,6 +260,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	if json.Unmarshal([]byte(reqData["Body"].(string)), &data) != nil {
 		logger.Error().Msg("Bad request")
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
