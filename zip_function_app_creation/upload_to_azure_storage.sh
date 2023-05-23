@@ -1,17 +1,17 @@
 #!/bin/bash
 
 # Usage:
-# upload_to_azure_storage.sh <zip_file_path> <resource_group> <storage_account_name> <container_name> [<blob_name>]
+# upload_to_azure_storage.sh <file_path> <resource_group> <storage_account_name> <container_name> [<blob_name>]
 
 set -e
 
-zip_file_path="$1"
+file_path="$1"
 resource_group="$2"
 storage_account_name="$3"
 container_name="$4"
-blob_name="${5:-$(basename "$zip_file_path")}"
+blob_name="${5:-$(basename "$file_path")}"
 
-echo "Uploading $zip_file_path to $storage_account_name/$container_name as $blob_name..."
+echo "Uploading $file_path to $storage_account_name/$container_name as $blob_name..."
 
 # Get the storage account key using the Azure CLI
 storage_account_key=$(az storage account keys list --resource-group "$resource_group" --account-name "$storage_account_name" --query '[0].value' --output tsv)
@@ -23,7 +23,7 @@ az storage blob upload \
     --container-name "$container_name" \
     --type block \
     --name "$blob_name" \
-    --file "$zip_file_path" \
+    --file "$file_path" \
     --overwrite
 
 echo "Upload complete."
