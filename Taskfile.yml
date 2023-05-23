@@ -1,9 +1,11 @@
 version: '3'
 
 env:
-  DIST: '{{.DIST | default "dev"}}'
   FUNCTION_CODE_PATH: '{{.TASKFILE_DIR}}/function-app/code'
-  FUNCTION_ZIP_DIR: '{{.TASKFILE_DIR}}/.tf-function-app'
+  FUNCTION_BINS_DIR: '{{.TASKFILE_DIR}}/.tf-function-app'
+  AZ_RESOURCE_GROUP: '{{.AZ_RESOURCE_GROUP | default "assaf"}}'
+  AZ_STORAGE_ACCOUNT: '{{.AZ_STORAGE_ACCOUNT | default "wekamanagement"}}'
+  AZ_CONTAINER_NAME: '{{.AZ_CONTAINER_NAME | default "binaries"}}'
 
 tasks:
   get_function_app_hash:
@@ -11,29 +13,25 @@ tasks:
       - ./zip_function_app_creation/get_function_app_hash.sh {{OS}} ${FUNCTION_CODE_PATH}
     silent: true
   
-  create_function_app_zip:
+  create_function_binarie:
     cmds:
-      - ./zip_function_app_creation/create_function_app_zip.sh {{OS}} ${FUNCTION_CODE_PATH} ${FUNCTION_ZIP_DIR}
-    desc: Generate function app zip
+      - ./zip_function_app_creation/create_function_binarie.sh {{OS}} ${FUNCTION_CODE_PATH} ${FUNCTION_BINS_DIR}
+    desc: Generate function app binarie
 
-  upload_to_storage_accounts:
+  upload_to_storage_account:
     env:
-      RESOURCE_GROUP: weka-tf-functions
       REGIONS_FILE_DIR: '{{.TASKFILE_DIR}}/supported_regions' # File containing list of supported Azure regions
-    deps: [create_function_app_zip]
+    deps: [create_function_binarie]
     cmds:
-      - ./zip_function_app_creation/upload_to_storage_accounts.sh ${REGIONS_FILE_DIR} ${DIST} {{OS}} ${FUNCTION_CODE_PATH} ${FUNCTION_ZIP_DIR} ${RESOURCE_GROUP}
-    desc: Upload zip to multiple Azure Storage accounts
+      - ./zip_function_app_creation/upload_to_single_sa.sh {{OS}} ${FUNCTION_CODE_PATH} ${FUNCTION_BINS_DIR} ${AZ_RESOURCE_GROUP} ${AZ_STORAGE_ACCOUNT} ${AZ_CONTAINER_NAME}
+    desc: Upload bin to multiple Azure Storage accounts
 
   write_function_hash_to_variables:
     cmds:
       - ./zip_function_app_creation/write_function_hash_to_variables.sh {{OS}} ${FUNCTION_CODE_PATH}
 
-  create_and_upload_zip:
-    preconditions:
-      - sh: "[ $DIST == 'dev' ] || [ $DIST == 'release' ]"
-        msg: "Valid value for DIST is one of the following: dev, release."
-    deps: [upload_to_storage_accounts, write_function_hash_to_variables]
+  create_and_upload_bin:
+    deps: [upload_to_storage_account, write_function_hash_to_variables]
     cmds:
-      - echo "Ran distribution for $DIST"
-    desc: Generate function app zip and upload to Azure Storage accounts
+      - echo "Function app upload is complete"
+    desc: Generate function app bin and upload to Azure Storage accounts
