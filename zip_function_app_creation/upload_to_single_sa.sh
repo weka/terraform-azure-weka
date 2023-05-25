@@ -17,4 +17,4 @@ file_path="$function_binaries_dir/${function_app_code_hash}/weka-deployment"
 az_filename="${function_app_code_hash}/weka-deployment"
 
 echo "Uploading to Storage Account: $storage_account"
-./zip_function_app_creation/upload_to_azure_storage.sh $file_path $resource_group $storage_account $container_name $az_filename
+${current_script_dir}/upload_to_azure_storage.sh $file_path $resource_group $storage_account $container_name $az_filename

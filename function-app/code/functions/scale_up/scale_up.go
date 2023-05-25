@@ -9,7 +9,6 @@ import (
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
 
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
@@ -38,10 +37,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
+	responseJson, _ := json.Marshal(resData)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(responseJson)

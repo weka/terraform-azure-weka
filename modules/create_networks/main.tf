@@ -38,6 +38,10 @@ resource "azurerm_subnet" "subnet" {
   name                 = "${var.prefix}-subnet-${count.index}"
   address_prefixes     = [var.subnet_prefixes[count.index]]
   virtual_network_name = local.vnet_name
+
+  private_endpoint_network_policies_enabled = true
+  service_endpoints    = ["Microsoft.Storage"]
+  
   lifecycle {
     ignore_changes = [service_endpoint_policy_ids, service_endpoints]
   }
@@ -79,6 +83,20 @@ resource "azurerm_network_security_rule" "sg_weka_ui" {
   source_port_range           = "*"
   destination_port_range      = "14000"
   source_address_prefix       = "*"
+  destination_address_prefix  = "*"
+  network_security_group_name = azurerm_network_security_group.sg.name
+}
+
+resource "azurerm_network_security_rule" "sg_port8080" {
+  name                        = "${var.prefix}-port8080-sg"
+  resource_group_name         = data.azurerm_resource_group.rg.name
+  priority                    = "900"
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "8080"
+  source_address_prefixes     = [var.address_space]
   destination_address_prefix  = "*"
   network_security_group_name = azurerm_network_security_group.sg.name
 }

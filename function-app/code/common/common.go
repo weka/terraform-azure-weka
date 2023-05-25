@@ -23,17 +23,6 @@ import (
 	"github.com/weka/go-cloud-lib/protocol"
 )
 
-type InvokeRequest struct {
-	Data     map[string]json.RawMessage
-	Metadata map[string]interface{}
-}
-
-type InvokeResponse struct {
-	Outputs     map[string]interface{}
-	Logs        []string
-	ReturnValue interface{}
-}
-
 type ClusterState struct {
 	InitialSize int                 `json:"initial_size"`
 	DesiredSize int                 `json:"desired_size"`

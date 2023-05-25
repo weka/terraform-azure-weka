@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/weka/go-cloud-lib/logging"
 	"net/http"
 	"os"
 	"time"
 	"weka-deployment/common"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/weka/go-cloud-lib/logging"
 )
 
 const BlobPermissionsErrorCode = "AuthorizationPermissionMismatch"
@@ -45,7 +46,6 @@ func UpdateStateReportingWithRetry(ctx context.Context, subscriptionId, resource
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
 
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
@@ -56,35 +56,17 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
 
-	var invokeRequest common.InvokeRequest
-
 	var report common.Report
 
-	if err := json.NewDecoder(r.Body).Decode(&invokeRequest); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&report); err != nil {
 		err = fmt.Errorf("cannot decode the request: %v", err)
 		logger.Error().Err(err).Send()
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	var reqData map[string]interface{}
-	err := json.Unmarshal(invokeRequest.Data["req"], &reqData)
-	if err != nil {
-		err = fmt.Errorf("cannot unmarshal the request data: %v", err)
-		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	if json.Unmarshal([]byte(reqData["Body"].(string)), &report) != nil {
-		err = fmt.Errorf("cannot unmarshal the request body: %v", err)
-		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
 	logger.Info().Msgf("Updating state %s with %s", report.Type, report.Message)
-	err = common.UpdateStateReporting(ctx, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, report)
+	err := common.UpdateStateReporting(ctx, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, report)
 
 	// Sometimes when we create a resource group and immediately run weka terraform deployment, the function-app
 	// permissions are not fully ready when we invoke this endpoint. It results in a blob read permissions issue.
@@ -104,14 +86,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		resData["body"] = err.Error()
 	} else {
-		resData["body"] = fmt.Sprintf("The report was added successfully")
+		resData["body"] = "The report was added successfully"
 	}
 
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
+	responseJson, _ := json.Marshal(resData)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(responseJson)
 }

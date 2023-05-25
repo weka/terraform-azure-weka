@@ -1,11 +1,11 @@
 #!/bin/bash
 set -ex
 
-curl -i ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running init script\"}"
+curl -i ${report_url} -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running init script\"}"
 
 handle_error () {
   if [ "$1" -ne 0 ]; then
-    curl -i ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"${2}\"}"
+    curl -i ${report_url} -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"${2}\"}"
     exit 1
   fi
 }
@@ -26,7 +26,7 @@ mkdir -p $INSTALLATION_PATH
 
 # install ofed
 if [[ ${install_ofed} == true ]]; then
-  curl -i ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"installing ofed\"}"
+  curl -i ${report_url} -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"installing ofed\"}"
   OFED_NAME=ofed-${ofed_version}
   if [[ "${install_ofed_url}" ]]; then
     wget ${install_ofed_url} -O $INSTALLATION_PATH/$OFED_NAME.tgz
@@ -39,7 +39,7 @@ if [[ ${install_ofed} == true ]]; then
   ./mlnxofedinstall --without-fw-update --add-kernel-support --force 2>&1 | tee /tmp/weka_ofed_installation
   /etc/init.d/openibd restart
 
-  curl -i ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"ofed installation completed\"}"
+  curl -i ${report_url} -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"ofed installation completed\"}"
 fi
 
 for(( i=0; i<${nics_num}; i++ )); do
@@ -100,6 +100,6 @@ rm -rf $INSTALLATION_PATH
 
 compute_name=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" | jq '.compute.name')
 compute_name=$(echo "$compute_name" | cut -c2- | rev | cut -c2- | rev)
-curl ${deploy_url}?code="${function_app_default_key}" --fail -H "Content-Type:application/json" -d "{\"vm\": \"$compute_name:$HOSTNAME\"}" > /tmp/deploy.sh
+curl ${deploy_url} --fail -H "Content-Type:application/json" -d "{\"vm\": \"$compute_name:$HOSTNAME\"}" > /tmp/deploy.sh
 chmod +x /tmp/deploy.sh
 /tmp/deploy.sh 2>&1 | tee /tmp/weka_deploy.log
