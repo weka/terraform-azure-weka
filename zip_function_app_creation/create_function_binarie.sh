@@ -27,4 +27,5 @@ cd $function_code_path
 # Build the function app
 GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $function_binarie_dir
 
+cd $current_script_dir
 echo "Function code built."

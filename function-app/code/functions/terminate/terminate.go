@@ -274,28 +274,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
 
-	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
-	var invokeRequest common.InvokeRequest
-
-	d := json.NewDecoder(r.Body)
-	err := d.Decode(&invokeRequest)
-	if err != nil {
-		logger.Error().Msg("Bad request")
-		return
-	}
-
-	var reqData map[string]interface{}
-	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
-	if err != nil {
-		logger.Error().Msg("Bad request")
-		return
-	}
 
 	var scaleResponse protocol.ScaleResponse
-
-	if json.Unmarshal([]byte(reqData["Body"].(string)), &scaleResponse) != nil {
-		logger.Error().Msgf("Failed to parse scaleResponse:%s", reqData["Body"].(string))
+	err := json.NewDecoder(r.Body).Decode(&scaleResponse)
+	if err != nil {
+		logger.Error().Msg("Bad request")
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -305,10 +290,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		resData["body"] = terminateResponse
 	}
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
 
-	responseJson, _ := json.Marshal(invokeResponse)
+	responseJson, _ := json.Marshal(resData)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(responseJson)

@@ -36,41 +36,23 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
 
-	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
 
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
-
-	var invokeRequest common.InvokeRequest
 
 	var function struct {
 		Function *string `json:"function"`
 		IpIndex  *string `json:"ip_index"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&invokeRequest); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&function); err != nil {
 		err = fmt.Errorf("cannot decode the request: %v", err)
 		logger.Error().Err(err).Send()
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	var reqData map[string]interface{}
-	err := json.Unmarshal(invokeRequest.Data["req"], &reqData)
-	if err != nil {
-		err = fmt.Errorf("cannot unmarshal the request data: %v", err)
-		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	if json.Unmarshal([]byte(reqData["Body"].(string)), &function) != nil {
-		err = fmt.Errorf("cannot unmarshal the request body: %v", err)
-		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
 	if function.Function == nil {
 		err := fmt.Errorf("wrong request format. 'function' is required")
 		logger.Error().Err(err).Send()
@@ -147,10 +129,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resData["body"] = result
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
+	responseJson, _ := json.Marshal(resData)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(responseJson)

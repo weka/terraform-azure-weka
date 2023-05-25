@@ -4,14 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/weka/go-cloud-lib/logging"
 	"net/http"
 	"os"
 	"weka-deployment/common"
+
+	"github.com/weka/go-cloud-lib/logging"
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
 
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
@@ -24,34 +24,17 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
 
-	var invokeRequest common.InvokeRequest
-
 	var size struct {
 		Value *int `json:"value"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&invokeRequest); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&size); err != nil {
 		err = fmt.Errorf("cannot decode the request: %v", err)
 		logger.Error().Err(err).Send()
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	var reqData map[string]interface{}
-	err := json.Unmarshal(invokeRequest.Data["req"], &reqData)
-	if err != nil {
-		err = fmt.Errorf("cannot unmarshal the request data: %v", err)
-		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	if json.Unmarshal([]byte(reqData["Body"].(string)), &size) != nil {
-		err = fmt.Errorf("cannot unmarshal the request body: %v", err)
-		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
 	if size.Value == nil {
 		err := fmt.Errorf("wrong request format. 'new_size' is required")
 		logger.Error().Err(err).Send()
@@ -60,6 +43,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logger.Info().Msgf("The requested new size is %d", *size.Value)
+
+	var err error
 
 	minCusterSize := 6
 	if *size.Value < minCusterSize {
@@ -78,10 +63,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		resData["body"] = fmt.Sprintf("New cluster size: %d", *size.Value)
 	}
 
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
+	responseJson, _ := json.Marshal(resData)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(responseJson)

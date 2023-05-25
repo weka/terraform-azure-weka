@@ -23,31 +23,16 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	prefix := os.Getenv("PREFIX")
 	clusterName := os.Getenv("CLUSTER_NAME")
 
-	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
-	var invokeRequest common.InvokeRequest
 
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
 
-	d := json.NewDecoder(r.Body)
-	err := d.Decode(&invokeRequest)
-	if err != nil {
-		logger.Error().Msg("Bad request")
-		return
-	}
-
-	var reqData map[string]interface{}
-	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
-	if err != nil {
-		logger.Error().Msg("Bad request")
-		return
-	}
-
 	var data RequestBody
-
-	if json.Unmarshal([]byte(reqData["Body"].(string)), &data) != nil {
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
 		logger.Error().Msg("Bad request")
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -67,11 +52,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		resData["body"] = "protection was set successfully"
 	}
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
 
-	responseJson, _ := json.Marshal(invokeResponse)
-
+	responseJson, _ := json.Marshal(resData)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(responseJson)
 }

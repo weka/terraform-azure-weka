@@ -5,29 +5,30 @@ locals {
   path_ssh_keys     = var.ssh_public_key == null ? "${local.ssh_path}-public-key.pub \n ${local.ssh_path}-private-key.pem" : "${var.ssh_private_key} \n ${var.ssh_public_key}"
 }
 output "cluster_helpers_commands" {
-  value = <<EOT
+  value       = <<EOT
+######################################## Connect to management machine ###################################################################
+ssh -i ${local.path_ssh_private_key} ${var.vm_username}@${local.mngmt_vm_public_ip}
+
 ########################################## Get clusterization status #####################################################################
-function_key=$(az functionapp keys list --name ${azurerm_linux_function_app.function_app.name} --resource-group ${data.azurerm_resource_group.rg.name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
-curl --fail https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/status?code=$function_key -H "Content-Type:application/json" -d '{"type": "progress"}'
+curl --fail ${local.mngmt_vm_private_ip}/status -H "Content-Type:application/json" -d '{"type": "progress"}'
 
 ########################################## Get cluster status ############################################################################
-function_key=$(az functionapp keys list --name ${azurerm_linux_function_app.function_app.name} --resource-group ${data.azurerm_resource_group.rg.name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
-curl --fail https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/status?code=$function_key
+curl --fail ${local.mngmt_vm_private_ip}/status
 
 ######################################### Fetch weka cluster password ####################################################################
 az keyvault secret show --vault-name ${azurerm_key_vault.key_vault.name} --name weka-password | jq .value
 
 ${local.blob_commands}
 ############################################## Path to ssh keys  ##########################################################################
-${local.path_ssh_keys}
+${local.path_ssh_private_key}
+${local.path_ssh_public_key}
 
 ################################################ Vms ips ##################################################################################
 ${local.vm_ips}
 username: ${var.vm_username}
 
 ########################################## Resize cluster #################################################################################
-function_key=$(az functionapp keys list --name ${azurerm_linux_function_app.function_app.name} --resource-group ${data.azurerm_resource_group.rg.name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
-curl --fail https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/resize?code=$function_key -H "Content-Type:application/json" -d '{"value":ENTER_NEW_VALUE_HERE}'
+curl --fail ${local.mngmt_vm_private_ip}/resize -H "Content-Type:application/json" -d '{"value":ENTER_NEW_VALUE_HERE}'
 EOT
   description = "Useful commands and script to interact with weka cluster"
 }

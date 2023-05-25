@@ -4,15 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/weka/go-cloud-lib/connectors"
-	"github.com/weka/go-cloud-lib/lib/jrpc"
-	"github.com/weka/go-cloud-lib/lib/weka"
-	"github.com/weka/go-cloud-lib/logging"
 	"math/rand"
 	"net/http"
 	"os"
 	"time"
 	"weka-deployment/common"
+
+	"github.com/weka/go-cloud-lib/connectors"
+	"github.com/weka/go-cloud-lib/lib/jrpc"
+	"github.com/weka/go-cloud-lib/lib/weka"
+	"github.com/weka/go-cloud-lib/logging"
 )
 
 type ClusterStatus struct {
@@ -155,7 +156,6 @@ func GetClusterStatus(ctx context.Context, subscriptionId, resourceGroupName, vm
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
 
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
@@ -169,31 +169,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
 
-	var invokeRequest common.InvokeRequest
-
 	var requestBody struct {
 		Type string `json:"type"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&invokeRequest); err != nil {
-		err = fmt.Errorf("cannot decode the request: %v", err)
-		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	var reqData map[string]interface{}
-	err := json.Unmarshal(invokeRequest.Data["req"], &reqData)
-	if err != nil {
-		err = fmt.Errorf("cannot unmarshal the request data: %v", err)
-		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	if reqData["Body"] != nil {
-		if json.Unmarshal([]byte(reqData["Body"].(string)), &requestBody) != nil {
-			err = fmt.Errorf("cannot unmarshal the request body: %v", err)
+	if r.Body != nil {
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			err = fmt.Errorf("cannot decode the request: %v", err)
 			logger.Error().Err(err).Send()
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -201,6 +183,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName)
+	var err error
 	var result interface{}
 	if requestBody.Type == "" || requestBody.Type == "status" {
 		result, err = GetClusterStatus(ctx, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, keyVaultUri)
@@ -213,13 +196,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		resData["body"] = err.Error()
 	} else {
-
 		resData["body"] = result
 	}
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
 
-	responseJson, _ := json.Marshal(invokeResponse)
+	responseJson, _ := json.Marshal(resData)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(responseJson)

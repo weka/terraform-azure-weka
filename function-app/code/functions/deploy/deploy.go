@@ -48,11 +48,6 @@ func getWekaIoToken(ctx context.Context, keyVaultUri string) (token string, err 
 	return
 }
 
-func getFunctionKey(ctx context.Context, keyVaultUri string) (functionAppKey string, err error) {
-	functionAppKey, err = common.GetKeyVaultValue(ctx, keyVaultUri, "function-app-default-key")
-	return
-}
-
 func GetDeployScript(
 	ctx context.Context,
 	subscriptionId,
@@ -186,15 +181,12 @@ type RequestBody struct {
 	Vm string `json:"vm"`
 }
 
-func writeResponse(w http.ResponseWriter, outputs, resData map[string]interface{}, err error) {
+func writeResponse(w http.ResponseWriter, resData map[string]interface{}, err error) {
 	if err != nil {
 		resData["body"] = err.Error()
 	}
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
 
-	responseJson, _ := json.Marshal(invokeResponse)
-
+	responseJson, _ := json.Marshal(resData)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(responseJson)
 }
@@ -240,40 +232,18 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	instanceType := os.Getenv("INSTANCE_TYPE")
 	installUrl := os.Getenv("INSTALL_URL")
 
-	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
-	var invokeRequest common.InvokeRequest
 
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
 
-	d := json.NewDecoder(r.Body)
-	err := d.Decode(&invokeRequest)
+	var data RequestBody
+	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
 		err = fmt.Errorf("cannot decode the request: %v", err)
 		logger.Error().Err(err).Send()
 		w.WriteHeader(http.StatusBadRequest)
-		writeResponse(w, outputs, resData, err)
-		return
-	}
-
-	var reqData map[string]interface{}
-	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
-	if err != nil {
-		err = fmt.Errorf("cannot unmarshal the request data: %v", err)
-		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
-		writeResponse(w, outputs, resData, err)
-		return
-	}
-
-	var data RequestBody
-
-	if json.Unmarshal([]byte(reqData["Body"].(string)), &data) != nil {
-		err = fmt.Errorf("cannot unmarshal the request body: %v", err)
-		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
-		writeResponse(w, outputs, resData, err)
+		writeResponse(w, resData, err)
 		return
 	}
 
@@ -303,5 +273,5 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		resData["body"] = bashScript
 	}
-	writeResponse(w, outputs, resData, err)
+	writeResponse(w, resData, err)
 }
