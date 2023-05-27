@@ -185,16 +185,6 @@ type RequestBody struct {
 	Vm string `json:"vm"`
 }
 
-func writeResponse(w http.ResponseWriter, resData map[string]interface{}, err error) {
-	if err != nil {
-		resData["body"] = err.Error()
-	}
-
-	responseJson, _ := json.Marshal(resData)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
-}
-
 func getGateway(subnet string) string {
 	ip, ipNet, _ := net.ParseCIDR(subnet)
 	ip = ip.Mask(ipNet.Mask)
@@ -240,8 +230,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	instanceType := os.Getenv("INSTANCE_TYPE")
 	installUrl := os.Getenv("INSTALL_URL")
 
-	resData := make(map[string]interface{})
-
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
 
@@ -250,8 +238,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		err = fmt.Errorf("cannot decode the request: %v", err)
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
-		writeResponse(w, resData, err)
+		common.RespondWithError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -279,9 +266,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-	} else {
-		resData["body"] = bashScript
+		logger.Error().Err(err).Send()
+		common.RespondWithError(w, err, http.StatusInternalServerError)
+		return
 	}
-	writeResponse(w, resData, err)
+
+	w.Header().Set("Content-Type", "application/text")
+	w.Write([]byte(bashScript))
 }

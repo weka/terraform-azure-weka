@@ -39,7 +39,6 @@ data "template_file" "management-init" {
   vars = {
     function_app_code_url          = local.code_url
     http_server_port               = var.http_server_port
-    appinsights_instrumentationkey = azurerm_application_insights.application_insights.instrumentation_key
     state_storage_name             = azurerm_storage_account.deployment_sa.name
     state_container_name           = azurerm_storage_container.deployment.name
     hosts_num                      = var.cluster_size
@@ -226,7 +225,7 @@ data "azurerm_storage_account_blob_container_sas" "sa_sas" {
   https_only        = false
 
   start  = timestamp()
-  expiry = timeadd("${timestamp()}", "30m")
+  expiry = timeadd("${timestamp()}", "40m")
 
   permissions {
     read   = true
@@ -264,4 +263,18 @@ resource "azurerm_role_assignment" "mngmnt-vm-scale-set-machine-owner" {
   role_definition_name = "Owner"
   principal_id         = azurerm_linux_virtual_machine.management_vm.identity.0.principal_id
   depends_on           = [azurerm_linux_virtual_machine.management_vm, azurerm_linux_virtual_machine_scale_set.custom_image_vmss, azurerm_linux_virtual_machine_scale_set.default_image_vmss]
+}
+
+resource "azurerm_role_assignment" "mngmnt-vm-key-user-access-admin" {
+  scope                = data.azurerm_resource_group.rg.id
+  role_definition_name = "User Access Administrator"
+  principal_id         = azurerm_linux_virtual_machine.management_vm.identity[0].principal_id
+  depends_on           = [azurerm_linux_virtual_machine.management_vm]
+}
+
+resource "azurerm_role_assignment" "mngmnt-vm-reader" {
+  scope                = data.azurerm_resource_group.rg.id
+  role_definition_name = "Reader"
+  principal_id         = azurerm_linux_virtual_machine.management_vm.identity[0].principal_id
+  depends_on           = [azurerm_linux_virtual_machine.management_vm]
 }

@@ -7,6 +7,7 @@ locals {
   path_ssh_public_key  = var.ssh_public_key == null ? "${local.ssh_path}-public-key.pub" : var.ssh_public_key
   mngmt_vm_public_ip   = azurerm_linux_virtual_machine.management_vm.public_ip_address
   mngmt_vm_private_ip  = azurerm_linux_virtual_machine.management_vm.private_ip_address
+  function_url         = "${local.mngmt_vm_private_ip}:${var.http_server_port}"
 }
 output "cluster_helpers_commands" {
   value       = <<EOT
@@ -14,10 +15,10 @@ output "cluster_helpers_commands" {
 ssh -i ${local.path_ssh_private_key} ${var.vm_username}@${local.mngmt_vm_public_ip}
 
 ########################################## Get clusterization status #####################################################################
-curl --fail ${local.mngmt_vm_private_ip}/status -H "Content-Type:application/json" -d '{"type": "progress"}'
+curl --fail ${local.function_url}/status -H "Content-Type:application/json" -d '{"type": "progress"}'
 
 ########################################## Get cluster status ############################################################################
-curl --fail ${local.mngmt_vm_private_ip}/status
+curl --fail ${local.function_url}/status
 
 ######################################### Fetch weka cluster password ####################################################################
 az keyvault secret show --vault-name ${azurerm_key_vault.key_vault.name} --name weka-password | jq .value
@@ -32,7 +33,7 @@ ${local.vm_ips}
 username: ${var.vm_username}
 
 ########################################## Resize cluster #################################################################################
-curl --fail ${local.mngmt_vm_private_ip}/resize -H "Content-Type:application/json" -d '{"value":ENTER_NEW_VALUE_HERE}'
+curl --fail ${local.function_url}/resize -H "Content-Type:application/json" -d '{"value":ENTER_NEW_VALUE_HERE}'
 EOT
   description = "Useful commands and script to interact with weka cluster"
 }

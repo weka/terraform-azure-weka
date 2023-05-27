@@ -301,7 +301,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "8f3bbec3c0b7bab9b5167b6014391bca"
+  default     = "8a69754f5b7ab8f6191a1b1da76bb3ce"
 }
 
 variable "install_cluster_dpdk" {

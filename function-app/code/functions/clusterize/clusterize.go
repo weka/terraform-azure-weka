@@ -177,9 +177,9 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName)
 	vmName := p.VmName
 
-	ip, err := common.GetPublicIp(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, p.Prefix, p.Cluster.ClusterName, instanceId)
-	if err != nil {
-		logger.Error().Msg("Failed to fetch public ip")
+	ip, err := common.GetPrivateIp(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, p.Prefix, p.Cluster.ClusterName, instanceId)
+	if err != nil || ip == "" {
+		logger.Warn().Msg("Failed to fetch private ip")
 	} else {
 		vmName = fmt.Sprintf("%s:%s", vmName, ip)
 	}
@@ -233,16 +233,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	hotspare, _ := strconv.Atoi(os.Getenv("HOTSPARE"))
 	installDpdk, _ := strconv.ParseBool(os.Getenv("INSTALL_DPDK"))
 
-	resData := make(map[string]interface{})
-
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
 
 	var data RequestBody
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
-		logger.Error().Msg("Bad request")
-		w.WriteHeader(http.StatusBadRequest)
+		logger.Error().Err(err).Send()
+		common.RespondWithError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -276,16 +274,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if data.Vm == "" {
-		msg := "Cluster name wasn't supplied"
-		logger.Error().Msgf(msg)
-		resData["body"] = msg
-	} else {
-		clusterizeScript := Clusterize(ctx, params)
-		resData["body"] = clusterizeScript
+		err := fmt.Errorf("cluster name wasn't supplied")
+		logger.Error().Err(err).Send()
+		common.RespondWithError(w, err, http.StatusBadRequest)
+		return
 	}
 
-	responseJson, _ := json.Marshal(resData)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	clusterizeScript := Clusterize(ctx, params)
+	w.Header().Set("Content-Type", "application/text")
+	w.Write([]byte(clusterizeScript))
 }

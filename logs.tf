@@ -9,31 +9,40 @@ resource "azurerm_log_analytics_workspace" "la_workspace" {
   }
 }
 
-resource "azurerm_application_insights" "application_insights" {
-  name                = "${var.prefix}-${var.cluster_name}-application-insights"
-  location            = data.azurerm_resource_group.rg.location
+resource "azurerm_monitor_data_collection_rule" "dcr" {
+  name                = "${var.prefix}-${var.cluster_name}-dcr"
   resource_group_name = data.azurerm_resource_group.rg.name
-  workspace_id        = azurerm_log_analytics_workspace.la_workspace.id
-  application_type    = "web"
-  lifecycle {
-    ignore_changes = [tags]
+  location            = data.azurerm_resource_group.rg.location
+  description         = "Syslog collection rule for VMs"
+
+  destinations {
+    log_analytics {
+      workspace_resource_id = azurerm_log_analytics_workspace.la_workspace.id
+      name                  = "la_workspace"
+    }
+  }
+  data_sources {
+    syslog {
+      streams        = ["Microsoft-Syslog"]
+      facility_names = ["*"]
+      log_levels     = ["Info"]
+      name           = "${var.prefix}-${var.cluster_name}-vms-syslog"
+    }
+  }
+  data_flow {
+    streams      = ["Microsoft-Syslog"]
+    destinations = ["la_workspace"]
   }
 }
 
-resource "azurerm_monitor_diagnostic_setting" "insights_diagnostic_setting" {
-  name                       = "${var.prefix}-${var.cluster_name}-insights-diagnostic-setting"
-  target_resource_id         = azurerm_application_insights.application_insights.id
-  storage_account_id         = azurerm_storage_account.deployment_sa.id
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.la_workspace.id
-  enabled_log {
-    category = "AppTraces"
+resource "azurerm_monitor_data_collection_rule_association" "mngmt_vm_syslog" {
+  name                    = "mngmt-vm-syslog-dcr"
+  target_resource_id      = azurerm_linux_virtual_machine.management_vm.id
+  data_collection_rule_id = azurerm_monitor_data_collection_rule.dcr.id
+}
 
-    retention_policy {
-      enabled = false
-    }
-  }
-  lifecycle {
-    ignore_changes = [metric, log_analytics_destination_type]
-  }
-  depends_on = [azurerm_log_analytics_workspace.la_workspace]
+resource "azurerm_monitor_data_collection_rule_association" "vmss_syslog" {
+  name                    = "vmss-syslog-dcr"
+  target_resource_id      = var.custom_image_id != null ? azurerm_linux_virtual_machine_scale_set.custom_image_vmss.0.id : azurerm_linux_virtual_machine_scale_set.default_image_vmss.0.id
+  data_collection_rule_id = azurerm_monitor_data_collection_rule.dcr.id
 }

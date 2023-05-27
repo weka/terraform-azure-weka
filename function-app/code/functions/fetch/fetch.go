@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"weka-deployment/common"
+
+	"github.com/weka/go-cloud-lib/logging"
 )
 
 type ScaleSetInfoResponse struct {
@@ -20,8 +22,6 @@ type ScaleSetInfoResponse struct {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	resData := make(map[string]interface{})
-
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
@@ -33,17 +33,18 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
 
 	ctx := r.Context()
+	logger := logging.LoggerFromCtx(ctx)
 
 	response, err := getScaleSetInfoResponse(
 		ctx, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName, keyVaultUri,
 	)
 	if err != nil {
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = response
+		logger.Error().Err(err).Send()
+		common.RespondWithError(w, err, http.StatusInternalServerError)
+		return
 	}
 
-	responseJson, _ := json.Marshal(resData)
+	responseJson, _ := json.Marshal(response)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(responseJson)

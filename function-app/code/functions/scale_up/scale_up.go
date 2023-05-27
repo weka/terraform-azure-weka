@@ -1,16 +1,15 @@
 package scale_up
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"weka-deployment/common"
+
+	"github.com/weka/go-cloud-lib/logging"
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	resData := make(map[string]interface{})
-
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
@@ -19,26 +18,29 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	clusterName := os.Getenv("CLUSTER_NAME")
 
 	ctx := r.Context()
+	logger := logging.LoggerFromCtx(ctx)
 	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
 
 	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
 	if err != nil {
-		resData["body"] = err.Error()
-	} else {
-		if !state.Clusterized {
-			resData["body"] = "Not clusterized yet, skipping..."
-		} else {
-			err = common.UpdateVmScaleSetNum(ctx, subscriptionId, resourceGroupName, vmScaleSetName, int64(state.DesiredSize))
-			if err != nil {
-				resData["body"] = err.Error()
-			} else {
-				resData["body"] = "updated size successfully"
-			}
-		}
+		logger.Error().Err(err).Send()
+		common.RespondWithError(w, err, http.StatusInternalServerError)
+		return
 	}
 
-	responseJson, _ := json.Marshal(resData)
+	if !state.Clusterized {
+		msg := "Not clusterized yet, skipping..."
+		common.RespondWithMessage(w, msg, http.StatusOK)
+		return
+	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	err = common.UpdateVmScaleSetNum(ctx, subscriptionId, resourceGroupName, vmScaleSetName, int64(state.DesiredSize))
+	if err != nil {
+		logger.Error().Err(err).Send()
+		common.RespondWithError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	msg := fmt.Sprintf("updated size to %d successfully", state.DesiredSize)
+	common.RespondWithMessage(w, msg, http.StatusOK)
 }
