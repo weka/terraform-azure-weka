@@ -55,7 +55,8 @@ func useMiddlewares(r chi.Router) {
 			Send()
 	}))
 	r.Use(logging.FuncNameHandler("function"))
-	r.Use(hlog.RequestIDHandler("req_id", "Request-Id"))
+	r.Use(hlog.RequestIDHandler("req_id", middleware.RequestIDHeader))
+	r.Use(hlog.RemoteAddrHandler("remote_addr"))
 	r.Use(middleware.Recoverer)
 }
 

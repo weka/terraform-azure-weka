@@ -23,16 +23,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	prefix := os.Getenv("PREFIX")
 	clusterName := os.Getenv("CLUSTER_NAME")
 
-	resData := make(map[string]interface{})
-
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
 
 	var data RequestBody
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
-		logger.Error().Msg("Bad request")
-		w.WriteHeader(http.StatusBadRequest)
+		logger.Error().Err(err).Send()
+		common.RespondWithError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -47,13 +45,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	err = common.RetrySetDeletionProtectionAndReport(ctx, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, vmScaleSetName, instanceId, hostName, maxAttempts, authSleepInterval)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = "protection was set successfully"
+		logger.Error().Err(err).Send()
+		common.RespondWithError(w, err, http.StatusInternalServerError)
+		return
 	}
 
-	responseJson, _ := json.Marshal(resData)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	msg := "protection was set successfully"
+	common.RespondWithMessage(w, msg, http.StatusOK)
 }

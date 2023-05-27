@@ -15,8 +15,6 @@ type RequestBody struct {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	resData := make(map[string]interface{})
-
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
 
@@ -36,12 +34,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	err = common.SetDeletionProtection(ctx, subscriptionId, resourceGroupName, vmScaleSetName, common.GetScaleSetVmIndex(data.Name), true)
 	if err != nil {
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = "set protection successfully"
+		logger.Error().Err(err).Send()
+		common.RespondWithError(w, err, http.StatusInternalServerError)
+		return
 	}
 
-	responseJson, _ := json.Marshal(resData)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	msg := "set protection successfully"
+	common.RespondWithMessage(w, msg, http.StatusOK)
 }

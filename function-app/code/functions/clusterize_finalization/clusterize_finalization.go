@@ -5,26 +5,27 @@ import (
 	"net/http"
 	"os"
 	"weka-deployment/common"
+
+	"github.com/weka/go-cloud-lib/logging"
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	resData := make(map[string]interface{})
-
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 
 	ctx := r.Context()
+	logger := logging.LoggerFromCtx(ctx)
 
 	state, err := common.UpdateClusterized(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
 	if err != nil {
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = state
+		logger.Error().Err(err).Send()
+		common.RespondWithError(w, err, http.StatusInternalServerError)
+		return
 	}
 
-	responseJson, _ := json.Marshal(resData)
+	responseJson, _ := json.Marshal(state)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(responseJson)

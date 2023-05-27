@@ -19,7 +19,7 @@ func NewFuncDef() functions_def.FunctionDef {
 // each function takes json payload as an argument
 // e.g. "{\"hostname\": \"$HOSTNAME\", \"type\": \"$message_type\", \"message\": \"$message\"}"
 func (d *AzureFuncDef) GetFunctionCmdDefinition(name functions_def.FunctionName) string {
-	functionUrl := d.baseFunctionUrl + string(name)
+	functionUrl := fmt.Sprintf("%s/%s", d.baseFunctionUrl, name)
 	reportDefTemplate := `
 	function %s {
 		local json_data=$1

@@ -12,8 +12,6 @@ import (
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	resData := make(map[string]interface{})
-
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
@@ -31,14 +29,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&size); err != nil {
 		err = fmt.Errorf("cannot decode the request: %v", err)
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
+		common.RespondWithError(w, err, http.StatusBadRequest)
 		return
 	}
 
 	if size.Value == nil {
 		err := fmt.Errorf("wrong request format. 'new_size' is required")
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
+		common.RespondWithError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -50,23 +48,20 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if *size.Value < minCusterSize {
 		err = fmt.Errorf("invalid size, minimal cluster size is %d", minCusterSize)
 		logger.Error().Err(err).Send()
+		common.RespondWithError(w, err, http.StatusBadRequest)
+		return
 	}
 
-	if err == nil {
-		vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
-		err = updateDesiredClusterSize(ctx, *size.Value, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName)
-	}
-
+	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
+	err = updateDesiredClusterSize(ctx, *size.Value, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName)
 	if err != nil {
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = fmt.Sprintf("New cluster size: %d", *size.Value)
+		logger.Error().Err(err).Send()
+		common.RespondWithError(w, err, http.StatusBadRequest)
+		return
 	}
 
-	responseJson, _ := json.Marshal(resData)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	msg := fmt.Sprintf("New cluster size: %d", *size.Value)
+	common.RespondWithMessage(w, msg, http.StatusOK)
 }
 
 func updateDesiredClusterSize(ctx context.Context, newSize int, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName string) error {

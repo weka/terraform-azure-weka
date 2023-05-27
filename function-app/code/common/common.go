@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -464,6 +465,33 @@ func GetPublicIp(ctx context.Context, subscriptionId, resourceGroupName, vmScale
 		return
 	}
 	return
+}
+
+func GetPrivateIp(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, prefix, clusterName, instanceIndex string) (privateIp string, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	client, err := armnetwork.NewInterfacesClient(subscriptionId, credential, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	interfaceName := fmt.Sprintf("%s-%s-backend-nic-0", prefix, clusterName)
+	resp, err := client.GetVirtualMachineScaleSetIPConfiguration(ctx, resourceGroupName, vmScaleSetName, instanceIndex, interfaceName, "ipconfig0", nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return "", err
+	}
+	if resp.InterfaceIPConfiguration.Properties.PrivateIPAddress != nil {
+		privateIp = *resp.InterfaceIPConfiguration.Properties.PrivateIPAddress
+	}
+	return privateIp, nil
 }
 
 func GetVmsPrivateIps(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (vmsPrivateIps map[string]string, err error) {
@@ -987,4 +1015,26 @@ func UpdateStateReportingWithoutLocking(ctx context.Context, stateContainerName,
 		return
 	}
 	return
+}
+
+func RespondWithError(w http.ResponseWriter, err error, errCode int) {
+	data := make(map[string]any)
+	data["error"] = err.Error()
+
+	w.WriteHeader(errCode)
+	w.Header().Set("Content-Type", "application/json")
+
+	responseJson, _ := json.Marshal(data)
+	w.Write(responseJson)
+}
+
+func RespondWithMessage(w http.ResponseWriter, msg string, statusCode int) {
+	data := make(map[string]any)
+	data["message"] = msg
+
+	w.WriteHeader(statusCode)
+	w.Header().Set("Content-Type", "application/json")
+
+	responseJson, _ := json.Marshal(data)
+	w.Write(responseJson)
 }

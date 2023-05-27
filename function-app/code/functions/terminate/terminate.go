@@ -274,8 +274,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
 
-	resData := make(map[string]interface{})
-
 	var scaleResponse protocol.ScaleResponse
 	err := json.NewDecoder(r.Body).Decode(&scaleResponse)
 	if err != nil {
@@ -286,12 +284,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	terminateResponse, err := Terminate(ctx, scaleResponse, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName)
 	if err != nil {
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = terminateResponse
+		logger.Error().Err(err).Send()
+		common.RespondWithError(w, err, http.StatusInternalServerError)
+		return
 	}
 
-	responseJson, _ := json.Marshal(resData)
+	responseJson, _ := json.Marshal(terminateResponse)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(responseJson)

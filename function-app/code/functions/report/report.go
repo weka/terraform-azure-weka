@@ -46,8 +46,6 @@ func UpdateStateReportingWithRetry(ctx context.Context, subscriptionId, resource
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	resData := make(map[string]interface{})
-
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
@@ -61,7 +59,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&report); err != nil {
 		err = fmt.Errorf("cannot decode the request: %v", err)
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
+		common.RespondWithError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -83,13 +81,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = "The report was added successfully"
+		logger.Error().Err(err).Send()
+		common.RespondWithError(w, err, http.StatusInternalServerError)
+		return
 	}
 
-	responseJson, _ := json.Marshal(resData)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	msg := "The report was added successfully"
+	common.RespondWithMessage(w, msg, http.StatusOK)
 }

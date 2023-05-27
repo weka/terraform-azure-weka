@@ -156,8 +156,6 @@ func GetClusterStatus(ctx context.Context, subscriptionId, resourceGroupName, vm
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	resData := make(map[string]interface{})
-
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
@@ -177,7 +175,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
 			err = fmt.Errorf("cannot decode the request: %v", err)
 			logger.Error().Err(err).Send()
-			w.WriteHeader(http.StatusBadRequest)
+			common.RespondWithError(w, err, http.StatusBadRequest)
 			return
 		}
 	}
@@ -194,12 +192,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = result
+		logger.Error().Err(err).Send()
+		common.RespondWithError(w, err, http.StatusInternalServerError)
+		return
 	}
 
-	responseJson, _ := json.Marshal(resData)
+	responseJson, _ := json.Marshal(result)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(responseJson)
