@@ -22,7 +22,7 @@ resource "azurerm_key_vault" "key_vault" {
 resource "azurerm_key_vault_access_policy" "management-vm-get-secret-permission" {
   key_vault_id = azurerm_key_vault.key_vault.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = azurerm_linux_virtual_machine.management_vm.identity.0.principal_id
+  object_id    = azuread_service_principal.sp.id
 
   secret_permissions = [
     "Get",
