@@ -1,6 +1,10 @@
 #!/bin/bash
 set -ex
 
+export AZURE_CLIENT_ID="${azure_client_id}"
+export AZURE_CLIENT_SECRET="${azure_client_secret}"
+export AZURE_TENANT_ID="${azure_tenant_id}"
+
 export STATE_STORAGE_NAME="${state_storage_name}"
 export STATE_CONTAINER_NAME="${state_container_name}"
 export HOSTS_NUM="${hosts_num}"
@@ -79,7 +83,7 @@ EOF
 touch run_scale_functions
 echo 'MAILTO=""' >> run_scale_functions
 # add commands to new cron file
-echo "*/1 * * * * curl -s --fail-with-body -X POST $(ip route get 1 | awk '{print $(NF-2);exit}'):${http_server_port}/scale_up 2>&1 | /usr/bin/logger -t scale_functions" >> run_scale_functions
+echo "*/1 * * * * curl -s --show-error -X POST $(ip route get 1 | awk '{print $(NF-2);exit}'):${http_server_port}/scale_up 2>&1 | /usr/bin/logger -t scale_functions" >> run_scale_functions
 echo "*/1 * * * * /usr/bin/python3 $(pwd)/run_scale_down_workflow.py http://$(ip route get 1 | awk '{print $(NF-2);exit}'):${http_server_port} 2>&1 | /usr/bin/logger -t scale_functions" >> run_scale_functions
 # install new cron file
 crontab run_scale_functions
