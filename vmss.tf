@@ -1,4 +1,4 @@
-data azurerm_resource_group "rg"{
+data "azurerm_resource_group" "rg" {
   name = var.rg_name
 }
 
@@ -41,15 +41,11 @@ locals {
   private_ssh_key           = var.ssh_private_key == null ? tls_private_key.ssh_key[0].private_key_pem : file(var.ssh_private_key)
   disk_size                 = var.default_disk_size + var.traces_per_ionode * (var.container_number_map[var.instance_type].compute + var.container_number_map[var.instance_type].drive + var.container_number_map[var.instance_type].frontend)
   private_nic_first_index   = var.private_network ? 0 : 1
-  alphanumeric_cluster_name =  lower(replace(var.cluster_name,"/\\W|_|\\s/",""))
-  alphanumeric_prefix_name  = lower(replace(var.prefix,"/\\W|_|\\s/",""))
+  alphanumeric_cluster_name = lower(replace(var.cluster_name, "/\\W|_|\\s/", ""))
+  alphanumeric_prefix_name  = lower(replace(var.prefix, "/\\W|_|\\s/", ""))
   subnet_range              = data.azurerm_subnet.subnets[0].address_prefix
   nics_numbers              = var.install_cluster_dpdk ? var.container_number_map[var.instance_type].nics : 1
-}
-
-data "template_file" "init" {
-  template = file("${path.module}/user-data.sh")
-  vars = {
+  custom_data_script = templatefile("${path.module}/user-data.sh", {
     apt_repo_url             = var.apt_repo_url
     private_ssh_key          = local.private_ssh_key
     user                     = var.vm_username
@@ -63,22 +59,14 @@ data "template_file" "init" {
     report_url               = "https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/report"
     function_app_default_key = data.azurerm_function_app_host_keys.function_keys.default_function_key
     disk_size                = local.disk_size
-  }
-}
-
-data "template_cloudinit_config" "cloud_init" {
-  gzip          = false
-  part {
-    content_type = "text/x-shellscript"
-    content      = data.template_file.init.rendered
-  }
+  })
 }
 
 resource "azurerm_proximity_placement_group" "ppg" {
   name                = "${var.prefix}-${var.cluster_name}-backend-ppg"
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = var.rg_name
-  tags                = merge(var.tags_map, {"weka_cluster": var.cluster_name})
+  tags                = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
   lifecycle {
     ignore_changes = [tags]
   }
@@ -95,11 +83,13 @@ resource "azurerm_linux_virtual_machine_scale_set" "custom_image_vmss" {
   admin_username                  = var.vm_username
   instances                       = var.cluster_size
   computer_name_prefix            = "${var.prefix}-${var.cluster_name}-backend"
-  custom_data                     = base64encode(data.template_file.init.rendered)
+  custom_data                     = base64encode(local.custom_data_script)
   disable_password_authentication = true
   proximity_placement_group_id    = azurerm_proximity_placement_group.ppg.id
-  tags                            = merge(var.tags_map, {"weka_cluster": var.cluster_name,"user_id": data.azurerm_client_config.current.object_id})
-  source_image_id                 = var.custom_image_id
+  tags = merge(var.tags_map, {
+    "weka_cluster" : var.cluster_name, "user_id" : data.azurerm_client_config.current.object_id
+  })
+  source_image_id = var.custom_image_id
 
   os_disk {
     caching              = "ReadWrite"
@@ -157,7 +147,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "custom_image_vmss" {
     }
   }
   dynamic "network_interface" {
-    for_each = range(1,local.nics_numbers)
+    for_each = range(1, local.nics_numbers)
     content {
       name                          = "${var.prefix}-${var.cluster_name}-backend-nic-${network_interface.value}"
       network_security_group_id     = var.sg_id
@@ -172,9 +162,12 @@ resource "azurerm_linux_virtual_machine_scale_set" "custom_image_vmss" {
     }
   }
   lifecycle {
-    ignore_changes = [ instances, custom_data, tags ]
+    ignore_changes = [instances, custom_data, tags]
   }
-  depends_on = [azurerm_lb_backend_address_pool.lb_backend_pool,azurerm_lb_probe.backend_lb_probe,azurerm_proximity_placement_group.ppg, azurerm_lb_rule.backend_lb_rule, azurerm_lb_rule.ui_lb_rule]
+  depends_on = [
+    azurerm_lb_backend_address_pool.lb_backend_pool, azurerm_lb_probe.backend_lb_probe,
+    azurerm_proximity_placement_group.ppg, azurerm_lb_rule.backend_lb_rule, azurerm_lb_rule.ui_lb_rule
+  ]
 }
 
 
@@ -189,10 +182,12 @@ resource "azurerm_linux_virtual_machine_scale_set" "default_image_vmss" {
   admin_username                  = var.vm_username
   instances                       = var.cluster_size
   computer_name_prefix            = "${var.prefix}-${var.cluster_name}-backend"
-  custom_data                     = base64encode(data.template_file.init.rendered)
+  custom_data                     = base64encode(local.custom_data_script)
   disable_password_authentication = true
   proximity_placement_group_id    = azurerm_proximity_placement_group.ppg.id
-  tags                            = merge(var.tags_map, {"weka_cluster": var.cluster_name,"user_id": data.azurerm_client_config.current.object_id})
+  tags = merge(var.tags_map, {
+    "weka_cluster" : var.cluster_name, "user_id" : data.azurerm_client_config.current.object_id
+  })
   source_image_reference {
     offer     = lookup(var.linux_vm_image, "offer", null)
     publisher = lookup(var.linux_vm_image, "publisher", null)
@@ -255,7 +250,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "default_image_vmss" {
     }
   }
   dynamic "network_interface" {
-    for_each = range(1,local.nics_numbers)
+    for_each = range(1, local.nics_numbers)
     content {
       name                          = "${var.prefix}-${var.cluster_name}-backend-nic-${network_interface.value}"
       network_security_group_id     = var.sg_id
@@ -270,16 +265,22 @@ resource "azurerm_linux_virtual_machine_scale_set" "default_image_vmss" {
     }
   }
   lifecycle {
-    ignore_changes = [ instances, custom_data,tags ]
+    ignore_changes = [instances, custom_data, tags]
   }
-  depends_on = [azurerm_lb_backend_address_pool.lb_backend_pool,azurerm_lb_probe.backend_lb_probe,azurerm_proximity_placement_group.ppg, azurerm_lb_rule.backend_lb_rule, azurerm_lb_rule.ui_lb_rule]
+  depends_on = [
+    azurerm_lb_backend_address_pool.lb_backend_pool, azurerm_lb_probe.backend_lb_probe,
+    azurerm_proximity_placement_group.ppg, azurerm_lb_rule.backend_lb_rule, azurerm_lb_rule.ui_lb_rule
+  ]
 }
 
 resource "azurerm_role_assignment" "vm_role_assignment" {
   scope                = data.azurerm_resource_group.rg.id
   role_definition_name = "Contributor"
   principal_id         = var.custom_image_id != null ? azurerm_linux_virtual_machine_scale_set.custom_image_vmss[0].identity[0].principal_id : azurerm_linux_virtual_machine_scale_set.default_image_vmss[0].identity[0].principal_id
-  depends_on           = [azurerm_linux_virtual_machine_scale_set.custom_image_vmss, azurerm_linux_virtual_machine_scale_set.default_image_vmss]
+  depends_on = [
+    azurerm_linux_virtual_machine_scale_set.custom_image_vmss,
+    azurerm_linux_virtual_machine_scale_set.default_image_vmss
+  ]
 }
 
 resource "null_resource" "force-delete-vmss" {
@@ -289,8 +290,11 @@ resource "null_resource" "force-delete-vmss" {
     subscription_id = var.subscription_id
   }
   provisioner "local-exec" {
-    when = destroy
+    when    = destroy
     command = "az vmss delete --name ${self.triggers.vmss_name} --resource-group ${self.triggers.rg_name} --force-deletion true --subscription ${self.triggers.subscription_id}"
   }
-  depends_on = [azurerm_linux_virtual_machine_scale_set.default_image_vmss, azurerm_linux_virtual_machine_scale_set.custom_image_vmss]
+  depends_on = [
+    azurerm_linux_virtual_machine_scale_set.default_image_vmss,
+    azurerm_linux_virtual_machine_scale_set.custom_image_vmss
+  ]
 }
