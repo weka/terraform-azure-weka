@@ -37,7 +37,7 @@ No modules.
 | <a name="input_address_space"></a> [address\_space](#input\_address\_space) | n/a | `list(string)` | <pre>[<br>  "11.0.0.0/16"<br>]</pre> | no |
 | <a name="input_admin_username"></a> [admin\_username](#input\_admin\_username) | n/a | `string` | `"azureuser"` | no |
 | <a name="input_location"></a> [location](#input\_location) | n/a | `string` | `"East US"` | no |
-| <a name="input_prefix"></a> [prefix](#input\_prefix) | n/a | `string` | `"weka"` | no |
+| <a name="input_prefix"></a> [prefix](#input\_prefix) | n/a | `string` | `"ubuntu20"` | no |
 | <a name="input_ssh_public_key"></a> [ssh\_public\_key](#input\_ssh\_public\_key) | n/a | `string` | `"~/.ssh/weka_dev_ssh_key.pub"` | no |
 | <a name="input_vm_size"></a> [vm\_size](#input\_vm\_size) | n/a | `string` | `"Standard_D2s_v3"` | no |
 

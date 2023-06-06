@@ -12,8 +12,14 @@ resource "azurerm_key_vault" "key_vault" {
   enabled_for_deployment      = true
   tenant_id                   = data.azurerm_client_config.current.tenant_id
   purge_protection_enabled    = false
-  sku_name = "standard"
-  tags = merge(var.tags_map, {"weka_cluster": var.cluster_name})
+  sku_name                    = "standard"
+  tags                        = merge(var.tags_map, {"weka_cluster": var.cluster_name})
+  network_acls {
+    default_action             = "Deny"
+    bypass                     = "AzureServices"
+    virtual_network_subnet_ids = concat(data.azurerm_subnet.subnets.*.id, data.azurerm_subnet.subnets_delegation.*.id)
+    ip_rules                   = [local.my_ip]
+  }
   lifecycle {
     ignore_changes = [tags]
   }
@@ -122,3 +128,51 @@ resource "azurerm_key_vault_secret" "weka_password_secret" {
   }
   depends_on   = [azurerm_key_vault.key_vault, random_password.weka_password,azurerm_key_vault_access_policy.key_vault_access_policy]
 }
+
+
+data azurerm_private_dns_zone "keyvault_dns" {
+  name                = var.keyvault_dns_zone_name
+  resource_group_name = var.rg_name
+}
+
+resource "azurerm_private_endpoint" "key_vault_endpoint" {
+  name                          = "${var.prefix}-${var.cluster_name}-key-vault-endpoint"
+  resource_group_name           = var.rg_name
+  location                      = data.azurerm_resource_group.rg.location
+  subnet_id                     = data.azurerm_subnet.subnets[0].id
+  custom_network_interface_name = "${var.prefix}-${var.cluster_name}-key-vault-endpoint"
+  tags                          = merge(var.tags_map, {"weka_cluster": var.cluster_name})
+  private_service_connection {
+    name                           = "${var.prefix}-${var.cluster_name}-key-vault-endpoint"
+    private_connection_resource_id = azurerm_key_vault.key_vault.id
+    is_manual_connection           = false
+    subresource_names              = ["vault"]
+  }
+  private_dns_zone_group {
+    name                 = "${var.prefix}-${var.cluster_name}-key-vault-endpoint"
+    private_dns_zone_ids = [data.azurerm_private_dns_zone.keyvault_dns.id]
+  }
+  lifecycle {
+    ignore_changes = [tags]
+  }
+  depends_on = [azurerm_key_vault.key_vault]
+}
+
+
+resource "null_resource" "allow-logic-app-ips" {
+  triggers = {
+    function_name     = azurerm_linux_function_app.function_app.name
+    keyvault_name     = azurerm_key_vault.key_vault.name
+    rg_name           = var.rg_name
+    subscription_id   = var.subscription_id
+    allow_scale_up_ip = join(" ",azurerm_logic_app_workflow.scale-up-workflow.workflow_outbound_ip_addresses)
+    always_run = timestamp()
+  }
+  provisioner "local-exec" {
+    command = <<-EOT
+    az keyvault network-rule add --name ${self.triggers.keyvault_name} -g ${self.triggers.rg_name} --subscription ${self.triggers.subscription_id} --ip-address ${self.triggers.allow_scale_up_ip}
+EOT
+  }
+  depends_on = [azurerm_logic_app_workflow.scale-down-workflow]
+}
+

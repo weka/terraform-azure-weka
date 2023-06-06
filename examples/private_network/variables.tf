@@ -18,9 +18,9 @@ variable "subnet_prefixes" {
   description = "List of address prefixes to use for the subnet"
 }
 
-variable "subnet_delegation" {
-  type = string
-  description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service"
+variable "subnets_delegation_prefixes" {
+  type = list(string)
+  description = "List of subnets delegation range to enables designate a specific subnet for an Azure PaaS service"
 }
 
 variable "cluster_name" {

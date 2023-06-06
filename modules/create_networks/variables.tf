@@ -21,6 +21,18 @@ variable "subnet_prefixes" {
   default = []
 }
 
+variable "subnets_delegation_prefixes" {
+  type = list(string)
+  description = "List of subnets delegation enables you to designate a specific subnet for an Azure PaaS service"
+  default = []
+}
+
+variable "subnets_delegation_names" {
+  type        = list(string)
+  description = "List of names of exiting subnets delegation"
+  default     = []
+}
+
 variable "tags_map" {
   type = map(string)
   default = {"env": "dev", "creator": "tf"}
@@ -61,4 +73,40 @@ variable "create_private_dns_zone" {
   type = bool
   default = true
   description = "Should create private dns zone"
+}
+
+variable "sites_dns_zone_name" {
+  type        = string
+  default     = null
+  description = "Privatelink azurewebsites DNS zone"
+}
+
+variable "sites_dns_zone_link_to_network" {
+  type        = bool
+  default     = true
+  description = "Link private sites DNS zone to network"
+}
+
+variable "blob_dns_zone_link_to_network" {
+  type        = bool
+  default     = true
+  description = "Link private blob DNS to vnet"
+}
+
+variable "private_dns_blob_name" {
+  type = string
+  default = null
+  description = "privatelink.blob.core.windows.net"
+}
+
+variable "keyvault_dns_zone_name" {
+  type        = string
+  default     = null
+  description = "Keyvault private DNS zone"
+}
+
+variable "keyvault_dns_zone_link_to_network" {
+  type        = bool
+  default     = true
+  description = "Link keyvault private DNS zone to network"
 }

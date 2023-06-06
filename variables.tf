@@ -69,9 +69,9 @@ variable "sg_id" {
   description = "The security group id."
 }
 
-variable "subnet_delegation" {
-  type = string
-  description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service"
+variable "subnets_delegation_names" {
+  type        = list(string)
+  description = "List of subnets delegation enables you to designate a specific subnet for an Azure PaaS service"
 }
 
 variable "weka_version" {
@@ -325,4 +325,19 @@ variable "install_ofed" {
   type        = bool
   default     = true
   description = "Install ofed for weka cluster with dpdk configuration"
+}
+
+variable "sites_dns_zone_name" {
+  type = string
+  description = "Private sites DNS zone name (function app/ keyvault / logic app)"
+}
+
+variable "blob_dns_zone_name" {
+  type        = string
+  description = "Private Blob DNS zone name (storage account)"
+}
+
+variable "keyvault_dns_zone_name" {
+  type        = string
+  description = "Keyvault private DNS zone"
 }
