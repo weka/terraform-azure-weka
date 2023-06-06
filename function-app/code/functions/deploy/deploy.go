@@ -72,7 +72,6 @@ func GetDeployScript(
 	installDpdk bool,
 	nicsNum string,
 	gateways []string,
-	subnets []string,
 
 ) (bashScript string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
@@ -111,7 +110,6 @@ func GetDeployScript(
 			InstallDpdk:          installDpdk,
 			NicsNum:              nicsNum,
 			Gateways:             gateways,
-			Subnets:              subnets,
 		}
 		deployScriptGenerator := deploy.DeployScriptGenerator{
 			FuncDef:          funcDef,
@@ -162,7 +160,6 @@ func GetDeployScript(
 			InstallDpdk:    installDpdk,
 			InstanceParams: instanceParams,
 			Gateways:       gateways,
-			Subnets:        subnets,
 		}
 
 		scriptBase := `
@@ -224,13 +221,6 @@ func getGateway(subnet string) string {
 func getGateways(subnets []string) (gateways []string) {
 	for _, subnet := range subnets {
 		gateways = append(gateways, getGateway(subnet))
-	}
-	return
-}
-
-func getSubnetsWithoutMask(subnets []string) (subnetsWithoutMask []string) {
-	for _, subnet := range subnets {
-		subnetsWithoutMask = append(subnetsWithoutMask, strings.Split(subnet, "/")[0])
 	}
 	return
 }
@@ -311,7 +301,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		installDpdk,
 		nicsNum,
 		getGateways(subnetsList),
-		getSubnetsWithoutMask(subnetsList),
 	)
 
 	if err != nil {
