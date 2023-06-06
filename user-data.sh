@@ -42,7 +42,7 @@ if [[ "${skip_ofed_installation}" == false ]]; then
   curl -i ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"installing ofed\"}"
   OFED_NAME=ofed-${ofed_version}
   if [[ "${install_ofed_url}" ]]; then
-    wget ${install_ofed_url} -O $INSTALLATION_PATH/$OFED_NAME.tgz
+    wget "${install_ofed_url}" -O $INSTALLATION_PATH/$OFED_NAME.tgz
   else
     wget http://content.mellanox.com/ofed/MLNX_OFED-${ofed_version}/MLNX_OFED_LINUX-${ofed_version}-ubuntu18.04-x86_64.tgz -O $INSTALLATION_PATH/$OFED_NAME.tgz
   fi
