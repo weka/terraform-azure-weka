@@ -77,7 +77,7 @@ variable "subnet_delegation" {
 variable "weka_version" {
   type = string
   description = "The Weka version to deploy."
-  default = "4.2.0.120-beta"
+  default = "4.2.0"
 }
 
 variable "get_weka_io_token" {
