@@ -13,12 +13,16 @@ handle_error () {
 while fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; do
    sleep 2
 done
+
+apt update -y
+apt install -y jq
 apt install net-tools -y
 
 # set apt private repo
 if [[ "${apt_repo_url}" ]]; then
   mv /etc/apt/sources.list /etc/apt/sources.list.bak
   echo "deb ${apt_repo_url} focal main restricted universe" > /etc/apt/sources.list
+  echo "deb ${apt_repo_url} focal-updates main restricted" >> /etc/apt/sources.list
 fi
 
 INSTALLATION_PATH="/tmp/weka"
@@ -29,7 +33,7 @@ if [[ ${install_ofed} == true ]]; then
   curl -i ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"installing ofed\"}"
   OFED_NAME=ofed-${ofed_version}
   if [[ "${install_ofed_url}" ]]; then
-    wget ${install_ofed_url} -O $INSTALLATION_PATH/$OFED_NAME.tgz
+    wget "${install_ofed_url}" -O $INSTALLATION_PATH/$OFED_NAME.tgz
   else
     wget http://content.mellanox.com/ofed/MLNX_OFED-${ofed_version}/MLNX_OFED_LINUX-${ofed_version}-ubuntu20.04-x86_64.tgz -O $INSTALLATION_PATH/$OFED_NAME.tgz
   fi
@@ -78,9 +82,6 @@ EOF
 fi
 
 netplan apply
-
-apt update -y
-apt install -y jq
 
 # attache disk
 wekaiosw_device=/dev/"$(lsblk | grep ${disk_size}G | awk '{print $1}')"
