@@ -102,8 +102,8 @@ No modules.
 | <a name="input_private_network"></a> [private\_network](#input\_private\_network) | Determines whether to enable a private or public network. The default is public network. | `bool` | `false` | no |
 | <a name="input_rg_name"></a> [rg\_name](#input\_rg\_name) | A predefined resource group in the Azure subscription. | `string` | n/a | yes |
 | <a name="input_sg_public_ssh_ips"></a> [sg\_public\_ssh\_ips](#input\_sg\_public\_ssh\_ips) | A list of IP addresses that can use ssh connection with a public network deployment. | `list(string)` | <pre>[<br>  "0.0.0.0/0"<br>]</pre> | no |
-| <a name="input_subnet_prefixes"></a> [subnet\_prefixes](#input\_subnet\_prefixes) | A list of address prefixes to use for the subnet. | `list(string)` | `[]` | no |
-| <a name="input_subnets_name_list"></a> [subnets\_name\_list](#input\_subnets\_name\_list) | A list of subnet names, if exist. | `list(string)` | `[]` | no |
+| <a name="input_subnet_name"></a> [subnet\_name](#input\_subnet\_name) | Subnet name, if exist. | `string` | `null` | no |
+| <a name="input_subnet_prefixes"></a> [subnet\_prefixes](#input\_subnet\_prefixes) | Address prefixes to use for the subnet. | `string` | `""` | no |
 | <a name="input_tags_map"></a> [tags\_map](#input\_tags\_map) | A map of tags to assign the same metadata to all resources in the environment. Format: key:value. | `map(string)` | <pre>{<br>  "creator": "tf",<br>  "env": "dev"<br>}</pre> | no |
 | <a name="input_vnet_name"></a> [vnet\_name](#input\_vnet\_name) | The VNet name, if exists. | `string` | `null` | no |
 | <a name="input_vnet_rg_name"></a> [vnet\_rg\_name](#input\_vnet\_rg\_name) | Resource group name of vnet | `string` | `null` | no |
