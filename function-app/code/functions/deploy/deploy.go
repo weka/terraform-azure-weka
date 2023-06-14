@@ -72,8 +72,6 @@ func GetDeployScript(
 	installDpdk bool,
 	nicsNum string,
 	gateways []string,
-	subnets []string,
-
 ) (bashScript string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
@@ -111,7 +109,6 @@ func GetDeployScript(
 			InstallDpdk:          installDpdk,
 			NicsNum:              nicsNum,
 			Gateways:             gateways,
-			Subnets:              subnets,
 		}
 		deployScriptGenerator := deploy.DeployScriptGenerator{
 			FuncDef:          funcDef,
@@ -162,7 +159,6 @@ func GetDeployScript(
 			InstallDpdk:    installDpdk,
 			InstanceParams: instanceParams,
 			Gateways:       gateways,
-			Subnets:        subnets,
 		}
 
 		scriptBase := `
@@ -221,16 +217,11 @@ func getGateway(subnet string) string {
 	return ip.String()
 }
 
-func getGateways(subnets []string) (gateways []string) {
-	for _, subnet := range subnets {
-		gateways = append(gateways, getGateway(subnet))
-	}
-	return
-}
-
-func getSubnetsWithoutMask(subnets []string) (subnetsWithoutMask []string) {
-	for _, subnet := range subnets {
-		subnetsWithoutMask = append(subnetsWithoutMask, strings.Split(subnet, "/")[0])
+func getGateways(subnet string, nicsNum int) (gateways []string) {
+	gateway := getGateway(subnet)
+	gateways = make([]string, nicsNum)
+	for i := range gateways {
+		gateways[i] = gateway
 	}
 	return
 }
@@ -249,7 +240,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	driveContainerNum := os.Getenv("NUM_DRIVE_CONTAINERS")
 	installDpdk, _ := strconv.ParseBool(os.Getenv("INSTALL_DPDK"))
 	nicsNum := os.Getenv("NICS_NUM")
-	subnets := os.Getenv("SUBNETS")
+	nicsNumInt, _ := strconv.Atoi(os.Getenv("HOSTS_NUM"))
+	subnet := os.Getenv("SUBNET")
 
 	instanceType := os.Getenv("INSTANCE_TYPE")
 	installUrl := os.Getenv("INSTALL_URL")
@@ -291,7 +283,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	subnetsList := strings.Split(subnets, ",")
 	bashScript, err := GetDeployScript(
 		ctx,
 		subscriptionId,
@@ -310,8 +301,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		driveContainerNum,
 		installDpdk,
 		nicsNum,
-		getGateways(subnetsList),
-		getSubnetsWithoutMask(subnetsList),
+		getGateways(subnet, nicsNumInt),
 	)
 
 	if err != nil {

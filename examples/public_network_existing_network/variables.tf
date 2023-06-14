@@ -32,9 +32,8 @@ variable "vnet_name" {
   description = "Name of existing vnet"
 }
 
-variable "subnets_name_list" {
-  type = list(string)
-  default = []
+variable "subnet_name" {
+  type        = string
   description = "Names of existing subnets list"
 }
 

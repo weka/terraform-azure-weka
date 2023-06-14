@@ -4,7 +4,7 @@ output "vnet-name" {
 }
 
 output "subnets-name" {
-  value = length(var.subnets_name_list) > 0 ? var.subnets_name_list : azurerm_subnet.subnet.*.name
+  value = var.subnet_name == null ? azurerm_subnet.subnet[0].name : var.subnet_name
   description = "Displays the subnet names list."
 }
 
