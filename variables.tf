@@ -47,21 +47,10 @@ variable "cluster_size" {
   }
 }
 
-variable "custom_image_id" {
+variable "source_image_id" {
   type        = string
-  description = "Custom image id"
-  default     = null
-}
-
-variable "linux_vm_image" {
-  type        = map(string)
-  description = "The default azure vm image reference."
-  default     = {
-    publisher = "Canonical"
-    offer     = "0001-com-ubuntu-server-focal"
-    sku       = "20_04-lts-gen2"
-    version   = "latest"
-  }
+  default     = "/communityGalleries/WekaIO-d7d3f308-d5a1-4c45-8e8a-818aed57375a/images/ubuntu20.04/versions/latest"
+  description = "Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1"
 }
 
 variable "sg_id" {
@@ -133,18 +122,6 @@ variable "private_dns_zone_name" {
   type = string
   description = "The private DNS zone name."
   default = null
-}
-
-variable "ofed_version" {
-  type = string
-  description = "The OFED driver version to for ubuntu 18."
-  default = "5.8-1.1.2.1"
-}
-
-variable "install_ofed_url" {
-  type = string
-  description = "The URL of the Blob with the OFED tgz file."
-  default = ""
 }
 
 variable "obs_name" {
@@ -319,10 +296,4 @@ variable "install_cluster_dpdk" {
   type        = bool
   default     = true
   description = "Install weka cluster with DPDK"
-}
-
-variable "install_ofed" {
-  type        = bool
-  default     = true
-  description = "Install ofed for weka cluster with dpdk configuration"
 }
