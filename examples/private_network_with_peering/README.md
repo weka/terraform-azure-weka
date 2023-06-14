@@ -30,7 +30,6 @@ No resources.
 | <a name="input_apt_repo_url"></a> [apt\_repo\_url](#input\_apt\_repo\_url) | Url of private repo | `string` | n/a | yes |
 | <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | Cluster name | `string` | n/a | yes |
 | <a name="input_cluster_size"></a> [cluster\_size](#input\_cluster\_size) | Weka cluster size | `number` | n/a | yes |
-| <a name="input_install_ofed_url"></a> [install\_ofed\_url](#input\_install\_ofed\_url) | Link to blob of ofed version tgz | `string` | n/a | yes |
 | <a name="input_install_weka_url"></a> [install\_weka\_url](#input\_install\_weka\_url) | Url of weka tar installtion | `string` | n/a | yes |
 | <a name="input_instance_type"></a> [instance\_type](#input\_instance\_type) | The SKU which should be used for this virtual machine | `string` | n/a | yes |
 | <a name="input_prefix"></a> [prefix](#input\_prefix) | Prefix for all resources | `string` | n/a | yes |
