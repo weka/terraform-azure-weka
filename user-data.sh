@@ -63,6 +63,43 @@ fi
 
 netplan apply
 
+cat >>/usr/sbin/remove-routes.sh <<EOF
+#!/bin/bash
+set -ex
+EOF
+for(( i=1; i<${nics_num}; i++ )); do
+  cat >>/usr/sbin/remove-routes.sh <<EOF
+while ! ip route | grep eth$i; do
+  ip route
+  sleep 5
+done
+/usr/sbin/ip route del ${subnet_range} dev eth$i
+EOF
+done
+
+chmod +x /usr/sbin/remove-routes.sh
+
+cat >/etc/systemd/system/remove-routes.service <<EOF
+[Unit]
+Description=Remove specific routes
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /usr/sbin/remove-routes.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+ip route # show routes before removing
+systemctl daemon-reload
+systemctl enable remove-routes.service
+systemctl start remove-routes.service
+systemctl status remove-routes.service || true # show status of remove-routes.service
+ip route # show routes after removing
+
 # attache disk
 wekaiosw_device=/dev/"$(lsblk | grep ${disk_size}G | awk '{print $1}')"
 
