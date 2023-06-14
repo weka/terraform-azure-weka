@@ -6,7 +6,7 @@ resource "azurerm_lb" "ui_lb" {
   sku                 = "Standard"
   frontend_ip_configuration {
     name                          = "${var.prefix}-${var.cluster_name}-ui-lb-frontend"
-    subnet_id                     = data.azurerm_subnet.subnets[0].id
+    subnet_id                     = data.azurerm_subnet.subnet.id
     private_ip_address_allocation = "Dynamic"
     private_ip_address_version    = "IPv4"
   }
@@ -56,7 +56,7 @@ resource "azurerm_lb" "backend-lb" {
   tags                = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
   frontend_ip_configuration {
     name                          = "${var.prefix}-${var.cluster_name}-backend-lb-frontend"
-    subnet_id                     = data.azurerm_subnet.subnets[0].id
+    subnet_id                     = data.azurerm_subnet.subnet.id
     private_ip_address_allocation = "Dynamic"
     private_ip_address_version    = "IPv4"
   }

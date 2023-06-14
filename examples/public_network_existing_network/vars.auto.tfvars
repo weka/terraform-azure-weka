@@ -1,7 +1,7 @@
 prefix              = "weka"
 rg_name             = "weka-rg"
 vnet_name           = "weka-vnet"
-subnets_name_list   = ["weka-subnet-0"]
+subnet_name         = "weka-subnet-0"
 subnet_delegation   = "10.0.2.0/25"
 cluster_name        = "poc"
 instance_type       = "Standard_L8s_v3"

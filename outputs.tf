@@ -31,4 +31,3 @@ curl --fail https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites
 EOT
   description = "Useful commands and script to interact with weka cluster"
 }
-
