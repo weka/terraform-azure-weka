@@ -15,8 +15,6 @@ while fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1;
 done
 
 apt update -y
-apt install -y jq
-apt install net-tools -y
 
 # set apt private repo
 if [[ "${apt_repo_url}" ]]; then
@@ -27,24 +25,6 @@ fi
 
 INSTALLATION_PATH="/tmp/weka"
 mkdir -p $INSTALLATION_PATH
-
-# install ofed
-if [[ ${install_ofed} == true ]]; then
-  curl -i ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"installing ofed\"}"
-  OFED_NAME=ofed-${ofed_version}
-  if [[ "${install_ofed_url}" ]]; then
-    wget "${install_ofed_url}" -O $INSTALLATION_PATH/$OFED_NAME.tgz
-  else
-    wget http://content.mellanox.com/ofed/MLNX_OFED-${ofed_version}/MLNX_OFED_LINUX-${ofed_version}-ubuntu20.04-x86_64.tgz -O $INSTALLATION_PATH/$OFED_NAME.tgz
-  fi
-
-  tar xf $INSTALLATION_PATH/$OFED_NAME.tgz --directory $INSTALLATION_PATH --one-top-level=$OFED_NAME
-  cd $INSTALLATION_PATH/$OFED_NAME/*/
-  ./mlnxofedinstall --without-fw-update --add-kernel-support --force 2>&1 | tee /tmp/weka_ofed_installation
-  /etc/init.d/openibd restart
-
-  curl -i ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"ofed installation completed\"}"
-fi
 
 for(( i=0; i<${nics_num}; i++ )); do
     cat <<-EOF | sed -i "/        eth$i/r /dev/stdin" /etc/netplan/50-cloud-init.yaml

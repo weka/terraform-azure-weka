@@ -25,6 +25,12 @@ module "deploy-weka" {
 }
 ```
 
+## Weka custom image
+As you can see via `source_image_id` variable, we use our own custom image.
+This is a community image that we created and uploaded to azure.
+In case you would like to view how we created the image you can find it [here](https://github.com/weka/terraform-azure-weka-custom-image).
+You can as well create it on your own subscription and use it.
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
