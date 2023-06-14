@@ -47,11 +47,6 @@ variable "apt_repo_url" {
   description = "Url of private repo"
 }
 
-variable "install_ofed_url" {
-  type = string
-  description = "Link to blob of ofed version tgz"
-}
-
 variable "subscription_id" {
   type = string
   description = "Subscription id for deployment"

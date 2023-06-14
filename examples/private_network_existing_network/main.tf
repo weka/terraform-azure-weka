@@ -26,7 +26,6 @@ module "deploy-weka" {
   apt_repo_url          = var.apt_repo_url
   private_network       = var.private_network
   install_weka_url      = var.install_weka_url
-  install_ofed_url      = var.install_ofed_url
   instance_type         = var.instance_type
   cluster_size          = var.cluster_size
   set_obs_integration   = var.set_obs_integration

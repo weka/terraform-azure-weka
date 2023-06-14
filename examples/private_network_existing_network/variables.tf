@@ -47,11 +47,6 @@ variable "apt_repo_url" {
   description = "Url of private repo"
 }
 
-variable "install_ofed_url" {
-  type = string
-  description = "Link to blob of ofed version tgz"
-}
-
 variable "private_network" {
   type = bool
   description = "Should be true to enable private network, defaults to public networking"
