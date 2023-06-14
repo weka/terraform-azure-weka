@@ -28,7 +28,6 @@ module "deploy-weka" {
   private_network       = var.private_network
   install_weka_url      = var.install_weka_url
   cluster_name          = var.clusters_list[count.index]
-  install_ofed_url      = var.install_ofed_url
   instance_type         = var.instance_type
   cluster_size          = var.cluster_size
   set_obs_integration   = var.set_obs_integration
