@@ -59,11 +59,6 @@ variable "vnet_to_peering" {
   description = "List of vent-name:resource-group-name to peer"
 }
 
-variable "install_ofed_url" {
-  type = string
-  description = "Link to blob of ofed version tgz"
-}
-
 variable "subscription_id" {
   type = string
   description = "Subscription id for deployment"
