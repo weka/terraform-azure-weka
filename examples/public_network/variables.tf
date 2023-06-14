@@ -14,12 +14,12 @@ variable "rg_name" {
 
 variable "address_space" {
   type = string
-  description = "address space that is used the virtual network."
+  description = "Address space that is used the virtual network."
 }
 
 variable "subnet_prefixes" {
-  type = list(string)
-  description = "List of address prefixes to use for the subnet"
+  type        = string
+  description = "Address prefixes to use for the subnet"
 }
 
 variable "subnet_delegation" {

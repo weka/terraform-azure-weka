@@ -31,9 +31,9 @@ variable "vnet_name" {
   description = "The virtual network name."
 }
 
-variable "subnets" {
-  type = list(string)
-  description = "The subnet names list."
+variable "subnet_name" {
+  type        = string
+  description = "The subnet name."
 }
 
 variable "cluster_size" {
@@ -66,7 +66,7 @@ variable "subnet_delegation" {
 variable "weka_version" {
   type = string
   description = "The Weka version to deploy."
-  default = "4.2.0"
+  default = "4.2.0.138-azuredk"
 }
 
 variable "get_weka_io_token" {
@@ -278,7 +278,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type = string
   description = "Function app code version (hash)"
-  default = "525a5fc3040aeeff2ce27e6ffd39bd14"
+  default = "50df724d85230b4684b6f145633484ef"
 }
 
 variable "function_app_dist" {

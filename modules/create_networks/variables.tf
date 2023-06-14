@@ -16,9 +16,9 @@ variable "address_space" {
 }
 
 variable "subnet_prefixes" {
-  type = list(string)
-  description = "A list of address prefixes to use for the subnet."
-  default = []
+  type        = string
+  description = "Address prefixes to use for the subnet."
+  default     = ""
 }
 
 variable "tags_map" {
@@ -33,10 +33,10 @@ variable "vnet_name" {
   description = "The VNet name, if exists."
 }
 
-variable "subnets_name_list" {
-  type = list(string)
-  default = []
-  description = "A list of subnet names, if exist."
+variable "subnet_name" {
+  type        = string
+  default     = null
+  description = "Subnet name, if exist."
 }
 
 variable "private_network" {

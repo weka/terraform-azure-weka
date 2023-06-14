@@ -2,11 +2,10 @@ data "azurerm_resource_group" "rg" {
   name = var.rg_name
 }
 
-data "azurerm_subnet" "subnets" {
-  count                = length(var.subnets)
+data "azurerm_subnet" "subnet" {
   resource_group_name  = var.vnet_rg_name
   virtual_network_name = var.vnet_name
-  name                 = var.subnets[count.index]
+  name                 = var.subnet_name
 }
 
 data "azurerm_virtual_network" "vnet" {
@@ -43,7 +42,7 @@ locals {
   private_nic_first_index   = var.private_network ? 0 : 1
   alphanumeric_cluster_name = lower(replace(var.cluster_name, "/\\W|_|\\s/", ""))
   alphanumeric_prefix_name  = lower(replace(var.prefix, "/\\W|_|\\s/", ""))
-  subnet_range              = data.azurerm_subnet.subnets[0].address_prefix
+  subnet_range              = data.azurerm_subnet.subnet.address_prefix
   nics_numbers              = var.install_cluster_dpdk ? var.container_number_map[var.instance_type].nics : 1
   custom_data_script = templatefile("${path.module}/user-data.sh", {
     apt_repo_url             = var.apt_repo_url
@@ -118,7 +117,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
       ip_configuration {
         primary                                = true
         name                                   = "ipconfig0"
-        subnet_id                              = data.azurerm_subnet.subnets[0].id
+        subnet_id                              = data.azurerm_subnet.subnet.id
         load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
         public_ip_address {
           name              = "${var.prefix}-${var.cluster_name}-public-ip"
@@ -137,7 +136,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
       ip_configuration {
         primary                                = true
         name                                   = "ipconfig0"
-        subnet_id                              = data.azurerm_subnet.subnets[0].id
+        subnet_id                              = data.azurerm_subnet.subnet.id
         load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
       }
     }
@@ -152,7 +151,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
       ip_configuration {
         primary                                = false
         name                                   = "ipconfig${network_interface.value}"
-        subnet_id                              = data.azurerm_subnet.subnets[network_interface.value].id
+        subnet_id                              = data.azurerm_subnet.subnet.id
         load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
       }
     }

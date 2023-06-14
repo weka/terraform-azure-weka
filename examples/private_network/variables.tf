@@ -14,8 +14,8 @@ variable "address_space" {
 }
 
 variable "subnet_prefixes" {
-  type = list(string)
-  description = "List of address prefixes to use for the subnet"
+  type        = string
+  description = "Address prefixes to use for the subnet"
 }
 
 variable "subnet_delegation" {
