@@ -12,14 +12,14 @@ variable "rg_name" {
   description = "Name of existing resource group"
 }
 
-variable "address_space" {
+variable "vnet_name" {
   type = string
-  description = "Address space that is used the virtual network."
+  description = "Name of existing vnet"
 }
 
-variable "subnet_prefixes" {
+variable "subnet_name" {
   type        = string
-  description = "Address prefixes to use for the subnet"
+  description = "Names of existing subnets list"
 }
 
 variable "subnet_delegation" {
