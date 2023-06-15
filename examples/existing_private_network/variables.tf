@@ -1,26 +1,15 @@
 variable "prefix" {
   type = string
   description = "Prefix for all resources"
+  validation {
+    condition     = can(regex("^[a-zA-Z][a-zA-Z\\-\\_0-9]{1,64}$", var.prefix))
+    error_message = "Prefix name must start with letter, only contain letters, numbers, dashes, or underscores."
+  }
 }
 
 variable "rg_name" {
   type = string
   description = "Name of existing resource group"
-}
-
-variable "address_space" {
-  type = string
-  description = "Address space that is used the virtual network."
-}
-
-variable "subnet_prefixes" {
-  type        = string
-  description = "Address prefixes to use for the subnet"
-}
-
-variable "subnet_delegation" {
-  type = string
-  description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service"
 }
 
 variable "cluster_name" {
@@ -32,19 +21,35 @@ variable "cluster_name" {
   }
 }
 
-variable "private_network" {
-  type = bool
-  description = "Should be true to enable private network, defaults to public networking"
+variable "vnet_name" {
+  type = string
+  description = "Name of existing vnet"
+}
+
+variable "subnet_name" {
+  type        = string
+  description = "Names of existing subnets list"
+}
+
+variable "subnet_delegation" {
+  type = string
+  description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service"
 }
 
 variable "install_weka_url" {
   type = string
-  description = "Url of weka tar installtion"
+  description = "Url for weka tar"
 }
 
 variable "apt_repo_url" {
   type = string
   description = "Url of private repo"
+  default = ""
+}
+
+variable "private_network" {
+  type = bool
+  description = "Should be true to enable private network, defaults to public networking"
 }
 
 variable "subscription_id" {
