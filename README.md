@@ -7,6 +7,8 @@ Applying the Terraform variables file performs the following:
 - Installs the Weka software.
 - Configures the Weka cluster.
 
+<br> You can find [here](https://github.com/weka/terraform-azure-weka-essential) our essential deployment which creates only vms and placement group.
+
 ## Usage
 ```hcl
 module "deploy-weka" {
@@ -14,13 +16,16 @@ module "deploy-weka" {
    prefix                = "weka"
    rg_name               = "myResourceGroup"
    vnet_name             = "weka-vpc-0"
-   subnets               = ["weka-subnet-0"]
+   vnet_rg_name          = "myVnetResourceGroup"
+   subnet_name           = "weka-subnet-0"
    sg_id                 = "security-group-id"
    get_weka_io_token     = "get_weka_io_token"
    cluster_name          = "myCluster"
+   subnet_delegation      = "10.0.1.0/25"
    set_obs_integration   = false
    instance_type         = "Standard_L8s_v3"
    cluster_size          = 6
+   subscription_id       = "mySubscriptionId"
    private_dns_zone_name = "myDns.private.net"
 }
 ```
