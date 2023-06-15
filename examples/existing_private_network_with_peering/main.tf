@@ -9,8 +9,8 @@ module "create-network" {
   source            = "../../modules/create_networks"
   prefix            = var.prefix
   rg_name           = var.rg_name
-  address_space     = var.address_space
-  subnet_prefixes   = var.subnet_prefixes
+  vnet_name         = var.vnet_name
+  subnet_name       = var.subnet_name
   private_network   = var.private_network
 }
 

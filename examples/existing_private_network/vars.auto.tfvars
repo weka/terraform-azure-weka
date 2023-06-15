@@ -5,7 +5,6 @@ subnet_name         = "weka-subnet-0"
 subnet_delegation   = "10.0.2.0/25"
 cluster_name        = "poc"
 private_network     = true
-apt_repo_url        = "http://11.0.0.4/ubuntu/mirror/archive.ubuntu.com/ubuntu/"
 install_weka_url    = "https://wekadeploytars.blob.core.windows.net/tars/weka-4.1.0.71.tar"
 instance_type       = "Standard_L8s_v3"
 set_obs_integration = true
