@@ -240,7 +240,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	driveContainerNum := os.Getenv("NUM_DRIVE_CONTAINERS")
 	installDpdk, _ := strconv.ParseBool(os.Getenv("INSTALL_DPDK"))
 	nicsNum := os.Getenv("NICS_NUM")
-	nicsNumInt, _ := strconv.Atoi(os.Getenv("HOSTS_NUM"))
+	nicsNumInt, _ := strconv.Atoi(nicsNum)
 	subnet := os.Getenv("SUBNET")
 
 	instanceType := os.Getenv("INSTANCE_TYPE")
