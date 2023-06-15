@@ -817,6 +817,47 @@ func SetDeletionProtection(ctx context.Context, subscriptionId, resourceGroupNam
 	return
 }
 
+func RetrySetDeletionProtectionAndReport(
+	ctx context.Context, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, vmScaleSetName, instanceId, hostName string,
+	maxAttempts int, sleepInterval time.Duration,
+) (err error) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msgf("Setting deletion protection on %s", hostName)
+	counter := 0
+	for {
+		err = SetDeletionProtection(ctx, subscriptionId, resourceGroupName, vmScaleSetName, instanceId, true)
+		if err == nil {
+			msg := "Deletion protection was set successfully"
+			logger.Info().Msg(msg)
+			ReportMsg(ctx, hostName, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, "progress", msg)
+			break
+		}
+
+		if protectionErr, ok := err.(*azcore.ResponseError); ok && protectionErr.ErrorCode == "AuthorizationFailed" {
+			counter++
+			if counter > maxAttempts {
+				break
+			}
+			msg := fmt.Sprintf("Setting deletion protection authorization error, going to sleep for %dM", sleepInterval)
+			logger.Info().Msg(msg)
+			ReportMsg(ctx, hostName, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, "progress", msg)
+			time.Sleep(sleepInterval)
+		} else {
+			break
+		}
+	}
+	if err != nil {
+		logger.Error().Err(err).Send()
+		ReportMsg(ctx, hostName, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, "error", err.Error())
+	}
+	return
+}
+
+func ReportMsg(ctx context.Context, hostName, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, reportType, message string) {
+	reportObj := Report{Type: reportType, Hostname: hostName, Message: message}
+	_ = UpdateStateReporting(ctx, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, reportObj)
+}
+
 func GetWekaClusterPassword(ctx context.Context, keyVaultUri string) (password string, err error) {
 	return GetKeyVaultValue(ctx, keyVaultUri, "weka-password")
 }
@@ -848,12 +889,7 @@ func GetInstanceIpsSet(scaleResponse protocol.ScaleResponse) InstanceIdsSet {
 	return instanceIpsSet
 }
 
-func GetSpecificScaleSetInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, instanceIds []string, expand *string) (vms []*armcompute.VirtualMachineScaleSetVM, err error) {
-	allVms, err := GetScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, expand)
-	if err != nil {
-		return
-	}
-
+func FilterSpecificScaleSetInstances(ctx context.Context, allVms []*armcompute.VirtualMachineScaleSetVM, instanceIds []string) (vms []*armcompute.VirtualMachineScaleSetVM, err error) {
 	instanceIdsSet := make(InstanceIdsSet)
 	for _, instanceId := range instanceIds {
 		instanceIdsSet[instanceId] = types.Nilv
