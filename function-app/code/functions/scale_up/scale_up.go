@@ -2,7 +2,6 @@ package scale_up
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"weka-deployment/common"
@@ -20,7 +19,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	clusterName := os.Getenv("CLUSTER_NAME")
 
 	ctx := r.Context()
-	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
+	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName)
 
 	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
 	if err != nil {
