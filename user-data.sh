@@ -94,7 +94,11 @@ systemctl start remove-routes.service
 systemctl status remove-routes.service || true # show status of remove-routes.service
 ip route # show routes after removing
 
-# attache disk
+# attach disk
+while ! [ "$(lsblk | grep ${disk_size}G | awk '{print $1}')" ] ; do
+  echo "waiting for disk to be ready"
+  sleep 5
+done
 wekaiosw_device=/dev/"$(lsblk | grep ${disk_size}G | awk '{print $1}')"
 
 status=0
