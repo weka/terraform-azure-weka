@@ -25,7 +25,7 @@ No resources.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_apt_repo_url"></a> [apt\_repo\_url](#input\_apt\_repo\_url) | Url of private repo | `string` | n/a | yes |
+| <a name="input_apt_repo_url"></a> [apt\_repo\_url](#input\_apt\_repo\_url) | Url of private repo | `string` | `""` | no |
 | <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | Cluster name | `string` | n/a | yes |
 | <a name="input_cluster_size"></a> [cluster\_size](#input\_cluster\_size) | Weka cluster size | `number` | n/a | yes |
 | <a name="input_install_weka_url"></a> [install\_weka\_url](#input\_install\_weka\_url) | Url for weka tar | `string` | n/a | yes |
