@@ -272,13 +272,24 @@ variable "function_app_storage_account_prefix" {
 variable "function_app_storage_account_container_prefix" {
   type        = string
   description = "Weka storage account container name prefix"
-  default     = "weka-tf-functions-deployment-"
+  default     = "weka-tf-bin-deployment-"
 }
 
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
   default     = "8a69754f5b7ab8f6191a1b1da76bb3ce"
+}
+
+variable "function_app_dist" {
+  type = string
+  description = "Function app code dist"
+  default = "release"
+
+  validation {
+    condition = contains(["dev", "release"], var.function_app_dist)
+    error_message = "Valid value is one of the following: dev, release."
+  }
 }
 
 variable "install_cluster_dpdk" {

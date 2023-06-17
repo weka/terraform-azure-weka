@@ -26,6 +26,17 @@ resource "azurerm_storage_container" "container" {
   }
 }
 
+resource "azurerm_storage_container" "bin_container" {
+  name                  = "weka-tf-bin-deployment-${var.region}"
+  storage_account_name  = azurerm_storage_account.sa.name
+  container_access_type = "blob"
+  depends_on            = [azurerm_storage_account.sa]
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
 resource "azurerm_storage_management_policy" "retention_policy" {
   storage_account_id = azurerm_storage_account.sa.id
 
@@ -34,6 +45,28 @@ resource "azurerm_storage_management_policy" "retention_policy" {
     enabled = true
     filters {
       prefix_match = ["weka-tf-functions-deployment-${var.region}/dev"]
+      blob_types   = ["blockBlob"]
+    }
+    actions {
+      base_blob {
+        tier_to_cool_after_days_since_last_access_time_greater_than    = 20
+        delete_after_days_since_last_access_time_greater_than          = 30
+        auto_tier_to_hot_from_cool_enabled = true
+      }
+    }
+  }
+
+  depends_on = [azurerm_storage_account.sa]
+}
+
+resource "azurerm_storage_management_policy" "bin_retention_policy" {
+  storage_account_id = azurerm_storage_account.sa.id
+
+  rule {
+    name    = "weka-tf-bin-retention-rule-${var.region}"
+    enabled = true
+    filters {
+      prefix_match = ["weka-tf-bin-deployment-${var.region}/dev"]
       blob_types   = ["blockBlob"]
     }
     actions {

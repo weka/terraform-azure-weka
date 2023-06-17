@@ -7,15 +7,15 @@ locals {
   os                     = "darwin"
 }
 
-resource "null_resource" "upload_function_app" {
+resource "null_resource" "upload_binary" {
   triggers = {
     function_hash = local.function_app_code_hash
   }
   provisioner "local-exec" {
     command = <<EOT
-      ${path.module}/zip_function_app_creation/create_function_binarie.sh ${local.os} ${local.function_code_path} ${local.function_bins_dir}
-      ${path.module}/zip_function_app_creation/upload_to_single_sa.sh ${local.os} ${local.function_code_path} ${local.function_bins_dir} ${var.rg_name} ${local.storage_account} ${local.container_name}
-      ${path.module}/zip_function_app_creation/write_function_hash_to_variables.sh ${local.os} ${local.function_code_path}
+      ${path.module}/binary_app_creation/create_function_binarie.sh ${local.os} ${local.function_code_path} ${local.function_bins_dir}
+      ${path.module}/binary_app_creation/upload_to_single_sa.sh ${local.os} ${local.function_code_path} ${local.function_bins_dir} ${var.rg_name} ${local.storage_account} ${local.container_name}
+      ${path.module}/binary_app_creation/write_code_hash_to_variables.sh ${local.os} ${local.function_code_path}
     EOT
   }
   depends_on = [azurerm_storage_account.management_sa]
@@ -162,7 +162,7 @@ resource "azurerm_linux_virtual_machine" "management_vm" {
     public_key = local.public_ssh_key
   }
 
-  depends_on = [null_resource.upload_function_app]
+  depends_on = [null_resource.upload_binary]
 }
 
 data "http" "myip" {
