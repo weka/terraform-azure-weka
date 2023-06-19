@@ -277,17 +277,17 @@ variable "function_app_storage_account_container_prefix" {
 
 variable "app_code_hash" {
   type        = string
-  description = "Function app code version (hash)"
+  description = "App code version (hash)"
   default     = "eebb027feca058641f5a02b2db69c0fb"
 }
 
-variable "function_app_dist" {
+variable "app_code_dist" {
   type = string
-  description = "Function app code dist"
+  description = "App code dist"
   default = "dev"
 
   validation {
-    condition = contains(["dev", "release"], var.function_app_dist)
+    condition = contains(["dev", "release"], var.app_code_dist)
     error_message = "Valid value is one of the following: dev, release."
   }
 }

@@ -6,8 +6,8 @@ on:
       - main
   
 jobs:
-  update_function_app_dist:
-    name: Update function_app_dist
+  update_app_code_dist:
+    name: Update app_code_dist
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -15,11 +15,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Update function_app_dist default to 'release'
+      - name: Update app_code_dist default to 'release'
         run: sed -i 's/^\( *default =\) "dev"/\1 "release"/' variables.tf 
 
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          commit_message: 'chore: set function_app_dist=release'
+          commit_message: 'chore: set app_code_dist=release'
           file_pattern: 'variables.tf'
