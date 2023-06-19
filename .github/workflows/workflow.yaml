@@ -60,18 +60,18 @@ jobs:
           # see https://github.com/Azure/login#configure-a-service-principal-with-a-secret
           creds: ${{ secrets.RND_AZURE_CREDENTIALS }}
 
-      - name: Run create_and_upload_zip
+      - name: Run create_and_upload_bin
         if: github.event_name != 'workflow_dispatch'
-        run: task create_and_upload_zip DIST=$DIST
+        run: task create_and_upload_bin DIST=$DIST
      
-      - name: Run create_and_upload_zip (workflow_dispatch)
+      - name: Run create_and_upload_bin (workflow_dispatch)
         if: github.event_name == 'workflow_dispatch'
-        run: task create_and_upload_zip DIST=${{ inputs.dist }}
+        run: task create_and_upload_bin DIST=${{ inputs.dist }}
 
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          commit_message: 'chore: update function_app_version'
+          commit_message: 'chore: update app_code_hash'
           file_pattern: 'variables.tf'
 
 

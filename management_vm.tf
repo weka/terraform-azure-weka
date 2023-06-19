@@ -7,7 +7,7 @@ locals {
 
 locals {
   location              = data.azurerm_resource_group.rg.location
-  function_bin_name = "${var.function_app_dist}/${var.function_app_version}"
+  function_bin_name = "${var.function_app_dist}/${var.app_code_hash}"
   weka_sa               = "${var.function_app_storage_account_prefix}${local.location}"
   weka_sa_container     = "${var.function_app_storage_account_container_prefix}${local.location}"
   code_url         = "https://${local.weka_sa}.blob.core.windows.net/${local.weka_sa_container}/${local.function_bin_name}"

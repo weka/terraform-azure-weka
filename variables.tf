@@ -275,7 +275,7 @@ variable "function_app_storage_account_container_prefix" {
   default     = "weka-tf-bin-deployment-"
 }
 
-variable "function_app_version" {
+variable "app_code_hash" {
   type        = string
   description = "Function app code version (hash)"
   default     = "eebb027feca058641f5a02b2db69c0fb"
