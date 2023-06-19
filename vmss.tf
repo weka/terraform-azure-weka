@@ -44,6 +44,7 @@ locals {
   alphanumeric_prefix_name  = lower(replace(var.prefix, "/\\W|_|\\s/", ""))
   subnet_range              = data.azurerm_subnet.subnet.address_prefix
   nics_numbers              = var.install_cluster_dpdk ? var.container_number_map[var.instance_type].nics : 1
+  function_app_url = "${azurerm_network_interface.management_vm_nic.private_ip_address}:${var.http_server_port}"
   custom_data_script = templatefile("${path.module}/user-data.sh", {
     apt_repo_url             = var.apt_repo_url
     private_ssh_key          = local.private_ssh_key
@@ -51,9 +52,8 @@ locals {
     install_cluster_dpdk     = var.install_cluster_dpdk
     subnet_range             = local.subnet_range
     nics_num                 = local.nics_numbers
-    deploy_url               = "https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/deploy"
-    report_url               = "https://${var.prefix}-${var.cluster_name}-function-app.azurewebsites.net/api/report"
-    function_app_default_key = data.azurerm_function_app_host_keys.function_keys.default_function_key
+    deploy_url               = "${local.function_app_url}/deploy"
+    report_url               = "${local.function_app_url}/report"
     disk_size                = local.disk_size
   })
 }
@@ -159,10 +159,11 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
   lifecycle {
     ignore_changes = [instances, custom_data, tags]
   }
-  
+
   depends_on = [
     azurerm_lb_backend_address_pool.lb_backend_pool, azurerm_lb_probe.backend_lb_probe,
-    azurerm_proximity_placement_group.ppg, azurerm_lb_rule.backend_lb_rule, azurerm_lb_rule.ui_lb_rule
+    azurerm_proximity_placement_group.ppg, azurerm_lb_rule.backend_lb_rule, azurerm_lb_rule.ui_lb_rule,
+    azurerm_linux_virtual_machine.management_vm
   ]
 }
 

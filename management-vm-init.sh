@@ -33,7 +33,7 @@ export INSTALL_DPDK="${install_dpdk}"
 export NICS_NUM="${nics_num}"
 export INSTALL_URL='${install_url}'  # ensure raw string
 export LOG_LEVEL="${log_level}"
-export SUBNETS="${subnets}"
+export SUBNET="${subnet}"
 export HTTP_SERVER_HOST="$(ip route get 1 | awk '{print $(NF-2);exit}')"
 export HTTP_SERVER_PORT="${http_server_port}"
 

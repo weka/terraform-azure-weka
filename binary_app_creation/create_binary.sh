@@ -14,7 +14,7 @@ current_script_dir=$(dirname ${BASH_SOURCE[0]})
 function_app_code_hash="$($current_script_dir/get_code_hash.sh ${os_name} ${function_code_path})"
 echo "function_app_code_hash: $function_app_code_hash"
 
-binary_dir="${binaries_dir}/${function_app_code_hash}/"
+binary_dir="${binaries_dir}/"
 
 echo "Building function code..."
 
@@ -25,7 +25,7 @@ mkdir -p $binary_dir
 cd $function_code_path
 
 # Build the function app
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $binary_dir
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $binary_dir/$function_app_code_hash
 
 cd $current_script_dir
 echo "Function code built."

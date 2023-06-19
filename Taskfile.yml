@@ -2,8 +2,8 @@ version: '3'
 
 env:
   DIST: '{{.DIST | default "dev"}}'
-  FUNCTION_CODE_PATH: '{{.TASKFILE_DIR}}/function-app/code'
-  FUNCTION_BIN_DIR: '{{.TASKFILE_DIR}}/.tf-function-app'
+  FUNCTION_CODE_PATH: '{{.TASKFILE_DIR}}/app/code'
+  FUNCTION_BIN_DIR: '{{.TASKFILE_DIR}}/.tf-binaries'
 
 tasks:
   get_code_hash:

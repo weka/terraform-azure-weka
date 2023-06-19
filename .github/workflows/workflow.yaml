@@ -37,7 +37,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: ./function-app/distribution
+        working-directory: ./app/distribution
     steps:
       - name: Checkout
         uses: actions/checkout@v3

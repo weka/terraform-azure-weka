@@ -43,6 +43,6 @@ resource "azurerm_monitor_data_collection_rule_association" "mngmt_vm_syslog" {
 
 resource "azurerm_monitor_data_collection_rule_association" "vmss_syslog" {
   name                    = "vmss-syslog-dcr"
-  target_resource_id      = var.custom_image_id != null ? azurerm_linux_virtual_machine_scale_set.custom_image_vmss.0.id : azurerm_linux_virtual_machine_scale_set.default_image_vmss.0.id
+  target_resource_id      = azurerm_linux_virtual_machine_scale_set.vmss.id
   data_collection_rule_id = azurerm_monitor_data_collection_rule.dcr.id
 }

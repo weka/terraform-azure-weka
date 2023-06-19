@@ -14,8 +14,8 @@ regions_file="$regions_file_dir/${dist}.txt"
 current_script_dir=$(dirname ${BASH_SOURCE[0]})
 code_hash="$($current_script_dir/get_code_hash.sh ${os_name} ${code_path})"
 
-zip_path="$binary_dir/${code_hash}.zip"
-az_filename="${DIST}/${code_hash}.zip"
+bin_path="$binary_dir/${code_hash}"
+az_filename="${DIST}/${code_hash}"
 
 while read region; do 
     echo "Uploading to region: $region"
@@ -23,5 +23,5 @@ while read region; do
     storage_account="weka${region}"
     container_name="weka-tf-bin-deployment-${region}"
 
-    ./binary_app_creation/upload_to_azure_storage.sh $zip_path $resource_group $storage_account $container_name $az_filename
+    ./binary_app_creation/upload_to_azure_storage.sh $bin_path $resource_group $storage_account $container_name $az_filename
 done < $regions_file

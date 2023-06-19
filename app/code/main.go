@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 	"weka-deployment/functions/clusterize"
 	"weka-deployment/functions/clusterize_finalization"
@@ -28,7 +31,8 @@ import (
 )
 
 var (
-	logger *logging.Logger
+	logger     *logging.Logger
+	httpServer *http.Server
 )
 
 func init() {
@@ -63,6 +67,23 @@ func useMiddlewares(r chi.Router) {
 func main() {
 	ctx := context.Background()
 
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go runHttpServer(ctx, &wg)
+
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	wg.Add(1)
+	go func() {
+		<-c
+		cleanup(ctx)
+		wg.Done()
+	}()
+
+	wg.Wait()
+}
+
+func runHttpServer(ctx context.Context, wg *sync.WaitGroup) {
 	r := InitRouter(ctx)
 	r.Post("/clusterize", clusterize.Handler)
 	r.Post("/deploy", deploy.Handler)
@@ -89,9 +110,25 @@ func main() {
 		port = "8080"
 		os.Setenv("HTTP_SERVER_PORT", port)
 	}
-	logger.Info().Msgf("Go server Listening on: %v", port)
-	err := http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), r)
-	if err != nil {
-		logger.Fatal().Err(err).Send()
+	httpServer = &http.Server{
+		Addr:         fmt.Sprintf("%s:%s", host, port),
+		Handler:      r,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  10 * time.Second,
 	}
+	logger.Info().Msgf("Go server Listening on: %v", port)
+	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		logger.Fatal().Msgf("http server failure: %v", err)
+	}
+	logger.Info().Msg("HTTP Server Stopped")
+	wg.Done()
+}
+
+func cleanup(ctx context.Context) {
+	logger.Info().Msg("Cleanup")
+	// stop http server
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	httpServer.Shutdown(ctx)
 }
