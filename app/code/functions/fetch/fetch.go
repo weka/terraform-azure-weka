@@ -2,7 +2,6 @@ package fetch
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -44,10 +43,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	responseJson, _ := json.Marshal(response)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.RespondWithJson(w, response, http.StatusOK)
 }
 
 func getScaleSetInfoResponse(

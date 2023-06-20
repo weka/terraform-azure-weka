@@ -33,8 +33,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	logger.Debug().Msgf("transient errors: %s", errs)
 	resData := make(map[string]interface{})
 	resData["errors"] = errs
-	responseJson, _ := json.Marshal(resData)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.RespondWithJson(w, resData, http.StatusOK)
 }

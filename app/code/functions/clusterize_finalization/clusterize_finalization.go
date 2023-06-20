@@ -1,7 +1,6 @@
 package clusterize_finalization
 
 import (
-	"encoding/json"
 	"net/http"
 	"os"
 	"weka-deployment/common"
@@ -25,8 +24,5 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	responseJson, _ := json.Marshal(state)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.RespondWithJson(w, state, http.StatusOK)
 }

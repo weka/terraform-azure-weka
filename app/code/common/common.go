@@ -1038,3 +1038,17 @@ func RespondWithMessage(w http.ResponseWriter, msg string, statusCode int) {
 	responseJson, _ := json.Marshal(data)
 	w.Write(responseJson)
 }
+
+func RespondWithJson(w http.ResponseWriter, input any, statusCode int) {
+	responseJson, _ := json.Marshal(input)
+
+	w.WriteHeader(statusCode)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(responseJson)
+}
+
+func RespondWithPlainText(w http.ResponseWriter, text string, statusCode int) {
+	w.WriteHeader(statusCode)
+	w.Header().Set("Content-Type", "application/text")
+	w.Write([]byte(text))
+}

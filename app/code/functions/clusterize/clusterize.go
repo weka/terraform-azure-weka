@@ -172,17 +172,7 @@ func HandleLastClusterVm(ctx context.Context, state common.ClusterState, p Clust
 func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript string) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	instanceName := strings.Split(p.VmName, ":")[0]
-	instanceId := common.GetScaleSetVmIndex(instanceName)
-	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName)
 	vmName := p.VmName
-
-	ip, err := common.GetPrivateIp(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, p.Prefix, p.Cluster.ClusterName, instanceId)
-	if err != nil || ip == "" {
-		logger.Warn().Msg("Failed to fetch private ip")
-	} else {
-		vmName = fmt.Sprintf("%s:%s", vmName, ip)
-	}
 
 	state, err := common.AddInstanceToState(
 		ctx, p.SubscriptionId, p.ResourceGroupName, p.StateStorageName, p.StateContainerName, vmName,
@@ -281,6 +271,5 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	clusterizeScript := Clusterize(ctx, params)
-	w.Header().Set("Content-Type", "application/text")
-	w.Write([]byte(clusterizeScript))
+	common.RespondWithPlainText(w, clusterizeScript, http.StatusOK)
 }

@@ -289,8 +289,5 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	responseJson, _ := json.Marshal(terminateResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.RespondWithJson(w, terminateResponse, http.StatusOK)
 }

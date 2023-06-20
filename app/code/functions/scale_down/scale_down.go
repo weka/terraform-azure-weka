@@ -29,7 +29,5 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	responseJson, _ := json.Marshal(scaleResponse)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.RespondWithJson(w, scaleResponse, http.StatusOK)
 }

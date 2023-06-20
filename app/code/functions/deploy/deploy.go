@@ -260,7 +260,5 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		common.RespondWithError(w, err, http.StatusInternalServerError)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/text")
-	w.Write([]byte(bashScript))
+	common.RespondWithPlainText(w, bashScript, http.StatusOK)
 }
