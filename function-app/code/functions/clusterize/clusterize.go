@@ -239,6 +239,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	protectionLevel, _ := strconv.Atoi(os.Getenv("PROTECTION_LEVEL"))
 	hotspare, _ := strconv.Atoi(os.Getenv("HOTSPARE"))
 	installDpdk, _ := strconv.ParseBool(os.Getenv("INSTALL_DPDK"))
+	addFrontendNum, _ := strconv.Atoi(os.Getenv("NUM_FRONTEND_CONTAINERS"))
+	addFrontend := false
+	if addFrontendNum > 0 {
+		addFrontend = true
+	}
 
 	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
@@ -283,6 +288,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			ClusterName: clusterName,
 			NvmesNum:    nvmesNum,
 			SetObs:      setObs,
+			AddFrontend: addFrontend,
 			DataProtection: clusterize.DataProtectionParams{
 				StripeWidth:     stripeWidth,
 				ProtectionLevel: protectionLevel,

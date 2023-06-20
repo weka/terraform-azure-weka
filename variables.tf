@@ -162,7 +162,7 @@ variable "container_number_map" {
     frontend = number
     nvme     = number
     nics     = number
-    memory   = string
+    memory   = list(string)
   }))
   description = "Maps the number of objects and memory size per machine type."
   default = {
@@ -172,7 +172,7 @@ variable "container_number_map" {
       frontend = 1
       nvme     = 1
       nics     = 4
-      memory   = "31GB"
+      memory   = ["33GB","31GB"]
     },
     Standard_L16s_v3 = {
       compute  = 4
@@ -180,7 +180,7 @@ variable "container_number_map" {
       frontend = 1
       nvme     = 2
       nics     = 8
-      memory   = "72GB"
+      memory   = ["79GB","72GB"]
     },
     Standard_L32s_v3 = {
       compute  = 4
@@ -188,7 +188,7 @@ variable "container_number_map" {
       frontend = 1
       nvme     = 4
       nics     = 8
-      memory   = "189GB"
+      memory   = ["197GB","189GB"]
     },
     Standard_L48s_v3 = {
       compute  = 3
@@ -196,7 +196,7 @@ variable "container_number_map" {
       frontend = 1
       nvme     = 6
       nics     = 8
-      memory   = "306GB"
+      memory   = ["314GB","306GB"]
     },
     Standard_L64s_v3 = {
       compute  = 4
@@ -204,7 +204,7 @@ variable "container_number_map" {
       frontend = 1
       nvme     = 8
       nics     = 8
-      memory   = "418GB"
+      memory   = ["357GB","418GB"]
     }
   }
 }
@@ -278,7 +278,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type = string
   description = "Function app code version (hash)"
-  default = "caff19ed8651de36891b0c99e330c006"
+  default = "5e6314a36e7a5a2c017798ee96d6e884"
 }
 
 variable "function_app_dist" {
@@ -296,4 +296,10 @@ variable "install_cluster_dpdk" {
   type        = bool
   default     = true
   description = "Install weka cluster with DPDK"
+}
+
+variable "add_frontend_containers" {
+  type        = bool
+  default     = true
+  description = "Create cluster with FE containers"
 }

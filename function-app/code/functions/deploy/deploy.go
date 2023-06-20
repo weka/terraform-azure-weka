@@ -25,24 +25,6 @@ func getAzureInstanceNameCmd() string {
 	return "curl -s -H Metadata:true --noproxy * http://169.254.169.254/metadata/instance?api-version=2021-02-01 | jq '.compute.name' | cut -c2- | rev | cut -c2- | rev"
 }
 
-func GetBackendCoreCount(instanceType string) (backendCoreCount protocol.BackendCoreCount, err error) {
-	switch instanceType {
-	case "Standard_L8s_v3":
-		backendCoreCount = protocol.BackendCoreCount{Total: 3, Frontend: 1, Drive: 1, Memory: "31GB"}
-	case "Standard_L16s_v3":
-		backendCoreCount = protocol.BackendCoreCount{Total: 7, Frontend: 1, Drive: 2, Memory: "72GB"}
-	case "Standard_L32s_v3":
-		backendCoreCount = protocol.BackendCoreCount{Total: 7, Frontend: 1, Drive: 2, Memory: "189GB"}
-	case "Standard_L48s_v3":
-		backendCoreCount = protocol.BackendCoreCount{Total: 7, Frontend: 1, Drive: 3, Memory: "306GB"}
-	case "Standard_L64s_v3":
-		backendCoreCount = protocol.BackendCoreCount{Total: 7, Frontend: 1, Drive: 2, Memory: "418GB"}
-	default:
-		err = fmt.Errorf("unsupported instance type: %s", instanceType)
-	}
-	return backendCoreCount, err
-}
-
 func getWekaIoToken(ctx context.Context, keyVaultUri string) (token string, err error) {
 	token, err = common.GetKeyVaultValue(ctx, keyVaultUri, "get-weka-io-token")
 	return
@@ -66,9 +48,9 @@ func GetDeployScript(
 	keyVaultUri,
 	vm string,
 	computeMemory string,
-	computeContainerNum string,
-	frontendContainerNum string,
-	driveContainerNum string,
+	computeContainerNum int,
+	frontendContainerNum int,
+	driveContainerNum int,
 	installDpdk bool,
 	nicsNum string,
 	gateways []string,
@@ -88,6 +70,12 @@ func GetDeployScript(
 	baseFunctionUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/", prefix, clusterName)
 	funcDef := azure_functions_def.NewFuncDef(baseFunctionUrl, functionKey)
 
+	instanceParams := protocol.BackendCoreCount{Compute: computeContainerNum, Frontend: frontendContainerNum, Drive: driveContainerNum, ComputeMemory: computeMemory}
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return "", err
+	}
+
 	// used for getting failure domain
 	getHashedIpCommand := bash_functions.GetHashedPrivateIpBashCmd()
 
@@ -99,16 +87,13 @@ func GetDeployScript(
 		}
 
 		deploymentParams := deploy.DeploymentParams{
-			VMName:               vm,
-			ComputeMemory:        computeMemory,
-			ComputeContainerNum:  computeContainerNum,
-			FrontendContainerNum: frontendContainerNum,
-			DriveContainerNum:    driveContainerNum,
-			WekaInstallUrl:       installUrl,
-			WekaToken:            token,
-			InstallDpdk:          installDpdk,
-			NicsNum:              nicsNum,
-			Gateways:             gateways,
+			VMName:         vm,
+			InstanceParams: instanceParams,
+			WekaInstallUrl: installUrl,
+			WekaToken:      token,
+			InstallDpdk:    installDpdk,
+			NicsNum:        nicsNum,
+			Gateways:       gateways,
 		}
 		deployScriptGenerator := deploy.DeployScriptGenerator{
 			FuncDef:          funcDef,
@@ -146,7 +131,6 @@ func GetDeployScript(
 			return "", err
 		}
 
-		instanceParams, err := GetBackendCoreCount(instanceType)
 		if err != nil {
 			logger.Error().Err(err).Send()
 			return "", err
@@ -235,9 +219,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	prefix := os.Getenv("PREFIX")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 	computeMemory := os.Getenv("COMPUTE_MEMORY")
-	computeContainerNum := os.Getenv("NUM_COMPUTE_CONTAINERS")
-	frontendContainerNum := os.Getenv("NUM_FRONTEND_CONTAINERS")
-	driveContainerNum := os.Getenv("NUM_DRIVE_CONTAINERS")
+	computeContainerNum, _ := strconv.Atoi(os.Getenv("NUM_COMPUTE_CONTAINERS"))
+	frontendContainerNum, _ := strconv.Atoi(os.Getenv("NUM_FRONTEND_CONTAINERS"))
+	driveContainerNum, _ := strconv.Atoi(os.Getenv("NUM_DRIVE_CONTAINERS"))
 	installDpdk, _ := strconv.ParseBool(os.Getenv("INSTALL_DPDK"))
 	nicsNum := os.Getenv("NICS_NUM")
 	nicsNumInt, _ := strconv.Atoi(nicsNum)
