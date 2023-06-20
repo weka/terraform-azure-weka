@@ -88,15 +88,13 @@ locals {
 }
 
 locals {
-  location              = data.azurerm_resource_group.rg.location
-  function_app_zip_name = "${var.function_app_dist}/${var.function_app_version}.zip"
-  weka_sa               = "${var.function_app_storage_account_prefix}${local.location}"
-  weka_sa_container     = "${var.function_app_storage_account_container_prefix}${local.location}"
-}
-
-locals {
-  function_code_path     = "${path.module}/function-app/code"
-  function_app_code_hash = md5(join("", [for f in fileset(local.function_code_path, "**") : filemd5("${local.function_code_path}/${f}")]))
+  location                 = data.azurerm_resource_group.rg.location
+  function_app_zip_name    = "${var.function_app_dist}/${var.function_app_version}.zip"
+  weka_sa                  = "${var.function_app_storage_account_prefix}${local.location}"
+  weka_sa_container        = "${var.function_app_storage_account_container_prefix}${local.location}"
+  function_code_path       = "${path.module}/function-app/code"
+  function_app_code_hash   = md5(join("", [for f in fileset(local.function_code_path, "**") : filemd5("${local.function_code_path}/${f}")]))
+  get_compute_memory_index = var.add_frontend_containers ? 1 : 0
 }
 
 
@@ -123,7 +121,6 @@ resource "azurerm_linux_function_app" "function_app" {
     "STRIPE_WIDTH" = var.stripe_width != -1 ? var.stripe_width : local.stripe_width
     "HOTSPARE" = var.hotspare
     "VM_USERNAME" = var.vm_username
-    "COMPUTE_MEMORY" = var.container_number_map[var.instance_type].memory
     "SUBSCRIPTION_ID" = data.azurerm_subscription.primary.subscription_id
     "RESOURCE_GROUP_NAME" = data.azurerm_resource_group.rg.name
     "LOCATION" = data.azurerm_resource_group.rg.location
@@ -131,9 +128,10 @@ resource "azurerm_linux_function_app" "function_app" {
     "OBS_NAME" = var.obs_name != "" ? var.obs_name : "${var.prefix}${var.cluster_name}obs"
     "OBS_CONTAINER_NAME" = var.obs_container_name != "" ? var.obs_container_name : "${var.prefix}-${var.cluster_name}-obs"
     "OBS_ACCESS_KEY" = var.blob_obs_access_key
-    "NUM_DRIVE_CONTAINERS" = var.container_number_map[var.instance_type].drive
-    "NUM_COMPUTE_CONTAINERS" = var.container_number_map[var.instance_type].compute
-    "NUM_FRONTEND_CONTAINERS" = var.container_number_map[var.instance_type].frontend
+    NUM_DRIVE_CONTAINERS = var.container_number_map[var.instance_type].drive
+    NUM_COMPUTE_CONTAINERS = var.add_frontend_containers == false ? var.container_number_map[var.instance_type].compute + 1 : var.container_number_map[var.instance_type].compute
+    NUM_FRONTEND_CONTAINERS = var.add_frontend_containers == false ? 0 : var.container_number_map[var.instance_type].frontend
+    COMPUTE_MEMORY = var.container_number_map[var.instance_type].memory[local.get_compute_memory_index]
     "NVMES_NUM" = var.container_number_map[var.instance_type].nvme
     "TIERING_SSD_PERCENT" = var.tiering_ssd_percent
     "PREFIX" = var.prefix
