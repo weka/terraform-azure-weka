@@ -23,6 +23,7 @@ import (
 	"weka-deployment/functions/status"
 	"weka-deployment/functions/terminate"
 	"weka-deployment/functions/transient"
+	periodic "weka-deployment/periodic_tasks"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -33,10 +34,16 @@ import (
 var (
 	logger     *logging.Logger
 	httpServer *http.Server
+
+	scaleUpTask   periodic.ScaleUpPeriodicTask
+	scaleDownTask periodic.ScaleDownPeriodicTask
 )
 
 func init() {
 	logger = logging.NewLogger()
+
+	scaleUpTask = periodic.NewScaleUpPeriodicTask(time.Second * 10)
+	scaleDownTask = periodic.NewScaleDownPeriodicTask(time.Second * 10)
 }
 
 func InitRouter(ctx context.Context) chi.Router {
@@ -67,12 +74,18 @@ func useMiddlewares(r chi.Router) {
 func main() {
 	ctx := context.Background()
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go runHttpServer(ctx, &wg)
+	// run periodic tasks
+	go scaleUpTask.Run(ctx)
+	go scaleDownTask.Run(ctx)
 
+	// run hrrp server
+	go runHttpServer(ctx)
+
+	// cleanup stuff on interrupt
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		<-c
@@ -83,7 +96,7 @@ func main() {
 	wg.Wait()
 }
 
-func runHttpServer(ctx context.Context, wg *sync.WaitGroup) {
+func runHttpServer(ctx context.Context) {
 	r := InitRouter(ctx)
 	r.Post("/clusterize", clusterize.Handler)
 	r.Post("/deploy", deploy.Handler)
@@ -122,7 +135,6 @@ func runHttpServer(ctx context.Context, wg *sync.WaitGroup) {
 		logger.Fatal().Msgf("http server failure: %v", err)
 	}
 	logger.Info().Msg("HTTP Server Stopped")
-	wg.Done()
 }
 
 func cleanup(ctx context.Context) {
@@ -131,4 +143,7 @@ func cleanup(ctx context.Context) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	httpServer.Shutdown(ctx)
+	// stop periodic tasks
+	scaleUpTask.Stop()
+	scaleDownTask.Stop()
 }

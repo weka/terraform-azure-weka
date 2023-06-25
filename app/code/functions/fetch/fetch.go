@@ -8,6 +8,7 @@ import (
 	"weka-deployment/common"
 
 	"github.com/weka/go-cloud-lib/logging"
+	"github.com/weka/go-cloud-lib/protocol"
 )
 
 type ScaleSetInfoResponse struct {
@@ -34,7 +35,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
 
-	response, err := getScaleSetInfoResponse(
+	response, err := GetScaleSetInfoResponse(
 		ctx, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName, keyVaultUri,
 	)
 	if err != nil {
@@ -46,9 +47,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	common.RespondWithJson(w, response, http.StatusOK)
 }
 
-func getScaleSetInfoResponse(
+func GetScaleSetInfoResponse(
 	ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName, keyVaultUri string,
-) (scaleSetInfoResponse ScaleSetInfoResponse, err error) {
+) (scaleSetInfoResponse protocol.HostGroupInfoResponse, err error) {
 	instances, err := common.GetScaleSetInstancesInfo(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
 		return
@@ -64,11 +65,21 @@ func getScaleSetInfoResponse(
 		return
 	}
 
-	scaleSetInfoResponse = ScaleSetInfoResponse{
+	// convert []ScaleSetInstanceInfo to []HgInstance
+	hgInstances := make([]protocol.HgInstance, 0)
+	for _, instance := range instances {
+		hgInstance := protocol.HgInstance{
+			Id:        instance.Id,
+			PrivateIp: instance.PrivateIp,
+		}
+		hgInstances = append(hgInstances, hgInstance)
+	}
+
+	scaleSetInfoResponse = protocol.HostGroupInfoResponse{
 		Username:        scaleSetInfo.AdminUsername,
 		Password:        scaleSetInfo.AdminPassword,
 		DesiredCapacity: desiredCapacity,
-		Instances:       instances,
+		Instances:       hgInstances,
 		BackendIps:      getBackendIps(instances),
 		Role:            "backend",
 		Version:         1,

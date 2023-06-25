@@ -14,12 +14,13 @@ type PeriodicTask struct {
 	closing     chan chan bool
 }
 
-func (p *PeriodicTask) ScaleUp(ctx context.Context) error {
-	return nil
-}
-
-func (p *PeriodicTask) Run(ctx context.Context) {
-	p.run(ctx, p.ScaleUp)
+func NewPeriodicTask(name string, runInterval time.Duration) PeriodicTask {
+	p := PeriodicTask{
+		name:        name,
+		runInterval: runInterval,
+	}
+	p.closing = make(chan chan bool)
+	return p
 }
 
 func (p *PeriodicTask) run(ctx context.Context, workFunc func(ctx context.Context) error) {
@@ -34,13 +35,13 @@ func (p *PeriodicTask) run(ctx context.Context, workFunc func(ctx context.Contex
 			errc <- true
 			return
 		case <-ticker.C:
-			logger.Info().Msgf("Start running %s", p.name)
+			logger.Debug().Msgf("Start running %s", p.name)
 			err := workFunc(ctx)
 			if err != nil {
 				err := fmt.Errorf("failed to run %s: %v", p.name, err)
 				logger.Warn().Err(err).Send()
 			}
-			logger.Info().Msgf("Finished running %s", p.name)
+			logger.Debug().Msgf("Finished running %s", p.name)
 		}
 	}
 }
