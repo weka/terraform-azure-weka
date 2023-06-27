@@ -303,3 +303,28 @@ variable "add_frontend_containers" {
   default     = true
   description = "Create cluster with FE containers"
 }
+
+############################### clients ############################
+variable "clients_number" {
+  type        = number
+  description = "The number of client virtual machines to deploy."
+  default     = 0
+}
+
+variable "client_instance_type" {
+  type        = string
+  description = "The client virtual machine type (sku) to deploy."
+  default     = "Standard_D8_v5"
+}
+
+variable "client_nics_num" {
+  type        = string
+  description = "The client NICs number."
+  default     = 2
+}
+
+variable "mount_clients_dpdk" {
+  type        = bool
+  default     = true
+  description = "Mount weka clients in DPDK mode"
+}
