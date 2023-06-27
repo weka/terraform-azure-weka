@@ -37,6 +37,26 @@ This is a community image that we created and uploaded to azure.
 In case you would like to view how we created the image you can find it [here](https://github.com/weka/terraform-azure-weka-custom-image).
 You can as well create it on your own subscription and use it.
 
+
+## Clients
+We support creating clients that will be mounted automatically to the cluster.
+<br>In order to create clients you need to provide the number of clients you want (by default the number is 0),
+for example:
+```hcl
+clients_number = 2
+```
+This will automatically create 2 clients.
+<br>In addition you can supply these optional variables:
+```hcl
+client_instance_type = "Standard_D4_v4"
+client_nics_num = DESIRED_NUM
+```
+### Mounting clients in udp mode
+In order to mount clients in udp mode you should pass the following param (in addition to the above):
+```hcl
+mount_clients_dpdk = false
+```
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
