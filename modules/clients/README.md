@@ -17,11 +17,7 @@ No modules.
 
 | Name | Type |
 |------|------|
-| [azurerm_linux_virtual_machine.vms](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/linux_virtual_machine) | resource |
-| [azurerm_network_interface.client_nic](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/network_interface) | resource |
-| [azurerm_network_interface.primary_client_nic_private](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/network_interface) | resource |
-| [azurerm_network_interface.primary_client_nic_public](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/network_interface) | resource |
-| [azurerm_public_ip.public_ip](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/public_ip) | resource |
+| [azurerm_linux_virtual_machine_scale_set.vmss](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/linux_virtual_machine_scale_set) | resource |
 | [azurerm_resource_group.rg](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/resource_group) | data source |
 | [azurerm_subnet.subnet](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/subnet) | data source |
 
@@ -39,8 +35,8 @@ No modules.
 | <a name="input_nics"></a> [nics](#input\_nics) | Number of nics to set on each client vm | `number` | `2` | no |
 | <a name="input_nics_map"></a> [nics\_map](#input\_nics\_map) | n/a | `map(number)` | <pre>{<br>  "Standard_L16s_v3": 8,<br>  "Standard_L8s_v3": 4<br>}</pre> | no |
 | <a name="input_ppg_id"></a> [ppg\_id](#input\_ppg\_id) | Placement proximity group id. | `string` | n/a | yes |
-| <a name="input_preparation_template_file"></a> [preparation\_template\_file](#input\_preparation\_template\_file) | preparation\_template file path | `string` | n/a | yes |
 | <a name="input_rg_name"></a> [rg\_name](#input\_rg\_name) | A predefined resource group in the Azure subscription. | `string` | n/a | yes |
+| <a name="input_sg_id"></a> [sg\_id](#input\_sg\_id) | Security group id | `string` | n/a | yes |
 | <a name="input_source_image_id"></a> [source\_image\_id](#input\_source\_image\_id) | Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1 | `string` | n/a | yes |
 | <a name="input_ssh_public_key"></a> [ssh\_public\_key](#input\_ssh\_public\_key) | The VM public key. If it is not set, the keys are auto-generated. | `string` | n/a | yes |
 | <a name="input_subnet_name"></a> [subnet\_name](#input\_subnet\_name) | The subnet names. | `string` | n/a | yes |
@@ -52,5 +48,6 @@ No modules.
 
 | Name | Description |
 |------|-------------|
-| <a name="output_client-ips"></a> [client-ips](#output\_client-ips) | n/a |
+| <a name="output_backend"></a> [backend](#output\_backend) | n/a |
+| <a name="output_client-name"></a> [client-name](#output\_client-name) | n/a |
 <!-- END_TF_DOCS -->
