@@ -21,6 +21,7 @@ import (
 	"github.com/weka/go-cloud-lib/lib/types"
 	"github.com/weka/go-cloud-lib/logging"
 	"github.com/weka/go-cloud-lib/protocol"
+	reportLib "github.com/weka/go-cloud-lib/report"
 )
 
 type InvokeRequest struct {
@@ -32,15 +33,6 @@ type InvokeResponse struct {
 	Outputs     map[string]interface{}
 	Logs        []string
 	ReturnValue interface{}
-}
-
-type ClusterState struct {
-	InitialSize int                 `json:"initial_size"`
-	DesiredSize int                 `json:"desired_size"`
-	Progress    map[string][]string `json:"progress"`
-	Errors      map[string][]string `json:"errors"`
-	Instances   []string            `json:"instances"`
-	Clusterized bool                `json:"clusterized"`
 }
 
 func leaseContainer(ctx context.Context, subscriptionId, resourceGroupName, storageAccountName, containerName string, leaseIdIn *string, action armstorage.LeaseContainerRequestAction) (leaseIdOut *string, err error) {
@@ -129,7 +121,7 @@ func ReadBlobObject(ctx context.Context, stateStorageName, containerName, blobNa
 
 }
 
-func ReadState(ctx context.Context, stateStorageName, containerName string) (state ClusterState, err error) {
+func ReadState(ctx context.Context, stateStorageName, containerName string) (state protocol.ClusterState, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	stateAsByteArray, err := ReadBlobObject(ctx, stateStorageName, containerName, "state")
@@ -166,7 +158,7 @@ func WriteBlobObject(ctx context.Context, stateStorageName, containerName, blobN
 
 }
 
-func WriteState(ctx context.Context, stateStorageName, containerName string, state ClusterState) (err error) {
+func WriteState(ctx context.Context, stateStorageName, containerName string, state protocol.ClusterState) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	stateAsByteArray, err := json.Marshal(state)
@@ -191,7 +183,7 @@ func (e *ShutdownRequired) Error() string {
 	return e.Message
 }
 
-func AddInstanceToState(ctx context.Context, subscriptionId, resourceGroupName, stateStorageName, stateContainerName, newInstance string) (state ClusterState, err error) {
+func AddInstanceToState(ctx context.Context, subscriptionId, resourceGroupName, stateStorageName, stateContainerName, newInstance string) (state protocol.ClusterState, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	leaseId, err := LockContainer(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
@@ -229,7 +221,7 @@ func AddInstanceToState(ctx context.Context, subscriptionId, resourceGroupName, 
 	return
 }
 
-func UpdateClusterized(ctx context.Context, subscriptionId, resourceGroupName, stateStorageName, stateContainerName string) (state ClusterState, err error) {
+func UpdateClusterized(ctx context.Context, subscriptionId, resourceGroupName, stateStorageName, stateContainerName string) (state protocol.ClusterState, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	leaseId, err := LockContainer(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
@@ -854,7 +846,7 @@ func RetrySetDeletionProtectionAndReport(
 }
 
 func ReportMsg(ctx context.Context, hostName, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, reportType, message string) {
-	reportObj := Report{Type: reportType, Hostname: hostName, Message: message}
+	reportObj := protocol.Report{Type: reportType, Hostname: hostName, Message: message}
 	_ = UpdateStateReporting(ctx, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, reportObj)
 }
 
@@ -944,13 +936,7 @@ func TerminateScaleSetInstances(ctx context.Context, subscriptionId, resourceGro
 	return
 }
 
-type Report struct {
-	Type     string `json:"type"`
-	Message  string `json:"message"`
-	Hostname string `json:"hostname"`
-}
-
-func UpdateStateReporting(ctx context.Context, subscriptionId, resourceGroupName, stateContainerName, stateStorageName string, report Report) (err error) {
+func UpdateStateReporting(ctx context.Context, subscriptionId, resourceGroupName, stateContainerName, stateStorageName string, report protocol.Report) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	leaseId, err := LockContainer(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
@@ -970,31 +956,19 @@ func UpdateStateReporting(ctx context.Context, subscriptionId, resourceGroupName
 	return
 }
 
-func UpdateStateReportingWithoutLocking(ctx context.Context, stateContainerName, stateStorageName string, report Report) (err error) {
+func UpdateStateReportingWithoutLocking(ctx context.Context, stateContainerName, stateStorageName string, report protocol.Report) (err error) {
 	state, err := ReadState(ctx, stateStorageName, stateContainerName)
 	if err != nil {
 		return
 	}
-	currentTime := time.Now().UTC().Format("15:04:05") + " UTC"
-	switch report.Type {
-	case "error":
-		if state.Errors == nil {
-			state.Errors = make(map[string][]string)
-		}
-		state.Errors[report.Hostname] = append(state.Errors[report.Hostname], fmt.Sprintf("%s: %s", currentTime, report.Message))
-	case "progress":
-		if state.Progress == nil {
-			state.Progress = make(map[string][]string)
-		}
-		state.Progress[report.Hostname] = append(state.Progress[report.Hostname], fmt.Sprintf("%s: %s", currentTime, report.Message))
-	default:
-		err = fmt.Errorf("invalid type: %s", report.Type)
+	err = reportLib.UpdateReport(report, &state)
+	if err != nil {
+		err = fmt.Errorf("failed updating state report")
 		return
 	}
-
 	err = WriteState(ctx, stateStorageName, stateContainerName, state)
 	if err != nil {
-		err = fmt.Errorf("failed updating state errors")
+		err = fmt.Errorf("failed updating state report")
 		return
 	}
 	return

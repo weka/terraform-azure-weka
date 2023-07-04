@@ -13,7 +13,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.0.0
 	github.com/google/uuid v1.3.0
 	github.com/lithammer/dedent v1.1.0
-	github.com/weka/go-cloud-lib v0.0.0-20230625073119-85d6c80ea543
+	github.com/weka/go-cloud-lib v0.0.0-20230705071853-ec52c54cf71e
 )
 
 require (
