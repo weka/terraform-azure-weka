@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/weka/go-cloud-lib/protocol"
 	"net/http"
 	"os"
 	"strconv"
@@ -87,11 +88,11 @@ shutdown now
 
 func reportClusterizeError(ctx context.Context, p ClusterizationParams, err error) {
 	hostName := strings.Split(p.VmName, ":")[1]
-	report := common.Report{Type: "error", Hostname: hostName, Message: err.Error()}
+	report := protocol.Report{Type: "error", Hostname: hostName, Message: err.Error()}
 	_ = common.UpdateStateReporting(ctx, p.SubscriptionId, p.ResourceGroupName, p.StateContainerName, p.StateStorageName, report)
 }
 
-func HandleLastClusterVm(ctx context.Context, state common.ClusterState, p ClusterizationParams) (clusterizeScript string) {
+func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p ClusterizationParams) (clusterizeScript string) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("This is the last instance in the cluster, creating obs and clusterization script")
 
