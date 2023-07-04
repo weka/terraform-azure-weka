@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/weka/go-cloud-lib/logging"
+	"github.com/weka/go-cloud-lib/protocol"
 	"net/http"
 	"os"
 	"time"
@@ -19,7 +20,7 @@ func isPermissionsMismatch(err error) bool {
 	return ok && readErr.ErrorCode == BlobPermissionsErrorCode
 }
 
-func UpdateStateReportingWithRetry(ctx context.Context, subscriptionId, resourceGroupName, stateContainerName, stateStorageName string, report common.Report) (err error) {
+func UpdateStateReportingWithRetry(ctx context.Context, subscriptionId, resourceGroupName, stateContainerName, stateStorageName string, report protocol.Report) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	counter := 0
 	authSleepInterval := 10 //seconds
@@ -58,7 +59,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	var invokeRequest common.InvokeRequest
 
-	var report common.Report
+	var report protocol.Report
 
 	if err := json.NewDecoder(r.Body).Decode(&invokeRequest); err != nil {
 		err = fmt.Errorf("cannot decode the request: %v", err)
@@ -89,7 +90,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	// Sometimes when we create a resource group and immediately run weka terraform deployment, the function-app
 	// permissions are not fully ready when we invoke this endpoint. It results in a blob read permissions issue.
 	if err != nil && isPermissionsMismatch(err) {
-		progressReport := common.Report{
+		progressReport := protocol.Report{
 			Type:     "progress",
 			Message:  fmt.Sprintf("Handled %s successfully", BlobPermissionsErrorCode),
 			Hostname: report.Hostname,
