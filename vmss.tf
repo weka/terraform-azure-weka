@@ -167,12 +167,6 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
   ]
 }
 
-resource "azurerm_role_assignment" "vm_role_assignment" {
-  scope                = data.azurerm_resource_group.rg.id
-  role_definition_name = "Contributor"
-  principal_id         = azurerm_linux_virtual_machine_scale_set.vmss.identity[0].principal_id
-  depends_on           = [azurerm_linux_virtual_machine_scale_set.vmss]
-}
 
 resource "null_resource" "force-delete-vmss" {
   triggers = {

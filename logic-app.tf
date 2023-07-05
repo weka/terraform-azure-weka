@@ -177,13 +177,6 @@ resource "azurerm_role_assignment" "logic-app-key-vault-secrets-user" {
   depends_on           = [azurerm_linux_function_app.function_app,azurerm_resource_group_template_deployment.workflow_scale_down_template_deployment]
 }
 
-resource "azurerm_role_assignment" "logic-app-storage-account-contributor" {
-  scope                = azurerm_storage_account.deployment_sa.id
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = local.scale_down_logic_app_identity_id
-  depends_on           = [azurerm_resource_group_template_deployment.workflow_scale_down_template_deployment]
-}
-
 resource "azurerm_logic_app_action_custom" "scale_down_logic_app_action_get_secret" {
   name         = "get-secret"
   logic_app_id = local.scale_down_logic_app_id
@@ -345,7 +338,7 @@ BODY
 resource "azurerm_monitor_diagnostic_setting" "logic_app_diagnostic_setting" {
   name                       = "${var.prefix}-${var.cluster_name}-workflow-diagnostic"
   target_resource_id         = local.scale_down_logic_app_id
-  storage_account_id         = azurerm_storage_account.deployment_sa.id
+  storage_account_id         = local.deployment_storage_account_id
   log_analytics_workspace_id = azurerm_log_analytics_workspace.la_workspace.id
   enabled_log {
     category = "WorkflowRuntime"
@@ -469,13 +462,6 @@ resource "azurerm_role_assignment" "scale-up-logic-app-key-vault-secrets-user" {
   depends_on           = [azurerm_linux_function_app.function_app,azurerm_resource_group_template_deployment.workflow_scale_up_template_deployment]
 }
 
-resource "azurerm_role_assignment" "scale-up-logic-app-storage-account-contributor" {
-  scope                = azurerm_storage_account.deployment_sa.id
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = local.scale_up_logic_app_identity_id
-  depends_on           = [azurerm_resource_group_template_deployment.workflow_scale_up_template_deployment]
-}
-
 resource "azurerm_logic_app_action_custom" "scale_up_logic_app_action_get_secret" {
   name         = "get-secret"
   logic_app_id = local.scale_up_logic_app_id
@@ -536,7 +522,7 @@ BODY
 resource "azurerm_monitor_diagnostic_setting" "scale_up_logic_app_diagnostic_setting" {
   name                       = "${var.prefix}-${var.cluster_name}-workflow-scale-up-diagnostic"
   target_resource_id         = local.scale_up_logic_app_id
-  storage_account_id         = azurerm_storage_account.deployment_sa.id
+  storage_account_id         = local.deployment_storage_account_id
   log_analytics_workspace_id = azurerm_log_analytics_workspace.la_workspace.id
   enabled_log {
     category = "WorkflowRuntime"
