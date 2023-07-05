@@ -10,7 +10,8 @@ resource "null_resource" "get-backend-ip" {
 }
 
 data "local_file" "backend_ips" {
-  filename = "${path.root}/backend_ips"
+  count      = var.clients_number > 0 ? 1 : 0
+  filename   = "${path.root}/backend_ips"
   depends_on = [null_resource.get-backend-ip]
 }
 
@@ -26,7 +27,7 @@ module "clients" {
   vnet_name          = var.vnet_name
   nics               = var.mount_clients_dpdk ? var.client_nics_num : 1
   instance_type      = var.client_instance_type
-  backend_ips        = [replace(join(" ",[data.local_file.backend_ips.content]), "\n", " ")]
+  backend_ips        = [replace(join(" ",[data.local_file.backend_ips[0].content]), "\n", " ")]
   ssh_public_key     = var.ssh_public_key == null ? tls_private_key.ssh_key[0].public_key_openssh : var.ssh_public_key
   ppg_id             = azurerm_proximity_placement_group.ppg.id
   assign_public_ip   = var.private_network ? false : true
