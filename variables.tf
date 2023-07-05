@@ -339,3 +339,23 @@ variable "placement_group_id" {
   default     = ""
   description = "Proximity placement group to use for the vmss. If not passed, will be created automatically."
 }
+
+
+variable "deployment_storage_account_name" {
+  type        = string
+  default     = ""
+  description = "Name of exising deployment storage account"
+}
+
+variable "deployment_container_name" {
+  type        = string
+  default     = ""
+  description = "Name of exising deployment container"
+}
+
+variable "deployment_storage_account_access_key" {
+  type        = string
+  description = "The access key of the existing Blob object store container."
+  sensitive   = true
+  default     = ""
+}

@@ -1,3 +1,23 @@
+locals {
+  stripe_width_calculated          = var.cluster_size - var.protection_level - 1
+  stripe_width                     = local.stripe_width_calculated < 16 ? local.stripe_width_calculated : 16
+  location                         = data.azurerm_resource_group.rg.location
+  function_app_zip_name            = "${var.function_app_dist}/${var.function_app_version}.zip"
+  weka_sa                          = "${var.function_app_storage_account_prefix}${local.location}"
+  weka_sa_container                = "${var.function_app_storage_account_container_prefix}${local.location}"
+  function_code_path               = "${path.module}/function-app/code"
+  function_app_code_hash           = md5(join("", [for f in fileset(local.function_code_path, "**") : filemd5("${local.function_code_path}/${f}")]))
+  get_compute_memory_index         = var.add_frontend_containers ? 1 : 0
+  deployment_storage_account_id    = var.deployment_storage_account_name == "" ? azurerm_storage_account.deployment_sa[0].id : data.azurerm_storage_account.deployment_blob[0].id
+  deployment_storage_account_name  = var.deployment_storage_account_name == "" ? azurerm_storage_account.deployment_sa[0].name : var.deployment_storage_account_name
+  deployment_container_name        = var.deployment_container_name == "" ? azurerm_storage_container.deployment[0].name : var.deployment_container_name
+  deployment_storage_account_scope = "${local.deployment_storage_account_id}/blobServices/default/containers/${local.deployment_container_name}"
+  obs_storage_account_name         = var.obs_name == "" ? "${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}obs" : var.obs_name
+  obs_container_name               = var.obs_container_name == "" ? "${var.prefix}-${var.cluster_name}-obs" : var.obs_container_name
+  obs_id                           = var.obs_name != "" ? data.azurerm_storage_account.obs_sa[0].id : ""
+  obs_scope                        = var.obs_name != "" ? "${data.azurerm_storage_account.obs_sa[0].id}/blobServices/default/containers/${local.obs_container_name}" : ""
+}
+
 resource "azurerm_log_analytics_workspace" "la_workspace" {
   name                = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-workspace"
   location            = data.azurerm_resource_group.rg.location
@@ -23,7 +43,7 @@ resource "azurerm_application_insights" "application_insights" {
 resource "azurerm_monitor_diagnostic_setting" "insights_diagnostic_setting" {
   name                       = "${var.prefix}-${var.cluster_name}-insights-diagnostic-setting"
   target_resource_id         = azurerm_application_insights.application_insights.id
-  storage_account_id         = azurerm_storage_account.deployment_sa.id
+  storage_account_id         = local.deployment_storage_account_id
   log_analytics_workspace_id = azurerm_log_analytics_workspace.la_workspace.id
   enabled_log {
     category = "AppTraces"
@@ -41,7 +61,7 @@ resource "azurerm_monitor_diagnostic_setting" "insights_diagnostic_setting" {
 resource "azurerm_monitor_diagnostic_setting" "function_diagnostic_setting" {
   name                       = "${var.prefix}-${var.cluster_name}-function-diagnostic-setting"
   target_resource_id         = azurerm_linux_function_app.function_app.id
-  storage_account_id         = azurerm_storage_account.deployment_sa.id
+  storage_account_id         = local.deployment_storage_account_id
   log_analytics_workspace_id = azurerm_log_analytics_workspace.la_workspace.id
   enabled_log {
     category = "FunctionAppLogs"
@@ -83,31 +103,13 @@ resource "azurerm_service_plan" "app_service_plan" {
   }
 }
 
-locals {
-  stripe_width_calculated = var.cluster_size - var.protection_level - 1
-  stripe_width            = local.stripe_width_calculated < 16 ? local.stripe_width_calculated : 16
-}
-
-locals {
-  location               = data.azurerm_resource_group.rg.location
-  function_app_zip_name  = "${var.function_app_dist}/${var.function_app_version}.zip"
-  weka_sa                = "${var.function_app_storage_account_prefix}${local.location}"
-  weka_sa_container      = "${var.function_app_storage_account_container_prefix}${local.location}"
-  function_code_path     = "${path.module}/function-app/code"
-  function_app_code_hash = md5(join("", [
-    for f in fileset(local.function_code_path, "**") :filemd5("${local.function_code_path}/${f}")
-  ]))
-  get_compute_memory_index = var.add_frontend_containers ? 1 : 0
-}
-
-
 resource "azurerm_linux_function_app" "function_app" {
   name                       = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-function-app"
   resource_group_name        = data.azurerm_resource_group.rg.name
   location                   = data.azurerm_resource_group.rg.location
   service_plan_id            = azurerm_service_plan.app_service_plan.id
-  storage_account_name       = azurerm_storage_account.deployment_sa.name
-  storage_account_access_key = azurerm_storage_account.deployment_sa.primary_access_key
+  storage_account_name       = local.deployment_storage_account_name
+  storage_account_access_key = var.deployment_storage_account_access_key == "" ? azurerm_storage_account.deployment_sa[0].primary_access_key : var.deployment_storage_account_access_key
   https_only                 = true
   virtual_network_subnet_id  = var.subnet_delegation_id == null ? azurerm_subnet.subnet_delegation[0].id : var.subnet_delegation_id
   site_config {
@@ -116,8 +118,8 @@ resource "azurerm_linux_function_app" "function_app" {
 
   app_settings = {
     "APPINSIGHTS_INSTRUMENTATIONKEY" = azurerm_application_insights.application_insights.instrumentation_key
-    "STATE_STORAGE_NAME"             = azurerm_storage_account.deployment_sa.name
-    "STATE_CONTAINER_NAME"           = azurerm_storage_container.deployment.name
+    "STATE_STORAGE_NAME"             = local.deployment_storage_account_name
+    "STATE_CONTAINER_NAME"           = local.deployment_container_name
     "HOSTS_NUM"                      = var.cluster_size
     "CLUSTER_NAME"                   = var.cluster_name
     "PROTECTION_LEVEL"               = var.protection_level
@@ -128,8 +130,8 @@ resource "azurerm_linux_function_app" "function_app" {
     "RESOURCE_GROUP_NAME"            = data.azurerm_resource_group.rg.name
     "LOCATION"                       = data.azurerm_resource_group.rg.location
     "SET_OBS"                        = var.set_obs_integration
-    "OBS_NAME"                       = var.obs_name != "" ? var.obs_name : "${var.prefix}${var.cluster_name}obs"
-    "OBS_CONTAINER_NAME"             = var.obs_container_name != "" ? var.obs_container_name : "${var.prefix}-${var.cluster_name}-obs"
+    "OBS_NAME"                       = local.obs_storage_account_name
+    "OBS_CONTAINER_NAME"             = local.obs_container_name
     "OBS_ACCESS_KEY"                 = var.blob_obs_access_key
     NUM_DRIVE_CONTAINERS             = var.container_number_map[var.instance_type].drive
     NUM_COMPUTE_CONTAINERS           = var.add_frontend_containers == false ? var.container_number_map[var.instance_type].compute + 1 : var.container_number_map[var.instance_type].compute
@@ -171,25 +173,27 @@ resource "azurerm_linux_function_app" "function_app" {
 
 data "azurerm_subscription" "primary" {}
 
-resource "azurerm_role_assignment" "function-assignment" {
-  scope                = data.azurerm_resource_group.rg.id
+resource "azurerm_role_assignment" "storage-blob-data-contributor" {
+  scope                = local.deployment_storage_account_scope
   role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
-  depends_on           = [azurerm_linux_function_app.function_app]
-}
-
-resource "azurerm_role_assignment" "storage-blob-data-owner" {
-  scope                = azurerm_storage_account.deployment_sa.id
-  role_definition_name = "Storage Blob Data Owner"
   principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
   depends_on           = [azurerm_linux_function_app.function_app, azurerm_storage_account.deployment_sa]
 }
 
-resource "azurerm_role_assignment" "storage-account-contributor" {
+resource "azurerm_role_assignment" "obs-storage-account-contributor" {
+  count                = var.set_obs_integration && var.obs_name == "" ? 1 : 0
   scope                = data.azurerm_resource_group.rg.id
   role_definition_name = "Storage Account Contributor"
   principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
   depends_on           = [azurerm_linux_function_app.function_app]
+}
+
+resource "azurerm_role_assignment" "obs-storage-blob-data-owner" {
+  count                = var.obs_name != "" ? 1 : 0
+  scope                = local.obs_scope
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
+  depends_on           = [azurerm_linux_function_app.function_app, azurerm_storage_account.deployment_sa]
 }
 
 resource "azurerm_role_assignment" "function-app-key-vault-secrets-user" {
@@ -212,9 +216,10 @@ resource "azurerm_role_assignment" "function-app-reader" {
   principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
   depends_on           = [azurerm_linux_function_app.function_app]
 }
+
 resource "azurerm_role_assignment" "function-app-scale-set-machine-owner" {
   scope                = azurerm_linux_virtual_machine_scale_set.vmss.id
-  role_definition_name = "Owner"
+  role_definition_name = "Contributor"
   principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
   depends_on           = [azurerm_linux_function_app.function_app, azurerm_linux_virtual_machine_scale_set.vmss]
 }
