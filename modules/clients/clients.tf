@@ -9,7 +9,6 @@ data "azurerm_subnet" "subnet" {
 }
 
 locals {
-  secondary_nics_num      = (var.nics - 1) * var.clients_number
   private_nic_first_index = var.assign_public_ip ? 1 : 0
   preparation_script      = templatefile("${path.module}/init.sh", {
     apt_repo_url  = var.apt_repo_url
@@ -91,7 +90,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
     }
   }
   dynamic "network_interface" {
-    for_each = range(1, local.secondary_nics_num)
+    for_each = range(1, var.nics)
     content {
       name                          = "${var.clients_name}-nic-${network_interface.value}"
       network_security_group_id     = var.sg_id
