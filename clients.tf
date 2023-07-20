@@ -29,7 +29,7 @@ module "clients" {
   instance_type      = var.client_instance_type
   backend_ips        = [replace(join(" ",[data.local_file.backend_ips[0].content]), "\n", " ")]
   ssh_public_key     = var.ssh_public_key == null ? tls_private_key.ssh_key[0].public_key_openssh : var.ssh_public_key
-  ppg_id             = azurerm_proximity_placement_group.ppg.id
+  ppg_id             = local.placement_group_id
   assign_public_ip   = var.private_network ? false : true
   vnet_rg_name       = var.vnet_rg_name
   source_image_id    = var.source_image_id
