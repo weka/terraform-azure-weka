@@ -328,3 +328,8 @@ variable "mount_clients_dpdk" {
   default     = true
   description = "Mount weka clients in DPDK mode"
 }
+variable "placement_group_id" {
+  type        = string
+  default     = ""
+  description = "Proximity placement group to use for the vmss. If not passed, will be created automatically."
+}

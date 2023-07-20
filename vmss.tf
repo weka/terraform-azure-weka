@@ -44,7 +44,7 @@ locals {
   alphanumeric_prefix_name  = lower(replace(var.prefix, "/\\W|_|\\s/", ""))
   subnet_range              = data.azurerm_subnet.subnet.address_prefix
   nics_numbers              = var.install_cluster_dpdk ? var.container_number_map[var.instance_type].nics : 1
-  custom_data_script = templatefile("${path.module}/user-data.sh", {
+  custom_data_script        = templatefile("${path.module}/user-data.sh", {
     apt_repo_url             = var.apt_repo_url
     private_ssh_key          = local.private_ssh_key
     user                     = var.vm_username
@@ -56,9 +56,11 @@ locals {
     function_app_default_key = data.azurerm_function_app_host_keys.function_keys.default_function_key
     disk_size                = local.disk_size
   })
+  placement_group_id = var.placement_group_id != "" ? var.placement_group_id : azurerm_proximity_placement_group.ppg[0].id
 }
 
 resource "azurerm_proximity_placement_group" "ppg" {
+  count               = var.placement_group_id == "" ? 1 : 0
   name                = "${var.prefix}-${var.cluster_name}-backend-ppg"
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = var.rg_name
@@ -80,9 +82,9 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
   computer_name_prefix            = "${var.prefix}-${var.cluster_name}-backend"
   custom_data                     = base64encode(local.custom_data_script)
   disable_password_authentication = true
-  proximity_placement_group_id    = azurerm_proximity_placement_group.ppg.id
+  proximity_placement_group_id    = local.placement_group_id
   source_image_id                 = var.source_image_id
-  tags = merge(var.tags_map, {
+  tags                            = merge(var.tags_map, {
     "weka_cluster" : var.cluster_name, "user_id" : data.azurerm_client_config.current.object_id
   })
 
