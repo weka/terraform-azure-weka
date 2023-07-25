@@ -208,5 +208,15 @@ mount_clients_dpdk = false
 
 | Name | Description |
 |------|-------------|
-| <a name="output_cluster_helpers_commands"></a> [cluster\_helpers\_commands](#output\_cluster\_helpers\_commands) | Useful commands and script to interact with weka cluster |
+| <a name="output_backend_ips"></a> [backend\_ips](#output\_backend\_ips) | n/a |
+| <a name="output_client_ips"></a> [client\_ips](#output\_client\_ips) | n/a |
+| <a name="output_cluster_helper_commands"></a> [cluster\_helper\_commands](#output\_cluster\_helper\_commands) | Useful commands and script to interact with weka cluster |
+| <a name="output_cluster_name"></a> [cluster\_name](#output\_cluster\_name) | n/a |
+| <a name="output_function_app_name"></a> [function\_app\_name](#output\_function\_app\_name) | n/a |
+| <a name="output_key_vault_name"></a> [key\_vault\_name](#output\_key\_vault\_name) | n/a |
+| <a name="output_prefix"></a> [prefix](#output\_prefix) | n/a |
+| <a name="output_private_ssh_key"></a> [private\_ssh\_key](#output\_private\_ssh\_key) | n/a |
+| <a name="output_resource_group_name"></a> [resource\_group\_name](#output\_resource\_group\_name) | n/a |
+| <a name="output_ssh_user"></a> [ssh\_user](#output\_ssh\_user) | ssh user for weka cluster |
+| <a name="output_subscription_id"></a> [subscription\_id](#output\_subscription\_id) | n/a |
 <!-- END_TF_DOCS -->
