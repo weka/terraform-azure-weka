@@ -53,7 +53,7 @@ data "azurerm_subnet" "subnets_data" {
 
 # ====================== sg ssh ========================== #
 resource "azurerm_network_security_rule" "sg_public_ssh" {
-  count                       = var.private_network ? 0 : length(var.sg_public_ssh_ips)
+  count                       = var.private_network ? 0 : length(var.sg_ssh_range)
   name                        = "${var.prefix}-ssh-sg-${count.index}"
   resource_group_name         = data.azurerm_resource_group.rg.name
   priority                    = "100${count.index}"
@@ -62,7 +62,7 @@ resource "azurerm_network_security_rule" "sg_public_ssh" {
   protocol                    = "Tcp"
   source_port_range           = "*"
   destination_port_range      = "22"
-  source_address_prefixes     = [var.sg_public_ssh_ips[count.index]]
+  source_address_prefixes     = [var.sg_ssh_range[count.index]]
   destination_address_prefix  = "*"
   network_security_group_name = azurerm_network_security_group.sg.name
 }

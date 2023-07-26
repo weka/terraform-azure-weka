@@ -66,3 +66,9 @@ variable "cluster_size" {
   type = number
   description = "Weka cluster size"
 }
+
+variable "sg_ssh_range" {
+  type        = list(string)
+  description = "A list of IP addresses that can use ssh connection with a public network deployment."
+  default = []
+}

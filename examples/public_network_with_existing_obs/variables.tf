@@ -82,3 +82,9 @@ variable "blob_obs_access_key" {
   description = "Access key of existing blob obs container"
   sensitive   = true
 }
+
+variable "sg_ssh_range" {
+  type        = list(string)
+  description = "A list of IP addresses that can use ssh connection with a public network deployment."
+  default = []
+}
