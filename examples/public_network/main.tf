@@ -11,6 +11,7 @@ module "create-network" {
   rg_name           = var.rg_name
   address_space     = var.address_space
   subnet_prefixes   = var.subnet_prefixes
+  sg_ssh_range      = var.sg_ssh_range
 }
 
 module "deploy-weka" {

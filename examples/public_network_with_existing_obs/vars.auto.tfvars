@@ -11,3 +11,4 @@ obs_container_name  = "obs-container"
 blob_obs_access_key = ""
 tiering_ssd_percent = 20
 cluster_size        = 6
+sg_ssh_range        = ["0.0.0.0/0"]
