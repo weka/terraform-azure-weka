@@ -8,3 +8,4 @@ instance_type       = "Standard_L8s_v3"
 set_obs_integration = true
 tiering_ssd_percent = 20
 cluster_size        = 6
+sg_ssh_range        = ["0.0.0.0/0"]

@@ -60,7 +60,13 @@ variable "sg_id" {
 
 variable "subnet_delegation" {
   type = string
-  description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service"
+  description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service."
+}
+
+variable "subnet_delegation_id" {
+  type = string
+  description = "Subnet delegation id"
+  default = null
 }
 
 variable "weka_version" {

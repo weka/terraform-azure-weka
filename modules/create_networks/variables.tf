@@ -45,10 +45,10 @@ variable "private_network" {
   description = "Determines whether to enable a private or public network. The default is public network."
 }
 
-variable "sg_public_ssh_ips" {
+variable "sg_ssh_range" {
   type        = list(string)
   description = "A list of IP addresses that can use ssh connection with a public network deployment."
-  default = ["0.0.0.0/0"]
+  default = []
 }
 
 variable "vnet_rg_name" {
