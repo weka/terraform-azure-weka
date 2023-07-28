@@ -35,6 +35,14 @@ type InvokeResponse struct {
 	ReturnValue interface{}
 }
 
+const FindDrivesScript = `
+import json
+import sys
+for d in json.load(sys.stdin)['disks']:
+	if d['isRotational']: continue
+	print(d['devPath'])
+`
+
 func leaseContainer(ctx context.Context, subscriptionId, resourceGroupName, storageAccountName, containerName string, leaseIdIn *string, action armstorage.LeaseContainerRequestAction) (leaseIdOut *string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
@@ -827,12 +835,19 @@ func RetrySetDeletionProtectionAndReport(
 
 		if protectionErr, ok := err.(*azcore.ResponseError); ok && protectionErr.ErrorCode == "AuthorizationFailed" {
 			counter++
+			// deletion protection invoked by terminate function
+			if maxAttempts == 0 {
+				msg := fmt.Sprintf("Deletion protection set authorization isn't ready, will retry on next scale down workflow")
+				ReportMsg(ctx, hostName, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, "debug", msg)
+				return
+			}
+
 			if counter > maxAttempts {
 				break
 			}
-			msg := fmt.Sprintf("Setting deletion protection authorization error, going to sleep for %dM", sleepInterval)
+			msg := fmt.Sprintf("Deletion protection set authorization isn't ready, going to sleep for %s", sleepInterval)
 			logger.Info().Msg(msg)
-			ReportMsg(ctx, hostName, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, "progress", msg)
+			ReportMsg(ctx, hostName, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, "debug", msg)
 			time.Sleep(sleepInterval)
 		} else {
 			break

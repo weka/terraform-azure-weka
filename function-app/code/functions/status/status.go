@@ -27,6 +27,7 @@ func GetReports(ctx context.Context, stateStorageName, stateContainerName string
 	reports.ReadyForClusterization = state.Instances
 	reports.Progress = state.Progress
 	reports.Errors = state.Errors
+	reports.Debug = state.Debug
 
 	return
 }
