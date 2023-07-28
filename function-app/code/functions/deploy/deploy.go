@@ -150,18 +150,10 @@ func GetDeployScript(
 		set -ex
 		`
 
-		findDrivesScript := `
-		import json
-		import sys
-		for d in json.load(sys.stdin)['disks']:
-			if d['isRotational']: continue
-			print(d['devPath'])
-		`
-
 		joinScriptGenerator := join.JoinScriptGenerator{
 			FailureDomainCmd:   getHashedIpCommand,
 			GetInstanceNameCmd: getAzureInstanceNameCmd(),
-			FindDrivesScript:   dedent.Dedent(findDrivesScript),
+			FindDrivesScript:   dedent.Dedent(common.FindDrivesScript),
 			ScriptBase:         dedent.Dedent(scriptBase),
 			Params:             joinParams,
 			FuncDef:            funcDef,

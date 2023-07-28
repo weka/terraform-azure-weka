@@ -163,6 +163,7 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 	clusterParams.WekaPassword = wekaPassword
 	clusterParams.WekaUsername = "admin"
 	clusterParams.InstallDpdk = p.InstallDpdk
+	clusterParams.FindDrivesScript = common.FindDrivesScript
 
 	baseFunctionUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/", p.Prefix, p.Cluster.ClusterName)
 	funcDef := azure_functions_def.NewFuncDef(baseFunctionUrl, functionAppKey)
