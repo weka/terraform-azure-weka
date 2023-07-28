@@ -340,7 +340,6 @@ variable "placement_group_id" {
   description = "Proximity placement group to use for the vmss. If not passed, will be created automatically."
 }
 
-
 variable "deployment_storage_account_name" {
   type        = string
   default     = ""
@@ -358,4 +357,51 @@ variable "deployment_storage_account_access_key" {
   description = "The access key of the existing Blob object store container."
   sensitive   = true
   default     = ""
+}
+
+variable "protocol_gateways_number" {
+  type = number
+  description = "The number of protocol gateway virtual machines to deploy."
+  default     = 0
+}
+
+variable "protocol" {
+  type    = string
+  description = "Name of the protocol."
+  default = "NFS"
+
+  validation {
+    condition     = contains(["NFS", "SMB"], var.protocol)
+    error_message = "Allowed values for protocol: NFS, SMB."
+  }
+}
+
+variable "protocol_gateway_secondary_ips_per_nic" {
+  type        = number
+  description = "Number of secondary IPs per single NIC per protocol gateway virtual machine."
+  default     = 1
+}
+
+variable "protocol_gateway_instance_type" {
+  type        = string
+  description = "The protocol gateways' virtual machine type (sku) to deploy."
+  default     = "Standard_D8_v5"
+}
+
+variable "protocol_gateway_nics_num" {
+  type        = string
+  description = "The protocol gateways' NICs number."
+  default     = 2
+}
+
+variable "protocol_gateway_disk_size" {
+  type        = number
+  default     = 48
+  description = "The protocol gateways' default disk size."
+}
+
+variable "protocol_gateway_frontend_num" {
+  type        = number
+  default     = 1
+  description = "The number of frontend cores on single protocol gateway machine."
 }
