@@ -34,6 +34,7 @@ module "clients" {
   vnet_rg_name       = var.vnet_rg_name
   source_image_id    = var.source_image_id
   sg_id              = var.sg_id
+  depends_on         = [azurerm_proximity_placement_group.ppg]
 }
 
 resource "null_resource" "clean" {
