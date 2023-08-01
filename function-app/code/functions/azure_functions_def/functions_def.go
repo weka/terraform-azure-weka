@@ -22,12 +22,23 @@ func NewFuncDef(baseFunctionUrl, functionKey string) functions_def.FunctionDef {
 // e.g. "{\"hostname\": \"$HOSTNAME\", \"type\": \"$message_type\", \"message\": \"$message\"}"
 func (d *AzureFuncDef) GetFunctionCmdDefinition(name functions_def.FunctionName) string {
 	functionUrl := d.baseFunctionUrl + string(name)
-	reportDefTemplate := `
-	function %s {
-		local json_data=$1
-		curl %s?code=%s -H 'Content-Type:application/json' -d "$json_data"
+	var funcDef string
+	if name == functions_def.Protect {
+		funcDefTemplate := `
+		function %s {
+			echo "%s function is not implemented"
+		}
+		`
+		funcDef = fmt.Sprintf(funcDefTemplate, name, name)
+	} else {
+		funcDefTemplate := `
+		function %s {
+			local json_data=$1
+			curl %s?code=%s -H 'Content-Type:application/json' -d "$json_data"
+		}
+		`
+		funcDef = fmt.Sprintf(funcDefTemplate, name, functionUrl, d.functionKey)
 	}
-	`
-	reportDef := fmt.Sprintf(reportDefTemplate, name, functionUrl, d.functionKey)
-	return reportDef
+
+	return funcDef
 }
