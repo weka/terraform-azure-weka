@@ -1,9 +1,10 @@
-name: Push to main branch
+name: Update function_app_dist
 
 on:
-  push:
+  pull_request:
     branches:
       - main
+      - dev
   
 jobs:
   update_function_app_dist:
@@ -16,7 +17,12 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Update function_app_dist default to 'release'
+        if: github.event.pull_request.base.ref == 'main'
         run: sed -i 's/^\( *default =\) "dev"/\1 "release"/' variables.tf 
+
+      - name: Update function_app_dist default to 'dev'
+        if: github.event.pull_request.base.ref == 'dev'
+        run: sed -i 's/^\( *default =\) "release"/\1 "dev"/' variables.tf 
 
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v4
