@@ -169,7 +169,15 @@ echo "$(date -u): before weka agent installation"
 # get token for key vault access
 access_token=$(curl 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fvault.azure.net' -H Metadata:true | jq -r '.access_token')
 # get key vault secret (get-weka-io-token)
-TOKEN=$(curl "${key_vault_url}secrets/get-weka-io-token?api-version=2016-10-01" -H "Authorization: Bearer $access_token" | jq -r '.value')
+max_retries=12 # 12 * 10 = 2 minutes
+for ((i=0; i<max_retries; i++)); do
+  TOKEN=$(curl "${key_vault_url}secrets/get-weka-io-token?api-version=2016-10-01" -H "Authorization: Bearer $access_token" | jq -r '.value')
+  if [ "$TOKEN" != "null" ]; then
+    break
+  fi
+  sleep 10
+  echo "$(date -u): waiting for token secret to be available"
+done
 
 # install weka
 if [[ "${install_weka_url}" == *.tar ]]; then
