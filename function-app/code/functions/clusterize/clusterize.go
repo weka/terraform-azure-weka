@@ -11,13 +11,13 @@ import (
 	"weka-deployment/common"
 	"weka-deployment/functions/azure_functions_def"
 
+	"github.com/lithammer/dedent"
+
+	"github.com/weka/go-cloud-lib/clusterize"
 	cloudCommon "github.com/weka/go-cloud-lib/common"
 	"github.com/weka/go-cloud-lib/functions_def"
-	"github.com/weka/go-cloud-lib/protocol"
-
-	"github.com/lithammer/dedent"
-	"github.com/weka/go-cloud-lib/clusterize"
 	"github.com/weka/go-cloud-lib/logging"
+	"github.com/weka/go-cloud-lib/protocol"
 )
 
 type AzureObsParams struct {
@@ -231,6 +231,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
 	setObs, _ := strconv.ParseBool(os.Getenv("SET_OBS"))
+	smbwEnabled, _ := strconv.ParseBool(os.Getenv("SMBW_ENABLED"))
 	obsName := os.Getenv("OBS_NAME")
 	obsContainerName := os.Getenv("OBS_CONTAINER_NAME")
 	obsAccessKey := os.Getenv("OBS_ACCESS_KEY")
@@ -296,6 +297,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			ClusterName: clusterName,
 			NvmesNum:    nvmesNum,
 			SetObs:      setObs,
+			SmbwEnabled: smbwEnabled,
 			AddFrontend: addFrontend,
 			ProxyUrl:    proxyUrl,
 			DataProtection: clusterize.DataProtectionParams{

@@ -293,7 +293,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type = string
   description = "Function app code version (hash)"
-  default = "c00e84e281d4a5e2725fd32356e149d6"
+  default = "8af636e9ea8286ec2c163f04c464d54a"
 }
 
 variable "function_app_dist" {
@@ -401,6 +401,12 @@ variable "deployment_storage_account_access_key" {
   default     = ""
 }
 
+variable "zone"{
+  type        = string
+  description = "The zone in which the resources should be created."
+  default     = "1"
+}
+
 ############################################### protocol gateways variables ###################################################
 variable "protocol_gateways_number" {
   type = number
@@ -449,10 +455,57 @@ variable "protocol_gateway_frontend_num" {
   description = "The number of frontend cores on single protocol gateway machine."
 }
 
-variable "zone"{
+variable "smbw_enabled" {
+  type        = bool
+  default     = false
+  description = "Enable SMBW protocol. This option should be provided before cluster is created to leave extra capacity for SMBW setup."
+}
+
+variable "smb_cluster_name" {
   type        = string
-  description = "The zone in which the resources should be created."
-  default     = "1"
+  description = "The name of the SMB setup."
+  default     = "Weka-SMB"
+
+  validation {
+    condition     = length(var.smb_cluster_name) > 0
+    error_message = "The SMB cluster name cannot be empty."
+  }
+}
+
+variable "smb_domain_name" {
+  type        = string
+  description = "The domain to join the SMB cluster to."
+  default     = ""
+}
+
+variable "smb_domain_netbios_name" {
+  type        = string
+  description = "The domain NetBIOS name of the SMB cluster."
+  default     = ""
+}
+
+variable "smb_domain_username" {
+  type        = string
+  description = "The SMB domain username."
+  default     = ""
+}
+
+variable "smb_domain_password" {
+  type        = string
+  description = "The SMB domain password."
+  default     = ""
+}
+
+variable "smb_dns_ip_address" {
+  type        = string
+  description = "DNS IP address"
+  default     = ""
+}
+
+variable "smb_share_name" {
+  type       = string
+  description = "The name of the SMB share"
+  default     = "default"
 }
 
 variable "proxy_url" {

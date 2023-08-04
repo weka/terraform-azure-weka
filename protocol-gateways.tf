@@ -24,7 +24,16 @@ module "protocol_gateways" {
   assign_public_ip           = var.assign_public_ip
   disk_size                  = var.protocol_gateway_disk_size
   frontend_num               = var.protocol_gateway_frontend_num
-  depends_on                 = [module.network, azurerm_linux_virtual_machine_scale_set.vmss, azurerm_key_vault_secret.get_weka_io_token, azurerm_proximity_placement_group.ppg]
+  smbw_enabled               = var.smbw_enabled
+  smb_cluster_name           = var.smb_cluster_name
+  smb_domain_name            = var.smb_domain_name
+  smb_domain_netbios_name    = var.smb_domain_netbios_name
+  smb_domain_username        = var.smb_domain_username
+  smb_domain_password        = var.smb_domain_password
+  smb_dns_ip_address         = var.smb_dns_ip_address
+  smb_share_name             = var.smb_share_name
+
+  depends_on = [module.network, azurerm_linux_virtual_machine_scale_set.vmss, azurerm_key_vault_secret.get_weka_io_token, azurerm_proximity_placement_group.ppg]
 }
 
 resource "azurerm_key_vault_access_policy" "gateways_vmss_key_vault" {
