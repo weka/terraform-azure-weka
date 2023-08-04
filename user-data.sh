@@ -1,7 +1,26 @@
 #!/bin/bash
 set -ex
 
-curl -i ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running init script\"}"
+function retry {
+  local retry_max=$1
+  local retry_sleep=$2
+  shift 2
+  local count=$retry_max
+  while [ $count -gt 0 ]; do
+      "$@" && break
+      count=$(($count - 1))
+      sleep $retry_sleep
+  done
+  [ $count -eq 0 ] && {
+      echo "Retry failed [$retry_max]"
+      return 1
+  }
+  return 0
+}
+
+# retry for 2 minutes
+# NOTE: in some cases it takes time for all access policies to be applied
+retry 12 10 curl --fail ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running init script\"}"
 
 handle_error () {
   if [ "$1" -ne 0 ]; then

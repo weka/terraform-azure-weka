@@ -23,6 +23,11 @@ variable "secondary_ips_per_nic" {
   type        = number
   description = "Number of secondary IPs per single NIC per protocol gateway virtual machine."
   default     = 3
+
+  validation {
+    condition     = var.secondary_ips_per_nic >= 1
+    error_message = "The number of secondary IPs per single NIC per protocol gateway virtual machine must be at least 1."
+  }
 }
 
 variable "vnet_rg_name" {
@@ -157,4 +162,55 @@ variable "install_weka_url" {
 variable "key_vault_url" {
   type        = string
   description = "The URL of the Azure Key Vault."
+}
+
+variable "smbw_enabled" {
+  type        = bool
+  default     = false
+  description = "Enable SMBW protocol."
+}
+
+variable "smb_cluster_name" {
+  type        = string
+  description = "The name of the SMB setup."
+
+  validation {
+    condition     = length(var.smb_cluster_name) > 0 && length(var.smb_cluster_name) <= 15
+    error_message = "The SMB cluster name should be less than 15 characters long."
+  }
+}
+
+variable "smb_domain_name" {
+  type        = string
+  description = "The domain to join the SMB cluster to."
+}
+
+variable "smb_domain_netbios_name" {
+  type        = string
+  description = "The domain NetBIOS name of the SMB cluster."
+  default     = ""
+}
+
+variable "smb_domain_username" {
+  type        = string
+  description = "The SMB domain username."
+  default     = ""
+}
+
+variable "smb_domain_password" {
+  type        = string
+  description = "The SMB domain password."
+  default     = ""
+}
+
+variable "smb_dns_ip_address" {
+  type        = string
+  description = "DNS IP address"
+  default     = ""
+}
+
+variable "smb_share_name" {
+  type       = string
+  description = "The name of the SMB share"
+  default     = ""
 }

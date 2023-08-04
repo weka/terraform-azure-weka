@@ -13,7 +13,6 @@ locals {
   preparation_script      = templatefile("${path.module}/init.sh", {
     apt_repo_server = var.apt_repo_server
     nics_num        = var.nics
-    install_dpdk    = var.mount_clients_dpdk
     subnet_range    = data.azurerm_subnet.subnet.address_prefix
   })
 
