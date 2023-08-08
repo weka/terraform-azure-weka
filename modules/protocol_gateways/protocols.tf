@@ -64,7 +64,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
 
   os_disk {
     caching              = "ReadWrite"
-    storage_account_type = "Standard_LRS"
+    storage_account_type = "StandardSSD_LRS"
   }
 
   data_disk {
@@ -72,7 +72,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
     caching              = "ReadWrite"
     create_option        = "Empty"
     disk_size_gb         = local.disk_size
-    storage_account_type = "Standard_LRS"
+    storage_account_type = "StandardSSD_LRS"
   }
 
   admin_ssh_key {

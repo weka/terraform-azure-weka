@@ -405,3 +405,9 @@ variable "protocol_gateway_frontend_num" {
   default     = 1
   description = "The number of frontend cores on single protocol gateway machine."
 }
+
+variable "zone"{
+  type        = string
+  description = "The zone in which the resources should be created."
+  default     = "1"
+}
