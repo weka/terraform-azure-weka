@@ -73,6 +73,7 @@ resource "azurerm_proximity_placement_group" "ppg" {
 resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
   name                            = "${var.prefix}-${var.cluster_name}-vmss"
   location                        = data.azurerm_resource_group.rg.location
+  zones                           = [var.zone]
   resource_group_name             = var.rg_name
   sku                             = var.instance_type
   upgrade_mode                    = "Manual"
@@ -90,14 +91,14 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
 
   os_disk {
     caching              = "ReadWrite"
-    storage_account_type = "StandardSSD_LRS"
+    storage_account_type = "Premium_LRS"
   }
   data_disk {
     lun                  = 0
-    caching              = "ReadWrite"
+    caching              = "None"
     create_option        = "Empty"
     disk_size_gb         = local.disk_size
-    storage_account_type = "StandardSSD_LRS"
+    storage_account_type = "PremiumV2_LRS"
   }
 
   admin_ssh_key {
