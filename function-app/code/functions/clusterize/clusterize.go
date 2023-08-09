@@ -63,6 +63,8 @@ type ClusterizationParams struct {
 	VmName  string
 	Cluster clusterize.ClusterParams
 	Obs     AzureObsParams
+
+	FunctionAppName string
 }
 
 type RequestBody struct {
@@ -165,7 +167,7 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 	clusterParams.InstallDpdk = p.InstallDpdk
 	clusterParams.FindDrivesScript = common.FindDrivesScript
 
-	baseFunctionUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/", p.Prefix, p.Cluster.ClusterName)
+	baseFunctionUrl := fmt.Sprintf("https://%s.azurewebsites.net/api/", p.FunctionAppName)
 	funcDef := azure_functions_def.NewFuncDef(baseFunctionUrl, functionAppKey)
 
 	scriptGenerator := clusterize.ClusterizeScriptGenerator{
@@ -242,6 +244,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	hotspare, _ := strconv.Atoi(os.Getenv("HOTSPARE"))
 	installDpdk, _ := strconv.ParseBool(os.Getenv("INSTALL_DPDK"))
 	addFrontendNum, _ := strconv.Atoi(os.Getenv("NUM_FRONTEND_CONTAINERS"))
+	functionAppName := os.Getenv("FUNCTION_APP_NAME")
+
 	addFrontend := false
 	if addFrontendNum > 0 {
 		addFrontend = true
@@ -303,6 +307,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			AccessKey:         obsAccessKey,
 			TieringSsdPercent: tieringSsdPercent,
 		},
+		FunctionAppName: functionAppName,
 	}
 
 	if data.Vm == "" {

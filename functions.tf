@@ -16,6 +16,7 @@ locals {
   obs_container_name               = var.obs_container_name == "" ? "${var.prefix}-${var.cluster_name}-obs" : var.obs_container_name
   obs_id                           = var.obs_name != "" ? data.azurerm_storage_account.obs_sa[0].id : ""
   obs_scope                        = var.obs_name != "" ? "${data.azurerm_storage_account.obs_sa[0].id}/blobServices/default/containers/${local.obs_container_name}" : ""
+  function_app_name                = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-function-app"
 }
 
 resource "azurerm_log_analytics_workspace" "la_workspace" {
@@ -104,7 +105,7 @@ resource "azurerm_service_plan" "app_service_plan" {
 }
 
 resource "azurerm_linux_function_app" "function_app" {
-  name                       = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-function-app"
+  name                       = local.function_app_name
   resource_group_name        = data.azurerm_resource_group.rg.name
   location                   = data.azurerm_resource_group.rg.location
   service_plan_id            = azurerm_service_plan.app_service_plan.id
@@ -141,12 +142,12 @@ resource "azurerm_linux_function_app" "function_app" {
     "TIERING_SSD_PERCENT"            = var.tiering_ssd_percent
     "PREFIX"                         = var.prefix
     "KEY_VAULT_URI"                  = azurerm_key_vault.key_vault.vault_uri
-    "INSTANCE_TYPE"                  = var.instance_type
     "INSTALL_DPDK"                   = var.install_cluster_dpdk
     "NICS_NUM"                       = var.container_number_map[var.instance_type].nics
     "INSTALL_URL"                    = var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.weka.io/dist/v1/install/${var.weka_version}/${var.weka_version}"
     "LOG_LEVEL"                      = var.function_app_log_level
     "SUBNET"                         = data.azurerm_subnet.subnet.address_prefix
+    FUNCTION_APP_NAME                = local.function_app_name
 
     https_only               = true
     FUNCTIONS_WORKER_RUNTIME = "custom"
@@ -180,15 +181,14 @@ resource "azurerm_role_assignment" "storage-blob-data-contributor" {
   depends_on           = [azurerm_linux_function_app.function_app, azurerm_storage_account.deployment_sa]
 }
 
-resource "azurerm_role_assignment" "obs-storage-account-contributor" {
-  count                = var.set_obs_integration && var.obs_name == "" ? 1 : 0
+resource "azurerm_role_assignment" "storage_account_contributor" {
   scope                = data.azurerm_resource_group.rg.id
   role_definition_name = "Storage Account Contributor"
   principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
   depends_on           = [azurerm_linux_function_app.function_app]
 }
 
-resource "azurerm_role_assignment" "obs-storage-blob-data-owner" {
+resource "azurerm_role_assignment" "obs_storage_blob_data_contributor" {
   count                = var.obs_name != "" ? 1 : 0
   scope                = local.obs_scope
   role_definition_name = "Storage Blob Data Contributor"
