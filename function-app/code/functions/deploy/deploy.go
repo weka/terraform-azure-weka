@@ -43,7 +43,6 @@ func GetDeployScript(
 	stateContainerName,
 	prefix,
 	clusterName,
-	instanceType,
 	installUrl,
 	keyVaultUri,
 	vm string,
@@ -53,6 +52,7 @@ func GetDeployScript(
 	driveContainerNum int,
 	installDpdk bool,
 	nicsNum string,
+	functionAppName string,
 	gateways []string,
 ) (bashScript string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
@@ -67,7 +67,7 @@ func GetDeployScript(
 	if err != nil {
 		return
 	}
-	baseFunctionUrl := fmt.Sprintf("https://%s-%s-function-app.azurewebsites.net/api/", prefix, clusterName)
+	baseFunctionUrl := fmt.Sprintf("https://%s.azurewebsites.net/api/", functionAppName)
 	funcDef := azure_functions_def.NewFuncDef(baseFunctionUrl, functionKey)
 
 	instanceParams := protocol.BackendCoreCount{Compute: computeContainerNum, Frontend: frontendContainerNum, Drive: driveContainerNum, ComputeMemory: computeMemory}
@@ -218,8 +218,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	nicsNum := os.Getenv("NICS_NUM")
 	nicsNumInt, _ := strconv.Atoi(nicsNum)
 	subnet := os.Getenv("SUBNET")
+	functionAppName := os.Getenv("FUNCTION_APP_NAME")
 
-	instanceType := os.Getenv("INSTANCE_TYPE")
 	installUrl := os.Getenv("INSTALL_URL")
 
 	outputs := make(map[string]interface{})
@@ -267,7 +267,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		stateContainerName,
 		prefix,
 		clusterName,
-		instanceType,
 		installUrl,
 		keyVaultUri,
 		data.Vm,
@@ -277,6 +276,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		driveContainerNum,
 		installDpdk,
 		nicsNum,
+		functionAppName,
 		getGateways(subnet, nicsNumInt),
 	)
 
