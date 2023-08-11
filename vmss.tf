@@ -98,7 +98,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
     caching              = "None"
     create_option        = "Empty"
     disk_size_gb         = local.disk_size
-    storage_account_type = "PremiumV2_LRS"
+    storage_account_type = "Premium_LRS"
   }
 
   admin_ssh_key {
