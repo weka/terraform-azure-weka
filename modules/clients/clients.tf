@@ -21,8 +21,10 @@ locals {
     all_subnets = split("/", data.azurerm_subnet.subnet.address_prefix)[0]
     all_gateways = cidrhost(data.azurerm_subnet.subnet.address_prefix, 1)
     nics_num           = var.nics
-    backend_ips        = join(" ", var.backend_ips)
     mount_clients_dpdk = var.mount_clients_dpdk
+    fetch_function_url = var.fetch_function_url
+    function_app_key   = var.function_app_key
+    cluster_size       = var.cluster_size
   })
 
   custom_data_parts = [local.preparation_script, local.mount_wekafs_script]

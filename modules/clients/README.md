@@ -27,9 +27,11 @@ No modules.
 |------|-------------|------|---------|:--------:|
 | <a name="input_apt_repo_url"></a> [apt\_repo\_url](#input\_apt\_repo\_url) | The URL of the apt private repository. | `string` | `""` | no |
 | <a name="input_assign_public_ip"></a> [assign\_public\_ip](#input\_assign\_public\_ip) | Determines whether to assign public ip. | `bool` | `true` | no |
-| <a name="input_backend_ips"></a> [backend\_ips](#input\_backend\_ips) | n/a | `list(string)` | n/a | yes |
 | <a name="input_clients_name"></a> [clients\_name](#input\_clients\_name) | The clients name. | `string` | n/a | yes |
 | <a name="input_clients_number"></a> [clients\_number](#input\_clients\_number) | The number of virtual machines to deploy. | `number` | `2` | no |
+| <a name="input_cluster_size"></a> [cluster\_size](#input\_cluster\_size) | The cluster size (backend VMs number) | `number` | n/a | yes |
+| <a name="input_fetch_function_url"></a> [fetch\_function\_url](#input\_fetch\_function\_url) | The url of the fetch function | `string` | n/a | yes |
+| <a name="input_function_app_key"></a> [function\_app\_key](#input\_function\_app\_key) | The function app key | `string` | n/a | yes |
 | <a name="input_instance_type"></a> [instance\_type](#input\_instance\_type) | The virtual machine type (sku) to deploy. | `string` | n/a | yes |
 | <a name="input_mount_clients_dpdk"></a> [mount\_clients\_dpdk](#input\_mount\_clients\_dpdk) | Install weka cluster with DPDK | `bool` | `true` | no |
 | <a name="input_nics"></a> [nics](#input\_nics) | Number of nics to set on each client vm | `number` | `2` | no |
@@ -48,6 +50,5 @@ No modules.
 
 | Name | Description |
 |------|-------------|
-| <a name="output_backend"></a> [backend](#output\_backend) | n/a |
 | <a name="output_client-name"></a> [client-name](#output\_client-name) | n/a |
 <!-- END_TF_DOCS -->

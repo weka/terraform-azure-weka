@@ -1,11 +1,30 @@
 echo "$(date -u): before weka agent installation"
 
+apt install -y jq
+
 INSTALLATION_PATH="/tmp/weka"
 mkdir -p $INSTALLATION_PATH
 cd $INSTALLATION_PATH
 
-IFS=" " read -ra ips <<< "${backend_ips}"
-backend_ip="$${ips[RANDOM % $${#ips[@]}]}"
+# get backend_ips using fetch function
+max_retries=60 # 60 * 10 = 10 minutes
+for (( i=0; i < max_retries; i++ )); do
+  fetch_output=$(curl ${fetch_function_url}?code="${function_app_key}" --fail -H "Content-Type: application/json")
+  backend_ips=($(echo "$fetch_output" | jq -r '.backend_ips[]'))
+  # while backend_ips length is < cluster_size, keep fetching backend_ips
+  if [ $${#backend_ips[@]} -lt ${cluster_size} ]; then
+    echo "$(date -u): backend_ips length is $${#backend_ips[@]}, weka cluster_size is ${cluster_size}, fetching backend_ips again..."
+    sleep 10
+  fi
+  echo "$(date -u): backend_ips: $${backend_ips[@]}"
+  break
+done
+if (( i > max_retries )); then
+    echo "$(date -u): timeout: unable to fetch all ${cluster_size} backend_ips after $max_retries attempts."
+    exit 1
+fi
+
+backend_ip="$${backend_ips[RANDOM % $${#backend_ips[@]}]}"
 # install weka using random backend ip from ips list
 function retry_weka_install {
   retry_max=60
@@ -15,7 +34,7 @@ function retry_weka_install {
   while [ $count -gt 0 ]; do
       curl --fail -o install_script.sh $backend_ip:14000/dist/v1/install && break
       count=$(($count - 1))
-      backend_ip="$${ips[RANDOM % $${#ips[@]}]}"
+      backend_ip="$${backend_ips[RANDOM % $${#backend_ips[@]}]}"
       echo "Retrying weka install from $backend_ip in $retry_sleep seconds..."
       sleep $retry_sleep
   done

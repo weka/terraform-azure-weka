@@ -1,8 +1,27 @@
+# get backend_ips using fetch function
+max_retries=60 # 60 * 10 = 10 minutes
+for (( i=0; i < max_retries; i++ )); do
+  fetch_output=$(curl ${fetch_function_url}?code="${function_app_key}" --fail -H "Content-Type: application/json")
+  backend_ips=($(echo "$fetch_output" | jq -r '.backend_ips[]'))
+  # while backend_ips length is < cluster_size, keep fetching backend_ips
+  if [ $${#backend_ips[@]} -lt ${cluster_size} ]; then
+    echo "$(date -u): backend_ips length is $${#backend_ips[@]}, weka cluster_size is ${cluster_size}, fetching backend_ips again..."
+    sleep 10
+  fi
+  echo "$(date -u): backend_ips: $${backend_ips[@]}"
+  break
+done
+if (( i > max_retries )); then
+    echo "$(date -u): timeout: unable to fetch all ${cluster_size} backend_ips after $max_retries attempts."
+    exit 1
+fi
+
 FAILURE_DOMAIN=$(printf $(hostname -I) | sha256sum | tr -d '-' | cut -c1-16)
 NUM_FRONTEND_CONTAINERS=${frontend_num}
 NICS_NUM=${nics_num}
 SUBNET_PREFIXES=( "${subnet_prefixes}" )
-BACKEND_IPS="${backend_ips}"
+# get comma-separated list of backend ips
+BACKEND_IPS=$(echo "$${backend_ips[@]}" | sed 's/ /,/g')
 GATEWAYS=""
 for subnet in $${SUBNET_PREFIXES[@]}
 do

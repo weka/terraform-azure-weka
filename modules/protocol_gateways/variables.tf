@@ -73,11 +73,6 @@ variable "client_group_name" {
   default     = "weka-cg"
 }
 
-variable "backend_ips" {
-  type        = list(string)
-  description = "IP addresses of the cluster servers."
-}
-
 variable "vm_username" {
   type        = string
   description = "The user name for logging in to the virtual machines."
@@ -157,4 +152,19 @@ variable "install_weka_url" {
 variable "key_vault_url" {
   type        = string
   description = "The URL of the Azure Key Vault."
+}
+
+variable "fetch_function_url" {
+  type        = string
+  description = "The url of the fetch function"
+}
+
+variable "function_app_key" {
+  type = string
+  description = "The function app key"
+}
+
+variable "cluster_size" {
+  type        = number
+  description = "The cluster size (backend VMs number)"
 }

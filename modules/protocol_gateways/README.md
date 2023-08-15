@@ -28,10 +28,12 @@ No modules.
 |------|-------------|------|---------|:--------:|
 | <a name="input_apt_repo_url"></a> [apt\_repo\_url](#input\_apt\_repo\_url) | The URL of the apt private repository. | `string` | `""` | no |
 | <a name="input_assign_public_ip"></a> [assign\_public\_ip](#input\_assign\_public\_ip) | Determines whether to assign public ip. | `bool` | `true` | no |
-| <a name="input_backend_ips"></a> [backend\_ips](#input\_backend\_ips) | IP addresses of the cluster servers. | `list(string)` | n/a | yes |
 | <a name="input_client_group_name"></a> [client\_group\_name](#input\_client\_group\_name) | Client access group name. | `string` | `"weka-cg"` | no |
+| <a name="input_cluster_size"></a> [cluster\_size](#input\_cluster\_size) | The cluster size (backend VMs number) | `number` | n/a | yes |
 | <a name="input_disk_size"></a> [disk\_size](#input\_disk\_size) | The disk size. | `number` | n/a | yes |
+| <a name="input_fetch_function_url"></a> [fetch\_function\_url](#input\_fetch\_function\_url) | The url of the fetch function | `string` | n/a | yes |
 | <a name="input_frontend_num"></a> [frontend\_num](#input\_frontend\_num) | The number of frontend ionodes per instance. | `number` | `1` | no |
+| <a name="input_function_app_key"></a> [function\_app\_key](#input\_function\_app\_key) | The function app key | `string` | n/a | yes |
 | <a name="input_gateways_name"></a> [gateways\_name](#input\_gateways\_name) | The protocol group name. | `string` | n/a | yes |
 | <a name="input_gateways_number"></a> [gateways\_number](#input\_gateways\_number) | The number of virtual machines to deploy as protocol gateways. | `number` | n/a | yes |
 | <a name="input_install_weka_url"></a> [install\_weka\_url](#input\_install\_weka\_url) | The URL of the Weka release download tar file. | `string` | n/a | yes |

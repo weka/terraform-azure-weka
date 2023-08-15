@@ -26,7 +26,9 @@ locals {
   deploy_script = templatefile("${path.module}/deploy_protocol_gateways.sh", {
     frontend_num    = var.frontend_num
     subnet_prefixes = data.azurerm_subnet.subnet.address_prefix
-    backend_ips     = join(",", var.backend_ips)
+    fetch_function_url = var.fetch_function_url
+    function_app_key   = var.function_app_key
+    cluster_size       = var.cluster_size
     nics_num        = var.nics
     key_vault_url   = var.key_vault_url
   })

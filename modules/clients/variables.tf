@@ -1,8 +1,3 @@
-variable "backend_ips" {
-  type        = list(string)
-  description = ""
-}
-
 variable "nics" {
   type        = number
   default     = 2
@@ -95,4 +90,19 @@ variable "vnet_rg_name" {
 variable "sg_id" {
   type        = string
   description = "Security group id"
+}
+
+variable "fetch_function_url" {
+  type        = string
+  description = "The url of the fetch function"
+}
+
+variable "function_app_key" {
+  type = string
+  description = "The function app key"
+}
+
+variable "cluster_size" {
+  type        = number
+  description = "The cluster size (backend VMs number)"
 }
