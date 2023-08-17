@@ -26,7 +26,7 @@ locals {
   deploy_script = templatefile("${path.module}/deploy_protocol_gateways.sh", {
     frontend_num    = var.frontend_num
     subnet_prefixes = data.azurerm_subnet.subnet.address_prefix
-    backend_ips     = join(",", var.backend_ips)
+    backend_lb_ip   = var.backend_lb_ip
     nics_num        = var.nics
     key_vault_url   = var.key_vault_url
   })
@@ -149,7 +149,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
   }
 
   lifecycle {
-    ignore_changes = [instances, custom_data]
+    ignore_changes = [instances, custom_data, location, tags]
     precondition {
       condition     = var.protocol == "NFS" ? var.gateways_number >= 1 : var.gateways_number >= 3
       error_message = "The amount of protocol gateways should be at least 1 for NFS and 3 for SMB."

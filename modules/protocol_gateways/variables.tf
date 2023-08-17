@@ -73,9 +73,9 @@ variable "client_group_name" {
   default     = "weka-cg"
 }
 
-variable "backend_ips" {
-  type        = list(string)
-  description = "IP addresses of the cluster servers."
+variable "backend_lb_ip" {
+  type        = string
+  description = "The backend load balancer ip address."
 }
 
 variable "vm_username" {

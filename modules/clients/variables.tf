@@ -1,6 +1,6 @@
-variable "backend_ips" {
-  type        = list(string)
-  description = ""
+variable "backend_lb_ip" {
+  type        = string
+  description = "The backend load balancer ip address."
 }
 
 variable "nics" {

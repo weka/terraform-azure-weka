@@ -74,7 +74,7 @@ resource "azurerm_lb_backend_address_pool" "lb_backend_pool" {
 resource "azurerm_lb_probe" "backend_lb_probe" {
   loadbalancer_id     = azurerm_lb.backend-lb.id
   name                = "${var.prefix}-${var.cluster_name}-lb-probe"
-  protocol            = "Https"
+  protocol            = "Http"
   request_path        = "/api/v2/healthcheck"
   port                = 14000
   interval_in_seconds = 5

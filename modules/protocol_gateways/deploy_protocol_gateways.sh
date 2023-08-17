@@ -2,7 +2,6 @@ FAILURE_DOMAIN=$(printf $(hostname -I) | sha256sum | tr -d '-' | cut -c1-16)
 NUM_FRONTEND_CONTAINERS=${frontend_num}
 NICS_NUM=${nics_num}
 SUBNET_PREFIXES=( "${subnet_prefixes}" )
-BACKEND_IPS="${backend_ips}"
 GATEWAYS=""
 for subnet in $${SUBNET_PREFIXES[@]}
 do
@@ -41,7 +40,7 @@ echo "$(date -u): setting up weka frontend"
 # weka@ev-test-NFS-0:~$ weka nfs interface-group add test NFS
 # error: Error: Failed connecting to http://127.0.0.1:14000/api/v1. Make sure weka is running on this host by running
 # 	 weka local status | start
-sudo weka local setup container --name frontend0 --base-port 14000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --allow-protocols true --failure-domain $FAILURE_DOMAIN --core-ids $frontend_core_ids $net --dedicate --join-ips $BACKEND_IPS
+sudo weka local setup container --name frontend0 --base-port 14000 --cores $NUM_FRONTEND_CONTAINERS --frontend-dedicated-cores $NUM_FRONTEND_CONTAINERS --allow-protocols true --failure-domain $FAILURE_DOMAIN --core-ids $frontend_core_ids $net --dedicate --join-ips ${backend_lb_ip}
 
 
 # check that frontend container is up
