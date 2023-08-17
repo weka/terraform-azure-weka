@@ -1,20 +1,3 @@
-resource "null_resource" "backend_ips_for_protocol_gateways" {
-  count = var.protocol_gateways_number > 0 ? 1 : 0
-  triggers = {
-    always_run = timestamp()
-  }
-  provisioner "local-exec" {
-    command = "az vmss nic list -g ${var.rg_name} --vmss-name ${azurerm_linux_virtual_machine_scale_set.vmss.name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress > ${path.root}/backend_ips_for_protocol_gateways"
-  }
-  depends_on = [azurerm_linux_virtual_machine_scale_set.vmss]
-}
-
-data "local_file" "backend_ips_for_protocol_gateways" {
-  count      = var.protocol_gateways_number > 0 ? 1 : 0
-  filename   = "${path.root}/backend_ips_for_protocol_gateways"
-  depends_on = [null_resource.backend_ips_for_protocol_gateways]
-}
-
 module "protocol_gateways" {
   count                      = var.protocol_gateways_number > 0 ? 1 : 0
   
@@ -30,7 +13,7 @@ module "protocol_gateways" {
   protocol                   = var.protocol
   nics                       = var.protocol_gateway_nics_num
   secondary_ips_per_nic      = var.protocol_gateway_secondary_ips_per_nic
-  backend_ips                = compact(split("\n", data.local_file.backend_ips_for_protocol_gateways[0].content))
+  backend_lb_ip              = azurerm_lb.backend-lb.private_ip_address
   install_weka_url           = var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.weka.io/dist/v1/install/${var.weka_version}/${var.weka_version}"
   instance_type              = var.protocol_gateway_instance_type
   apt_repo_url               = var.apt_repo_url
@@ -44,17 +27,6 @@ module "protocol_gateways" {
   frontend_num               = var.protocol_gateway_frontend_num
 
   depends_on = [azurerm_linux_virtual_machine_scale_set.vmss, azurerm_key_vault_secret.get_weka_io_token]
-}
-
-resource "null_resource" "clean_backend_ips_for_protocol_gateways" {
-  count = var.protocol_gateways_number > 0 ? 1 : 0
-  triggers = {
-    always_run = timestamp()
-  }
-  provisioner "local-exec" {
-    command = "rm -f ${path.root}/backend_ips_for_protocol_gateways"
-  }
-  depends_on = [module.protocol_gateways]
 }
 
 resource "azurerm_key_vault_access_policy" "gateways_vmss_key_vault" {
