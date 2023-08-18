@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"weka-deployment/common"
+	"weka-deployment/functions/azure_functions_def"
 	clusterizeFunc "weka-deployment/functions/clusterize"
 
 	"github.com/weka/go-cloud-lib/clusterize"
@@ -112,7 +113,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 					TieringSsdPercent: tieringSsdPercent,
 				},
 			}
-			result = clusterizeFunc.HandleLastClusterVm(ctx, state, params)
+			result, err = clusterizeFunc.HandleLastClusterVm(ctx, state, params, &azure_functions_def.AzureFuncDef{})
+			if err != nil {
+				result = clusterizeFunc.GetErrorScript(err)
+			}
 		}
 	} else if *function.Function == "instances" {
 		expand := "instanceView"

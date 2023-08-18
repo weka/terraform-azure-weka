@@ -63,6 +63,8 @@ resource "azurerm_proximity_placement_group" "ppg" {
   count               = var.placement_group_id == "" ? 1 : 0
   name                = "${var.prefix}-${var.cluster_name}-backend-ppg"
   location            = data.azurerm_resource_group.rg.location
+  zone                = var.zone
+  allowed_vm_sizes    = [var.instance_type]
   resource_group_name = var.rg_name
   tags                = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
   lifecycle {
@@ -164,7 +166,8 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
   }
   depends_on = [
     azurerm_lb_backend_address_pool.lb_backend_pool, azurerm_lb_probe.backend_lb_probe,
-    azurerm_proximity_placement_group.ppg, azurerm_lb_rule.backend_lb_rule, azurerm_lb_rule.ui_lb_rule
+    azurerm_proximity_placement_group.ppg, azurerm_lb_rule.backend_lb_rule, azurerm_lb_rule.ui_lb_rule,
+    azurerm_linux_function_app.function_app,
   ]
 }
 
