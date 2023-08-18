@@ -4,13 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/weka/go-cloud-lib/protocol"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"weka-deployment/common"
 	"weka-deployment/functions/azure_functions_def"
+
+	cloudCommon "github.com/weka/go-cloud-lib/common"
+	"github.com/weka/go-cloud-lib/functions_def"
+	"github.com/weka/go-cloud-lib/protocol"
 
 	"github.com/lithammer/dedent"
 	"github.com/weka/go-cloud-lib/clusterize"
@@ -82,23 +85,17 @@ exit 1
 }
 
 func GetShutdownScript() string {
-	return fmt.Sprintf(`
-#!/bin/bash
-shutdown now
-`)
+	s := `
+	#!/bin/bash
+	shutdown now
+	`
+	return dedent.Dedent(s)
 }
 
-func reportClusterizeError(ctx context.Context, p ClusterizationParams, err error) {
-	hostName := strings.Split(p.VmName, ":")[1]
-	report := protocol.Report{Type: "error", Hostname: hostName, Message: err.Error()}
-	_ = common.UpdateStateReporting(ctx, p.SubscriptionId, p.ResourceGroupName, p.StateContainerName, p.StateStorageName, report)
-}
-
-func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p ClusterizationParams) (clusterizeScript string) {
+func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p ClusterizationParams, funcDef functions_def.FunctionDef) (clusterizeScript string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("This is the last instance in the cluster, creating obs and clusterization script")
 
-	var err error
 	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName)
 
 	if p.Cluster.SetObs {
@@ -107,13 +104,15 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 				ctx, p.SubscriptionId, p.ResourceGroupName, p.Obs.Name, p.Location,
 			)
 			if err != nil {
-				clusterizeScript = GetErrorScript(err)
+				err = fmt.Errorf("failed to create storage account: %w", err)
+				logger.Error().Err(err).Send()
 				return
 			}
 
 			err = common.CreateContainer(ctx, p.Obs.Name, p.Obs.ContainerName)
 			if err != nil {
-				clusterizeScript = GetErrorScript(err)
+				err = fmt.Errorf("failed to create container: %w", err)
+				logger.Error().Err(err).Send()
 				return
 			}
 		}
@@ -122,27 +121,23 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 			ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, p.Obs.Name, p.Obs.ContainerName,
 		)
 		if err != nil {
-			clusterizeScript = GetErrorScript(err)
-			reportClusterizeError(ctx, p, err)
+			err = fmt.Errorf("failed to assign storage blob data contributor role to scale set: %w", err)
+			logger.Error().Err(err).Send()
 			return
 		}
 	}
 
-	functionAppKey, err := common.GetKeyVaultValue(ctx, p.KeyVaultUri, "function-app-default-key")
-	if err != nil {
-		clusterizeScript = GetErrorScript(err)
-		return
-	}
-
 	wekaPassword, err := common.GetWekaClusterPassword(ctx, p.KeyVaultUri)
 	if err != nil {
-		clusterizeScript = GetErrorScript(err)
+		err = fmt.Errorf("failed to get weka cluster password: %w", err)
+		logger.Error().Err(err).Send()
 		return
 	}
 
 	vmsPrivateIps, err := common.GetVmsPrivateIps(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName)
 	if err != nil {
-		clusterizeScript = GetErrorScript(err)
+		err = fmt.Errorf("failed to get vms private ips: %w", err)
+		logger.Error().Err(err).Send()
 		return
 	}
 
@@ -166,9 +161,6 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 	clusterParams.WekaUsername = "admin"
 	clusterParams.InstallDpdk = p.InstallDpdk
 	clusterParams.FindDrivesScript = common.FindDrivesScript
-
-	baseFunctionUrl := fmt.Sprintf("https://%s.azurewebsites.net/api/", p.FunctionAppName)
-	funcDef := azure_functions_def.NewFuncDef(baseFunctionUrl, functionAppKey)
 
 	scriptGenerator := clusterize.ClusterizeScriptGenerator{
 		Params:  clusterParams,
@@ -208,17 +200,26 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 		return
 	}
 
-	if len(state.Instances) == p.Cluster.HostsNum {
-		clusterizeScript = HandleLastClusterVm(ctx, state, p)
-	} else {
-		msg := fmt.Sprintf("This is instance number %d that is ready for clusterization (not last one), doing nothing.", len(state.Instances))
-		logger.Info().Msgf(msg)
-		clusterizeScript = dedent.Dedent(fmt.Sprintf(`
-		#!/bin/bash
-		echo "%s"
-		`, msg))
+	functionAppKey, err := common.GetKeyVaultValue(ctx, p.KeyVaultUri, "function-app-default-key")
+	if err != nil {
+		clusterizeScript = GetErrorScript(err)
+		return
 	}
 
+	baseFunctionUrl := fmt.Sprintf("https://%s.azurewebsites.net/api/", p.FunctionAppName)
+	funcDef := azure_functions_def.NewFuncDef(baseFunctionUrl, functionAppKey)
+	reportFunction := funcDef.GetFunctionCmdDefinition(functions_def.Report)
+
+	if len(state.Instances) == p.Cluster.HostsNum {
+		clusterizeScript, err = HandleLastClusterVm(ctx, state, p, funcDef)
+		if err != nil {
+			clusterizeScript = cloudCommon.GetErrorScript(err, reportFunction)
+		}
+	} else {
+		msg := fmt.Sprintf("This (%s) is instance %d/%d that is ready for clusterization", instanceName, len(state.Instances), p.Cluster.HostsNum)
+		logger.Info().Msgf(msg)
+		clusterizeScript = cloudCommon.GetScriptWithReport(msg, reportFunction)
+	}
 	return
 }
 
