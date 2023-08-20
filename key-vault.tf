@@ -1,10 +1,5 @@
 data "azurerm_client_config" "current" {}
 
-locals {
-  ssh_files = var.ssh_public_key == null && var.ssh_private_key == null ? ["${local.ssh_path}-public-key.pub", "${local.ssh_path}-private-key.pem" ]: []
-  ssh_file_name_array = ["ssh-public-key", "ssh-private-key"]
-}
-
 resource "azurerm_key_vault" "key_vault" {
   name                        = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-key-vault"
   location                    = data.azurerm_resource_group.rg.location
@@ -62,7 +57,7 @@ resource "azurerm_key_vault_secret" "public-ssh-keys" {
 }
 
 resource "azurerm_key_vault_secret" "private-ssh-keys" {
-  count        = var.ssh_private_key == null ? 1 : 0
+  count        = var.ssh_public_key == null ? 1 : 0
   name         = "private-key"
   value        = tls_private_key.ssh_key[0].private_key_pem
   key_vault_id = azurerm_key_vault.key_vault.id

@@ -53,7 +53,7 @@ variable "clients_number" {
 
 variable "ssh_public_key" {
   type        = string
-  description = "The VM public key. If it is not set, the keys are auto-generated."
+  description = "Ssh public key to pass to vms."
 }
 
 variable "apt_repo_url" {
