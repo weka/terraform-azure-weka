@@ -36,8 +36,7 @@ resource "local_file" "private_key" {
 
 locals {
   ssh_path                  = "/tmp/${var.prefix}-${var.cluster_name}"
-  public_ssh_key            = var.ssh_public_key == null ? tls_private_key.ssh_key[0].public_key_openssh : file(var.ssh_public_key)
-  private_ssh_key           = var.ssh_private_key == null ? tls_private_key.ssh_key[0].private_key_pem : file(var.ssh_private_key)
+  public_ssh_key            = var.ssh_public_key == null ? tls_private_key.ssh_key[0].public_key_openssh : var.ssh_public_key
   disk_size                 = var.default_disk_size + var.traces_per_ionode * (var.container_number_map[var.instance_type].compute + var.container_number_map[var.instance_type].drive + var.container_number_map[var.instance_type].frontend)
   private_nic_first_index   = var.private_network ? 0 : 1
   alphanumeric_cluster_name = lower(replace(var.cluster_name, "/\\W|_|\\s/", ""))
@@ -46,7 +45,6 @@ locals {
   nics_numbers              = var.install_cluster_dpdk ? var.container_number_map[var.instance_type].nics : 1
   custom_data_script        = templatefile("${path.module}/user-data.sh", {
     apt_repo_url             = var.apt_repo_url
-    private_ssh_key          = local.private_ssh_key
     user                     = var.vm_username
     install_cluster_dpdk     = var.install_cluster_dpdk
     subnet_range             = local.subnet_range

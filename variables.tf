@@ -95,15 +95,9 @@ variable "tags_map" {
 }
 
 variable "ssh_public_key" {
-  type = string
-  description = "The path to the VM public key. If it is not set, the key is auto-generated. If it is set, also set the ssh_private_key."
-  default = null
-}
-
-variable "ssh_private_key" {
-  type = string
-  description = "The path to the VM private key. If it is not set, the key is auto-generated. If it is set, also set the ssh_private_key. The private key used for connecting to the deployed virtual machines to initiate the clusterization of Weka."
-  default = null
+  type        = string
+  description = "Ssh public key to pass to vms."
+  default     = null
 }
 
 variable "private_network" {
