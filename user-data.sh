@@ -116,6 +116,18 @@ rm -rf $INSTALLATION_PATH
 
 compute_name=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" | jq '.compute.name')
 compute_name=$(echo "$compute_name" | cut -c2- | rev | cut -c2- | rev)
-curl ${deploy_url}?code="${function_app_default_key}" --fail -H "Content-Type:application/json" -d "{\"vm\": \"$compute_name:$HOSTNAME\"}" > /tmp/deploy.sh
+retry=0
+while ! curl ${deploy_url}?code="${function_app_default_key}" --fail -H "Content-Type:application/json" -d "{\"vm\": \"$compute_name:$HOSTNAME\"}" > /tmp/deploy.sh; do
+  echo "waiting for deploy script generation success"
+  retry=$((retry + 1))
+  sleep 5
+done
+
+if [ $retry -gt 0 ]; then
+  msg="Deploy script generation retried $retry times"
+  echo "$msg"
+  curl -i "${report_url}?code=${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"debug\", \"message\": \"$msg\"}"
+fi
+
 chmod +x /tmp/deploy.sh
 /tmp/deploy.sh 2>&1 | tee /tmp/weka_deploy.log
