@@ -199,8 +199,7 @@ mount_clients_dpdk = false
 | <a name="input_set_obs_integration"></a> [set\_obs\_integration](#input\_set\_obs\_integration) | Determines whether to enable object stores integration with the Weka cluster. Set true to enable the integration. | `bool` | `false` | no |
 | <a name="input_sg_id"></a> [sg\_id](#input\_sg\_id) | The security group id. | `string` | n/a | yes |
 | <a name="input_source_image_id"></a> [source\_image\_id](#input\_source\_image\_id) | Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1 | `string` | `"/communityGalleries/WekaIO-d7d3f308-d5a1-4c45-8e8a-818aed57375a/images/ubuntu20.04/versions/latest"` | no |
-| <a name="input_ssh_private_key"></a> [ssh\_private\_key](#input\_ssh\_private\_key) | The path to the VM private key. If it is not set, the key is auto-generated. If it is set, also set the ssh\_private\_key. The private key used for connecting to the deployed virtual machines to initiate the clusterization of Weka. | `string` | `null` | no |
-| <a name="input_ssh_public_key"></a> [ssh\_public\_key](#input\_ssh\_public\_key) | The path to the VM public key. If it is not set, the key is auto-generated. If it is set, also set the ssh\_private\_key. | `string` | `null` | no |
+| <a name="input_ssh_public_key"></a> [ssh\_public\_key](#input\_ssh\_public\_key) | Ssh public key to pass to vms. | `string` | `null` | no |
 | <a name="input_stripe_width"></a> [stripe\_width](#input\_stripe\_width) | Stripe width = cluster\_size - protection\_level - 1 (by default). | `number` | `-1` | no |
 | <a name="input_subnet_delegation"></a> [subnet\_delegation](#input\_subnet\_delegation) | Subnet delegation enables you to designate a specific subnet for an Azure PaaS service. | `string` | n/a | yes |
 | <a name="input_subnet_delegation_id"></a> [subnet\_delegation\_id](#input\_subnet\_delegation\_id) | Subnet delegation id | `string` | `null` | no |
