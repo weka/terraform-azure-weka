@@ -45,6 +45,7 @@ func GetDeployScript(
 	clusterName,
 	installUrl,
 	keyVaultUri,
+	proxyUrl,
 	vm string,
 	computeMemory string,
 	computeContainerNum int,
@@ -94,6 +95,7 @@ func GetDeployScript(
 			InstallDpdk:    installDpdk,
 			NicsNum:        nicsNum,
 			Gateways:       gateways,
+			ProxyUrl:       proxyUrl,
 		}
 		deployScriptGenerator := deploy.DeployScriptGenerator{
 			FuncDef:          funcDef,
@@ -143,6 +145,7 @@ func GetDeployScript(
 			InstallDpdk:    installDpdk,
 			InstanceParams: instanceParams,
 			Gateways:       gateways,
+			ProxyUrl:       proxyUrl,
 		}
 
 		scriptBase := `
@@ -221,6 +224,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	functionAppName := os.Getenv("FUNCTION_APP_NAME")
 
 	installUrl := os.Getenv("INSTALL_URL")
+	proxyUrl := os.Getenv("PROXY_URL")
 
 	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
@@ -269,6 +273,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		clusterName,
 		installUrl,
 		keyVaultUri,
+		proxyUrl,
 		data.Vm,
 		computeMemory,
 		computeContainerNum,

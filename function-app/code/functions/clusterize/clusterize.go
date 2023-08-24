@@ -246,6 +246,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	installDpdk, _ := strconv.ParseBool(os.Getenv("INSTALL_DPDK"))
 	addFrontendNum, _ := strconv.Atoi(os.Getenv("NUM_FRONTEND_CONTAINERS"))
 	functionAppName := os.Getenv("FUNCTION_APP_NAME")
+	proxyUrl := os.Getenv("PROXY_URL")
 
 	addFrontend := false
 	if addFrontendNum > 0 {
@@ -296,6 +297,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			NvmesNum:    nvmesNum,
 			SetObs:      setObs,
 			AddFrontend: addFrontend,
+			ProxyUrl:    proxyUrl,
 			DataProtection: clusterize.DataProtectionParams{
 				StripeWidth:     stripeWidth,
 				ProtectionLevel: protectionLevel,
