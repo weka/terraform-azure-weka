@@ -4,10 +4,10 @@ set -ex
 echo "$(date -u): cloud-init beginning"
 
 # set apt private repo
-if [[ "${apt_repo_url}" != "" ]]; then
+if [[ "${apt_repo_server}" != "" ]]; then
   mv /etc/apt/sources.list /etc/apt/sources.list.bak
-  echo "deb ${apt_repo_url} focal main restricted universe" > /etc/apt/sources.list
-  echo "deb ${apt_repo_url} focal-updates main restricted" >> /etc/apt/sources.list
+  echo "deb ${apt_repo_server} focal main restricted universe" > /etc/apt/sources.list
+  echo "deb ${apt_repo_server} focal-updates main restricted" >> /etc/apt/sources.list
 fi
 
 for(( i=0; i<${nics_num}; i++ )); do

@@ -15,8 +15,8 @@ locals {
   private_nic_first_index = var.assign_public_ip ? 1 : 0
 
   init_script = templatefile("${path.module}/init.sh", {
-    apt_repo_url     = var.apt_repo_url
-    nics_num         = var.nics
+    apt_repo_server  = var.apt_repo_server
+    nics_num         = var.nics_numbers
     subnet_range     = data.azurerm_subnet.subnet.address_prefix
     disk_size        = local.disk_size
     install_weka_url = var.install_weka_url
@@ -27,7 +27,7 @@ locals {
     frontend_num    = var.frontend_num
     subnet_prefixes = data.azurerm_subnet.subnet.address_prefix
     backend_lb_ip   = var.backend_lb_ip
-    nics_num        = var.nics
+    nics_num        = var.nics_numbers
     key_vault_url   = var.key_vault_url
   })
 
@@ -134,7 +134,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
   }
 
   dynamic "network_interface" {
-    for_each = range(1, var.nics)
+    for_each = range(1, var.nics_numbers)
     content {
       name                          = "${var.gateways_name}-secondary-nic-${network_interface.value}"
       network_security_group_id     = var.sg_id

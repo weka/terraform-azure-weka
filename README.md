@@ -29,6 +29,10 @@ module "deploy-weka" {
    subscription_id       = "mySubscriptionId"
    private_dns_zone_name = "myDns.private.net"
 }
+
+output "deploy_weka_output" {
+  value = module.deploy_weka
+}
 ```
 
 ## Weka custom image
@@ -37,6 +41,50 @@ This is a community image that we created and uploaded to azure.
 In case you would like to view how we created the image you can find it [here](https://github.com/weka/terraform-azure-weka-custom-image).
 You can as well create it on your own subscription and use it.
 
+
+### Private network deployment:
+```hcl
+private_network = true
+```
+#### To avoid public ip assignment:
+```hcl
+assign_public_ip   = false
+```
+
+## Ssh keys
+The username for ssh into vms is `weka`.
+<br />
+
+We allow passing an existing public key:
+```hcl
+ssh_public_key = "..."
+```
+If public key isn't passed we will create it for you and store the private key locally under `/tmp`
+Names will be:
+```
+/tmp/${prefix}-${cluster_name}-public-key.pub
+/tmp/${prefix}-${cluster_name}-private-key.pem
+```
+Also we store the keys on key vault as secret:
+To download keys from key vault use command:
+```
+az keyvault secret download --file private.pem --encoding utf-8 --vault-name  ${prefix}-${cluster_name}-key-vault --name private-key --query "value"
+az keyvault secret download --file private.pem --encoding utf-8 --vault-name  ${prefix}-${cluster_name}-key-vault --name public-key --query "value"
+```
+
+## OBS
+We support tiering to bucket.
+In order to setup tiering, you must supply the following variables:
+```hcl
+set_obs_integration = true
+obs_name            = "..."
+obs_container_name  = "..."
+blob_obs_access_key = "..."
+```
+In addition, you can supply (and override our default):
+```hcl
+tiering_ssd_percent = VALUE
+```
 
 ## Clients
 We support creating clients that will be mounted automatically to the cluster.
@@ -49,12 +97,37 @@ This will automatically create 2 clients.
 <br>In addition you can supply these optional variables:
 ```hcl
 client_instance_type = "Standard_D4_v4"
-client_nics_num = DESIRED_NUM
+client_nics_num      = DESIRED_NUM
 ```
 ### Mounting clients in udp mode
 In order to mount clients in udp mode you should pass the following param (in addition to the above):
 ```hcl
 mount_clients_dpdk = false
+```
+
+## Protocol Gateways
+We support creating protocol gateways that will be mounted automatically to the cluster.
+<br>In order to create you need to provide the number of protocol gateways instances you want (by default the number is 0),
+for example:
+```hcl
+protocol_gateways_number = 2
+```
+This will automatically create 2 instances.
+<br>In addition you can supply these optional variables:
+```hcl
+protocol                               = VALUE
+protocol_gateway_secondary_ips_per_nic = 3
+protocol_gateway_instance_type         = "Standard_D8_v5"
+protocol_gateway_nics_num              = 2
+protocol_gateway_disk_size             = 48
+protocol_gateway_frontend_num          = 1
+```
+
+## Weka installation with proxy url
+We support weka installation with proxy url.
+<br>In order to create you need to provide the proxy url(by default the number is ""),
+```hcl
+proxy_url = VALUE
 ```
 
 <!-- BEGIN_TF_DOCS -->

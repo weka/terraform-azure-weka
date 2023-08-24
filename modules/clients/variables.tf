@@ -56,7 +56,7 @@ variable "ssh_public_key" {
   description = "Ssh public key to pass to vms."
 }
 
-variable "apt_repo_url" {
+variable "apt_repo_server" {
   type        = string
   default     = ""
   description = "The URL of the apt private repository."
