@@ -11,10 +11,10 @@ data "azurerm_subnet" "subnet" {
 locals {
   private_nic_first_index = var.assign_public_ip ? 1 : 0
   preparation_script      = templatefile("${path.module}/init.sh", {
-    apt_repo_url  = var.apt_repo_url
-    nics_num      = var.nics
-    install_dpdk  = var.mount_clients_dpdk
-    subnet_range  = data.azurerm_subnet.subnet.address_prefix
+    apt_repo_server = var.apt_repo_server
+    nics_num        = var.nics
+    install_dpdk    = var.mount_clients_dpdk
+    subnet_range    = data.azurerm_subnet.subnet.address_prefix
   })
 
   mount_wekafs_script = templatefile("${path.module}/mount_wekafs.sh", {

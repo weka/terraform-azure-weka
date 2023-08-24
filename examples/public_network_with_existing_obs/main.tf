@@ -5,34 +5,18 @@ provider "azurerm" {
   }
 }
 
-module "create-network" {
-  source            = "../../modules/create_networks"
-  prefix            = var.prefix
-  rg_name           = var.rg_name
-  address_space     = var.address_space
-  subnet_prefixes   = var.subnet_prefixes
-  sg_ssh_range      = var.sg_ssh_range
-}
-
-module "deploy-weka" {
+module "weka_deployment" {
   source                = "../.."
-  prefix                = var.prefix
-  rg_name               = var.rg_name
-  vnet_name             = module.create-network.vnet-name
-  vnet_rg_name          = module.create-network.vnet_rg_name
-  subnet_name           = module.create-network.subnets-name
-  sg_id                 = module.create-network.sg-id
-  subnet_delegation     = var.subnet_delegation
-  get_weka_io_token     = var.get_weka_io_token
-  cluster_name          = var.cluster_name
-  set_obs_integration   = var.set_obs_integration
-  instance_type         = var.instance_type
-  cluster_size          = var.cluster_size
-  obs_name              = var.obs_name
-  obs_container_name    = var.obs_container_name
-  blob_obs_access_key   = var.blob_obs_access_key
-  tiering_ssd_percent   = var.tiering_ssd_percent
+  prefix                = "weka"
+  rg_name               = "weka-rg"
+  cluster_name          = "poc"
+  cluster_size          = 6
+  allow_ssh_ranges      = ["0.0.0.0/0"]
   subscription_id       = var.subscription_id
-  private_dns_zone_name = module.create-network.private-dns-zone-name
-  depends_on            = [module.create-network]
+  get_weka_io_token     = var.get_weka_io_token
+  set_obs_integration   = true
+  obs_name              = "obs"
+  obs_container_name    = "obs-container"
+  blob_obs_access_key   = "..."
+  tiering_ssd_percent   = 20
 }

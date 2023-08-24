@@ -1,45 +1,70 @@
 variable "prefix" {
   type = string
-  description = "The prefix for all the resource names. For example, the prefix for your system name."
+  description = "Prefix for all resources"
+  validation {
+    condition     = can(regex("^[a-zA-Z][a-zA-Z\\-\\_0-9]{1,64}$", var.prefix))
+    error_message = "Prefix name must start with letter, only contain letters, numbers, dashes, or underscores."
+  }
   default = "weka"
 }
 
 variable "rg_name" {
-  type = string
+  type        = string
   description = "A predefined resource group in the Azure subscription."
 }
 
 variable "vnet_rg_name" {
-  type = string
+  type        = string
   description = "Resource group name of vnet"
+  default     = ""
+}
+
+variable "subnet_prefix" {
+  type        = string
+  description = "Address prefixes to use for the subnet"
+  default     = "10.0.2.0/24"
+}
+
+variable "allow_ssh_ranges" {
+  type        = list(string)
+  description = "A list of IP addresses that can use ssh connection with a public network deployment."
+  default     = []
+}
+
+variable "address_space" {
+  type        = string
+  description = "The range of IP addresses the virtual network uses."
+  default     = "10.0.0.0/16"
 }
 
 variable "vm_username" {
-  type = string
+  type        = string
   description = "The user name for logging in to the virtual machines."
-  default = "weka"
+  default     = "weka"
 }
 
 variable "instance_type" {
-  type = string
+  type        = string
   description = "The virtual machine type (sku) to deploy."
-  default = "Standard_L8s_v3"
+  default     = "Standard_L8s_v3"
 }
 
 variable "vnet_name" {
-  type = string
+  type        = string
   description = "The virtual network name."
+  default     = ""
 }
 
 variable "subnet_name" {
   type        = string
   description = "The subnet name."
+  default     = ""
 }
 
 variable "cluster_size" {
-  type = number
+  type        = number
   description = "The number of virtual machines to deploy."
-  default = 6
+  default     = 6
 
   validation {
     condition = var.cluster_size >= 6
@@ -54,37 +79,43 @@ variable "source_image_id" {
 }
 
 variable "sg_id" {
-  type = string
+  type        = string
   description = "The security group id."
+  default     = ""
 }
 
 variable "subnet_delegation" {
-  type = string
+  type        = string
   description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service."
+  default     = "10.0.1.0/25"
 }
 
 variable "subnet_delegation_id" {
-  type = string
+  type        = string
   description = "Subnet delegation id"
-  default = null
+  default     = null
 }
 
 variable "weka_version" {
-  type = string
+  type        = string
   description = "The Weka version to deploy."
-  default = "4.2.1"
+  default     = "4.2.1"
 }
 
 variable "get_weka_io_token" {
-  type = string
+  type        = string
   description = "The token to download the Weka release from get.weka.io."
-  default = ""
-  sensitive = true
+  default     = ""
+  sensitive   = true
 }
 
 variable "cluster_name" {
   type = string
-  description = "The cluster name."
+  description = "Cluster name"
+  validation {
+    condition     = can(regex("^[a-zA-Z][a-zA-Z\\-\\_0-9]{1,64}$", var.cluster_name))
+    error_message = "Cluster name must start with letter, only contain letters, numbers, dashes, or underscores."
+  }
   default = "poc"
 }
 
@@ -101,58 +132,42 @@ variable "ssh_public_key" {
 }
 
 variable "private_network" {
-  type = bool
-  default = false
+  type        = bool
+  default     = false
   description = "Determines whether to enable a private or public network. The default is public network."
 }
 
-variable "install_weka_url" {
-  type = string
-  description = "The URL of the Weka release download tar file."
-  default = ""
+variable "assign_public_ip" {
+  type        = bool
+  default     = true
+  description = "Determines whether to assign public ip."
 }
 
-variable "apt_repo_url" {
-  type = string
+variable "install_weka_url" {
+  type        = string
+  description = "The URL of the Weka release download tar file."
+  default     = ""
+}
+
+variable "apt_repo_server" {
+  type        = string
   description = "The URL of the apt private repository."
-  default = ""
+  default     = ""
 }
 
 variable "private_dns_zone_name" {
-  type = string
+  type        = string
   description = "The private DNS zone name."
-  default = null
+  default     = ""
 }
 
-variable "obs_name" {
-  type = string
-  default = ""
-  description = "Name of existing obs storage account"
-}
-
-variable "obs_container_name" {
-  type = string
-  default = ""
-  description = "Name of existing obs conatiner name"
-}
-
-variable "set_obs_integration" {
-  type = bool
-  default = false
-  description = "Determines whether to enable object stores integration with the Weka cluster. Set true to enable the integration."
-}
-
-variable "blob_obs_access_key" {
-  type = string
-  description = "The access key of the existing Blob object store container."
-  sensitive   = true
-  default = ""
-}
-
-variable "tiering_ssd_percent" {
-  type = number
-  default = 20
-  description = "When set_obs_integration is true, this variable sets the capacity percentage of the filesystem that resides on SSD. For example, for an SSD with a total capacity of 20GB, and the tiering_ssd_percent is set to 20, the total available capacity is 100GB."
+variable "vnet_to_peering" {
+  type = list(object({
+    vnet = string
+    rg   = string
+  }))
+  description = "List of vent-name:resource-group-name to peer"
+  default     = []
 }
 
 variable "container_number_map" {
@@ -210,19 +225,19 @@ variable "container_number_map" {
 }
 
 variable "default_disk_size" {
-  type = number
-  default = 48
+  type        = number
+  default     = 48
   description = "The default disk size."
 }
 
 variable "traces_per_ionode" {
-  default = 10
-  type = number
+  default     = 10
+  type        = number
   description = "The number of traces per ionode. Traces are low-level events generated by Weka processes and are used as troubleshooting information for support purposes."
 }
 
 variable "subscription_id" {
-  type = string
+  type        = string
   description = "The subscription id for the deployment."
 }
 
@@ -304,6 +319,38 @@ variable "add_frontend_containers" {
   description = "Create cluster with FE containers"
 }
 
+################################################## obs variables ###################################################
+variable "obs_name" {
+  type = string
+  default = ""
+  description = "Name of existing obs storage account"
+}
+
+variable "obs_container_name" {
+  type = string
+  default = ""
+  description = "Name of existing obs conatiner name"
+}
+
+variable "set_obs_integration" {
+  type = bool
+  default = false
+  description = "Determines whether to enable object stores integration with the Weka cluster. Set true to enable the integration."
+}
+
+variable "blob_obs_access_key" {
+  type = string
+  description = "The access key of the existing Blob object store container."
+  sensitive   = true
+  default = ""
+}
+
+variable "tiering_ssd_percent" {
+  type = number
+  default = 20
+  description = "When set_obs_integration is true, this variable sets the capacity percentage of the filesystem that resides on SSD. For example, for an SSD with a total capacity of 20GB, and the tiering_ssd_percent is set to 20, the total available capacity is 100GB."
+}
+
 ############################### clients ############################
 variable "clients_number" {
   type        = number
@@ -328,6 +375,7 @@ variable "mount_clients_dpdk" {
   default     = true
   description = "Mount weka clients in DPDK mode"
 }
+
 variable "placement_group_id" {
   type        = string
   default     = ""
@@ -353,6 +401,7 @@ variable "deployment_storage_account_access_key" {
   default     = ""
 }
 
+############################################### protocol gateways variables ###################################################
 variable "protocol_gateways_number" {
   type = number
   description = "The number of protocol gateway virtual machines to deploy."
@@ -360,9 +409,9 @@ variable "protocol_gateways_number" {
 }
 
 variable "protocol" {
-  type    = string
+  type        = string
   description = "Name of the protocol."
-  default = "NFS"
+  default     = "NFS"
 
   validation {
     condition     = contains(["NFS", "SMB"], var.protocol)
@@ -405,7 +454,6 @@ variable "zone"{
   description = "The zone in which the resources should be created."
   default     = "1"
 }
-
 
 variable "proxy_url" {
   type        = string

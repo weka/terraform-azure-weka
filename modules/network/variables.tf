@@ -12,13 +12,13 @@ variable "rg_name" {
 variable "address_space" {
   type = string
   description = "The range of IP addresses the virtual network uses."
-  default = ""
+  default = "10.0.0.0/16"
 }
 
-variable "subnet_prefixes" {
+variable "subnet_prefix" {
   type        = string
   description = "Address prefixes to use for the subnet."
-  default     = ""
+  default     = "10.0.2.0/24"
 }
 
 variable "tags_map" {
@@ -40,25 +40,25 @@ variable "subnet_name" {
 }
 
 variable "private_network" {
-  type = bool
-  default = false
+  type        = bool
+  default     = false
   description = "Determines whether to enable a private or public network. The default is public network."
 }
 
-variable "sg_ssh_range" {
+variable "allow_ssh_ranges" {
   type        = list(string)
   description = "A list of IP addresses that can use ssh connection with a public network deployment."
-  default = []
+  default     = []
 }
 
 variable "vnet_rg_name" {
-  type = string
-  default = null
+  type        = string
+  default     = null
   description = "Resource group name of vnet"
 }
 
-variable "create_private_dns_zone" {
-  type = bool
-  default = true
-  description = "Should create private dns zone"
+variable "private_dns_zone_name" {
+  type        = string
+  description = "The private DNS zone name."
+  default     = ""
 }

@@ -97,9 +97,8 @@ resource "azurerm_lb_rule" "backend_lb_rule" {
 }
 
 resource "azurerm_private_dns_a_record" "dns_a_record_backend_lb" {
-  count               = var.private_dns_zone_name == null ? 0 : 1
   name                = lower("${var.cluster_name}-backend")
-  zone_name           = var.private_dns_zone_name
+  zone_name           = local.private_dns_zone_name
   resource_group_name = var.rg_name
   ttl                 = 300
   records             = [azurerm_lb.backend-lb.frontend_ip_configuration[0].private_ip_address]

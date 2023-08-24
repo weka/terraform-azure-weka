@@ -84,13 +84,13 @@ variable "vm_username" {
   default     = "weka"
 }
 
-variable "nics" {
+variable "nics_numbers" {
   type        = number
   default     = 2
   description = "Number of nics to set on each vm"
 
   validation {
-    condition     = var.nics >= 2
+    condition     = var.nics_numbers >= 2
     error_message = "The amount of NICs per protocol gateway VM should be at least 2."
   }
 }
@@ -121,7 +121,7 @@ variable "source_image_id" {
   description = "Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1"
 }
 
-variable "apt_repo_url" {
+variable "apt_repo_server" {
   type        = string
   default     = ""
   description = "The URL of the apt private repository."
