@@ -278,7 +278,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type = string
   description = "Function app code version (hash)"
-  default = "52d185df594454931c9c7d896747466f"
+  default = "c00e84e281d4a5e2725fd32356e149d6"
 }
 
 variable "function_app_dist" {
@@ -404,4 +404,11 @@ variable "zone"{
   type        = string
   description = "The zone in which the resources should be created."
   default     = "1"
+}
+
+
+variable "proxy_url" {
+  type        = string
+  description = "Weka home proxy url"
+  default     = ""
 }
