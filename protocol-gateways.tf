@@ -21,11 +21,10 @@ module "protocol_gateways" {
   ppg_id                     = local.placement_group_id
   sg_id                      = local.sg_id
   key_vault_url              = azurerm_key_vault.key_vault.vault_uri
-  assign_public_ip           = var.private_network ? false : true
+  assign_public_ip           = var.assign_public_ip
   disk_size                  = var.protocol_gateway_disk_size
   frontend_num               = var.protocol_gateway_frontend_num
-
-  depends_on = [azurerm_linux_virtual_machine_scale_set.vmss, azurerm_key_vault_secret.get_weka_io_token]
+  depends_on                 = [module.network, azurerm_linux_virtual_machine_scale_set.vmss, azurerm_key_vault_secret.get_weka_io_token, azurerm_proximity_placement_group.ppg]
 }
 
 resource "azurerm_key_vault_access_policy" "gateways_vmss_key_vault" {

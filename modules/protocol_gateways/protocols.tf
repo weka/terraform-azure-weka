@@ -104,7 +104,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
       dynamic "ip_configuration" {
         for_each = range(var.secondary_ips_per_nic)
         content {
-          name      = "ipconfig${ip_configuration.value + 1}"
+          name      = "secondary${ip_configuration.value}"
           subnet_id = data.azurerm_subnet.subnet.id
         }
       }
@@ -126,7 +126,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
       dynamic "ip_configuration" {
         for_each = range(var.secondary_ips_per_nic)
         content {
-          name      = "ipconfig${ip_configuration.value + 1}"
+          name      = "secondary${ip_configuration.value}"
           subnet_id = data.azurerm_subnet.subnet.id
         }
       }
