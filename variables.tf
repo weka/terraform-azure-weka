@@ -422,7 +422,7 @@ variable "protocol" {
 variable "protocol_gateway_secondary_ips_per_nic" {
   type        = number
   description = "Number of secondary IPs per single NIC per protocol gateway virtual machine."
-  default     = 1
+  default     = 3
 }
 
 variable "protocol_gateway_instance_type" {
