@@ -96,14 +96,14 @@ No modules.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_address_space"></a> [address\_space](#input\_address\_space) | The range of IP addresses the virtual network uses. | `string` | `""` | no |
-| <a name="input_create_private_dns_zone"></a> [create\_private\_dns\_zone](#input\_create\_private\_dns\_zone) | Should create private dns zone | `bool` | `true` | no |
+| <a name="input_address_space"></a> [address\_space](#input\_address\_space) | The range of IP addresses the virtual network uses. | `string` | `"10.0.0.0/16"` | no |
+| <a name="input_allow_ssh_ranges"></a> [allow\_ssh\_ranges](#input\_allow\_ssh\_ranges) | A list of IP addresses that can use ssh connection with a public network deployment. | `list(string)` | `[]` | no |
 | <a name="input_prefix"></a> [prefix](#input\_prefix) | The prefix for all the resource names. For example, the prefix for your system name. | `string` | `"weka"` | no |
+| <a name="input_private_dns_zone_name"></a> [private\_dns\_zone\_name](#input\_private\_dns\_zone\_name) | The private DNS zone name. | `string` | `""` | no |
 | <a name="input_private_network"></a> [private\_network](#input\_private\_network) | Determines whether to enable a private or public network. The default is public network. | `bool` | `false` | no |
 | <a name="input_rg_name"></a> [rg\_name](#input\_rg\_name) | A predefined resource group in the Azure subscription. | `string` | n/a | yes |
-| <a name="input_sg_ssh_range"></a> [sg\_ssh\_range](#input\_sg\_ssh\_range) | A list of IP addresses that can use ssh connection with a public network deployment. | `list(string)` | `[]` | no |
 | <a name="input_subnet_name"></a> [subnet\_name](#input\_subnet\_name) | Subnet name, if exist. | `string` | `null` | no |
-| <a name="input_subnet_prefixes"></a> [subnet\_prefixes](#input\_subnet\_prefixes) | Address prefixes to use for the subnet. | `string` | `""` | no |
+| <a name="input_subnet_prefix"></a> [subnet\_prefix](#input\_subnet\_prefix) | Address prefixes to use for the subnet. | `string` | `"10.0.2.0/24"` | no |
 | <a name="input_tags_map"></a> [tags\_map](#input\_tags\_map) | A map of tags to assign the same metadata to all resources in the environment. Format: key:value. | `map(string)` | <pre>{<br>  "creator": "tf",<br>  "env": "dev"<br>}</pre> | no |
 | <a name="input_vnet_name"></a> [vnet\_name](#input\_vnet\_name) | The VNet name, if exists. | `string` | `null` | no |
 | <a name="input_vnet_rg_name"></a> [vnet\_rg\_name](#input\_vnet\_rg\_name) | Resource group name of vnet | `string` | `null` | no |
@@ -112,9 +112,9 @@ No modules.
 
 | Name | Description |
 |------|-------------|
-| <a name="output_private-dns-zone-name"></a> [private-dns-zone-name](#output\_private-dns-zone-name) | Displays the private DNS zone name. |
-| <a name="output_sg-id"></a> [sg-id](#output\_sg-id) | Displays the security group id. |
-| <a name="output_subnets-name"></a> [subnets-name](#output\_subnets-name) | Displays the subnet names list. |
-| <a name="output_vnet-name"></a> [vnet-name](#output\_vnet-name) | Displays the VNet name. |
+| <a name="output_private_dns_zone_name"></a> [private\_dns\_zone\_name](#output\_private\_dns\_zone\_name) | Displays the private DNS zone name. |
+| <a name="output_sg_id"></a> [sg\_id](#output\_sg\_id) | Displays the security group id. |
+| <a name="output_subnet_name"></a> [subnet\_name](#output\_subnet\_name) | Displays the subnet name list. |
+| <a name="output_vnet_name"></a> [vnet\_name](#output\_vnet\_name) | Displays the VNet name. |
 | <a name="output_vnet_rg_name"></a> [vnet\_rg\_name](#output\_vnet\_rg\_name) | Resource group name of vnet. |
 <!-- END_TF_DOCS -->
