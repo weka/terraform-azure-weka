@@ -51,6 +51,12 @@ variable "allow_ssh_ranges" {
   default     = []
 }
 
+variable "allow_weka_api_ranges" {
+  type        = list(string)
+  description = "Allow port 14000, if not provided, i.e leaving the default empty list, the rule will not be included in the SG"
+  default     = []
+}
+
 variable "vnet_rg_name" {
   type        = string
   default     = ""

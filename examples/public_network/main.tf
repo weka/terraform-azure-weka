@@ -16,4 +16,5 @@ module "weka_deployment" {
   cluster_size          = 6
   tiering_ssd_percent   = 20
   allow_ssh_ranges      = ["0.0.0.0/0"]
+  allow_weka_api_ranges = ["0.0.0.0/0"]
 }
