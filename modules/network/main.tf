@@ -69,32 +69,32 @@ resource "azurerm_subnet" "subnet_delegation" {
 
 # ====================== sg ssh ========================== #
 resource "azurerm_network_security_rule" "sg_public_ssh" {
-  count                       = var.private_network ? 0 : length(var.allow_ssh_ranges)
+  count                       = length(var.allow_ssh_ranges)
   name                        = "${var.prefix}-ssh-sg-${count.index}"
   resource_group_name         = data.azurerm_resource_group.rg.name
-  priority                    = "100${count.index}"
+  priority                    = 100 + (count.index + 1)
   direction                   = "Inbound"
   access                      = "Allow"
   protocol                    = "Tcp"
   source_port_range           = "*"
   destination_port_range      = "22"
-  source_address_prefixes     = [var.allow_ssh_ranges[count.index]]
+  source_address_prefix       = element(var.allow_ssh_ranges, count.index)
   destination_address_prefix  = "*"
   network_security_group_name = azurerm_network_security_group.sg.name
 }
 
 # ====================== sg  ========================== #
 resource "azurerm_network_security_rule" "sg_weka_ui" {
-  count                       = var.private_network ? 0 : 1
-  name                        = "${var.prefix}-ui-sg"
+  count                       = length(var.allow_weka_api_ranges)
+  name                        = "${var.prefix}-ui-sg-${count.index}"
   resource_group_name         = data.azurerm_resource_group.rg.name
-  priority                    = "1002"
+  priority                    = 200 + (count.index + 1)
   direction                   = "Inbound"
   access                      = "Allow"
   protocol                    = "Tcp"
   source_port_range           = "*"
   destination_port_range      = "14000"
-  source_address_prefix       = "*"
+  source_address_prefix       = element(var.allow_weka_api_ranges, count.index)
   destination_address_prefix  = "*"
   network_security_group_name = azurerm_network_security_group.sg.name
 }

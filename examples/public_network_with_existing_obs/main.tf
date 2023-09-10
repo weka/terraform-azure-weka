@@ -12,6 +12,7 @@ module "weka_deployment" {
   cluster_name          = "poc"
   cluster_size          = 6
   allow_ssh_ranges      = ["0.0.0.0/0"]
+  allow_weka_api_ranges = ["0.0.0.0/0"]
   subscription_id       = var.subscription_id
   get_weka_io_token     = var.get_weka_io_token
   set_obs_integration   = true
