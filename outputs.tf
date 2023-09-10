@@ -2,7 +2,8 @@ locals {
   key_vault_name       = azurerm_key_vault.key_vault.name
   vm_ips               = var.private_network ? "az vmss nic list -g ${var.rg_name} --vmss-name ${azurerm_linux_virtual_machine_scale_set.vmss.name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress" : "az vmss list-instance-public-ips -g ${var.rg_name} --name ${azurerm_linux_virtual_machine_scale_set.vmss.name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n"
   clients_ips          = var.clients_number > 0 ? var.private_network ? "az vmss nic list -g ${var.rg_name} --vmss-name ${module.clients[0].client-name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress" : "az vmss list-instance-public-ips -g ${var.rg_name} --name ${module.clients[0].client-name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n" : ""
-  protocol_gw_ips      = var.protocol_gateways_number > 0 ? var.private_network ? "az vmss nic list -g ${var.rg_name} --vmss-name ${module.protocol_gateways[0].vmss_name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress" : "az vmss list-instance-public-ips -g ${var.rg_name} --name ${module.protocol_gateways[0].vmss_name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n" : ""
+  nfs_protocol_gw_ips      = var.nfs_protocol_gateways_number > 0 ? var.private_network ? "az vmss nic list -g ${var.rg_name} --vmss-name ${module.nfs_protocol_gateways[0].vmss_name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress" : "az vmss list-instance-public-ips -g ${var.rg_name} --name ${module.nfs_protocol_gateways[0].vmss_name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n" : ""
+  smb_protocol_gw_ips      = var.smb_protocol_gateways_number > 0 ? var.private_network ? "az vmss nic list -g ${var.rg_name} --vmss-name ${module.smb_protocol_gateways[0].vmss_name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress" : "az vmss list-instance-public-ips -g ${var.rg_name} --name ${module.smb_protocol_gateways[0].vmss_name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n" : ""
   ssh_keys_commands    = "########################################## Download ssh keys command from blob ###########################################################\n az keyvault secret download --file private.pem --encoding utf-8 --vault-name  ${local.key_vault_name} --name private-key --query \"value\" \n az keyvault secret download --file public.pub --encoding utf-8 --vault-name  ${local.key_vault_name} --name public-key --query \"value\"\n"
   blob_commands        = var.ssh_public_key == null ? local.ssh_keys_commands : ""
   private_ssh_key_path = var.ssh_public_key == null ? local.ssh_private_key_path : null
@@ -50,9 +51,14 @@ output "client_ips" {
   description = "If 'private_network' is set to false, it will output clients public ips, otherwise private ips."
 }
 
-output "protocol_gateway_ips" {
-  value       = local.protocol_gw_ips
-  description = "If 'private_network' is set to false, it will output protocol gateway public ips, otherwise private ips."
+output "nfs_protocol_gateway_ips" {
+  value       = local.nfs_protocol_gw_ips
+  description = "If 'private_network' is set to false, it will output nfs protocol gateway public ips, otherwise private ips."
+}
+
+output "smb_protocol_gateway_ips" {
+  value       = local.smb_protocol_gw_ips
+  description = "If 'private_network' is set to false, it will output smb protocol gateway public ips, otherwise private ips."
 }
 
 output "private_ssh_key" {
