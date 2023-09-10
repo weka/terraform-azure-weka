@@ -11,7 +11,7 @@ data "azurerm_subnet" "subnet" {
 }
 
 locals {
-  disk_size               = var.disk_size + var.traces_per_frontend * var.frontend_num
+  disk_size               = var.disk_size + var.traces_per_frontend * var.frontend_cores_num
   private_nic_first_index = var.assign_public_ip ? 1 : 0
 
   init_script = templatefile("${path.module}/init.sh", {
@@ -20,15 +20,15 @@ locals {
     subnet_range     = data.azurerm_subnet.subnet.address_prefix
     disk_size        = local.disk_size
     install_weka_url = var.install_weka_url
-    key_vault_url    = var.key_vault_url
+    key_vault_url    = data.azurerm_key_vault.this.vault_uri
   })
 
   deploy_script = templatefile("${path.module}/deploy_protocol_gateways.sh", {
-    frontend_num    = var.frontend_num
-    subnet_prefixes = data.azurerm_subnet.subnet.address_prefix
-    backend_lb_ip   = var.backend_lb_ip
-    nics_num        = var.nics_numbers
-    key_vault_url   = var.key_vault_url
+    frontend_cores_num = var.frontend_cores_num
+    subnet_prefixes    = data.azurerm_subnet.subnet.address_prefix
+    backend_lb_ip      = var.backend_lb_ip
+    nics_num           = var.nics_numbers
+    key_vault_url      = data.azurerm_key_vault.this.vault_uri
   })
 
   setup_nfs_protocol_script = templatefile("${path.module}/setup_nfs.sh", {
@@ -47,11 +47,13 @@ locals {
     dns_ip              = var.smb_dns_ip_address
     gateways_number     = var.gateways_number
     gateways_name       = var.gateways_name
-    frontend_num        = var.frontend_num
+    frontend_cores_num  = var.frontend_cores_num
     share_name          = var.smb_share_name
   })
 
-  setup_protocol_script = var.protocol == "NFS" ? local.setup_nfs_protocol_script : local.setup_smb_protocol_script
+  protocol_script = var.protocol == "NFS" ? local.setup_nfs_protocol_script : local.setup_smb_protocol_script
+
+  setup_protocol_script = var.setup_protocol ? local.protocol_script : ""
 
   custom_data_parts = [
     local.init_script, local.deploy_script, local.setup_protocol_script
@@ -175,4 +177,26 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
       error_message = "The number of secondary IPs per single NIC per protocol gateway virtual machine must be at most 3 for SMB."
     }
   }
+}
+
+data "azurerm_key_vault" "this" {
+  name                = var.key_vault_name
+  resource_group_name = var.rg_name
+}
+
+resource "azurerm_key_vault_access_policy" "gateways_vmss_key_vault" {
+  key_vault_id = data.azurerm_key_vault.this.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = azurerm_linux_virtual_machine_scale_set.vmss.identity[0].principal_id
+  secret_permissions = [
+    "Get",
+  ]
+  depends_on = [azurerm_linux_virtual_machine_scale_set.vmss]
+}
+
+resource "azurerm_role_assignment" "gateways_vmss_key_vault" {
+  scope                = data.azurerm_key_vault.this.id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = azurerm_linux_virtual_machine_scale_set.vmss.identity[0].principal_id
+  depends_on           = [azurerm_linux_virtual_machine_scale_set.vmss]
 }

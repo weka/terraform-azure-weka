@@ -1,3 +1,4 @@
+echo "$(date -u): running smb script"
 weka local ps
 
 function wait_for_weka_fs(){
@@ -117,6 +118,7 @@ echo "$(date -u): weka SMB cluster does not exist, creating it"
 # get all protocol gateways fromtend container ids separated by comma
 all_container_ids_str=$(echo "$all_container_ids" | tr '\n' ',' | sed 's/,$//')
 
+sleep 30s
 # if smbw_enabled is true, enable SMBW by adding --smbw flag
 smbw_cmd_extention=""
 if [[ ${smbw_enabled} == true ]]; then

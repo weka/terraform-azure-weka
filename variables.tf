@@ -407,52 +407,90 @@ variable "zone"{
   default     = "1"
 }
 
-############################################### protocol gateways variables ###################################################
-variable "protocol_gateways_number" {
+############################################### nfs protocol gateways variables ###################################################
+variable "nfs_protocol_gateways_number" {
   type = number
   description = "The number of protocol gateway virtual machines to deploy."
   default     = 0
 }
 
-variable "protocol" {
-  type        = string
-  description = "Name of the protocol."
-  default     = "NFS"
-
-  validation {
-    condition     = contains(["NFS", "SMB"], var.protocol)
-    error_message = "Allowed values for protocol: NFS, SMB."
-  }
-}
-
-variable "protocol_gateway_secondary_ips_per_nic" {
+variable "nfs_protocol_gateway_secondary_ips_per_nic" {
   type        = number
   description = "Number of secondary IPs per single NIC per protocol gateway virtual machine."
   default     = 3
 }
 
-variable "protocol_gateway_instance_type" {
+variable "nfs_protocol_gateway_instance_type" {
   type        = string
   description = "The protocol gateways' virtual machine type (sku) to deploy."
   default     = "Standard_D8_v5"
 }
 
-variable "protocol_gateway_nics_num" {
+variable "nfs_protocol_gateway_nics_num" {
   type        = string
   description = "The protocol gateways' NICs number."
   default     = 2
 }
 
-variable "protocol_gateway_disk_size" {
+variable "nfs_protocol_gateway_disk_size" {
   type        = number
   default     = 48
   description = "The protocol gateways' default disk size."
 }
 
-variable "protocol_gateway_frontend_num" {
+variable "nfs_protocol_gateway_frontend_cores_num" {
   type        = number
   default     = 1
   description = "The number of frontend cores on single protocol gateway machine."
+}
+
+variable "nfs_setup_protocol" {
+  type        = bool
+  description = "Config protocol, default if false"
+  default     = false
+}
+
+############################################### smb protocol gateways variables ###################################################
+variable "smb_protocol_gateways_number" {
+  type = number
+  description = "The number of protocol gateway virtual machines to deploy."
+  default     = 0
+}
+
+variable "smb_protocol_gateway_secondary_ips_per_nic" {
+  type        = number
+  description = "Number of secondary IPs per single NIC per protocol gateway virtual machine."
+  default     = 3
+}
+
+variable "smb_protocol_gateway_instance_type" {
+  type        = string
+  description = "The protocol gateways' virtual machine type (sku) to deploy."
+  default     = "Standard_D8_v5"
+}
+
+variable "smb_protocol_gateway_nics_num" {
+  type        = string
+  description = "The protocol gateways' NICs number."
+  default     = 2
+}
+
+variable "smb_protocol_gateway_disk_size" {
+  type        = number
+  default     = 48
+  description = "The protocol gateways' default disk size."
+}
+
+variable "smb_protocol_gateway_frontend_cores_num" {
+  type        = number
+  default     = 1
+  description = "The number of frontend cores on single protocol gateway machine."
+}
+
+variable "smb_setup_protocol" {
+  type        = bool
+  description = "Config protocol, default if false"
+  default     = false
 }
 
 variable "smbw_enabled" {
@@ -485,7 +523,7 @@ variable "smb_domain_netbios_name" {
 }
 
 variable "smb_domain_username" {
-  type        = string
+
   description = "The SMB domain username."
   default     = ""
 }

@@ -17,6 +17,8 @@ locals {
   obs_id                           = var.obs_name != "" ? data.azurerm_storage_account.obs_sa[0].id : ""
   obs_scope                        = var.obs_name != "" ? "${data.azurerm_storage_account.obs_sa[0].id}/blobServices/default/containers/${local.obs_container_name}" : ""
   function_app_name                = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-function-app"
+  install_weka_url                 = var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.weka.io/dist/v1/install/${var.weka_version}/${var.weka_version}"
+
 }
 
 resource "azurerm_log_analytics_workspace" "la_workspace" {
@@ -145,7 +147,7 @@ resource "azurerm_linux_function_app" "function_app" {
     "KEY_VAULT_URI"                  = azurerm_key_vault.key_vault.vault_uri
     "INSTALL_DPDK"                   = var.install_cluster_dpdk
     "NICS_NUM"                       = var.container_number_map[var.instance_type].nics
-    "INSTALL_URL"                    = var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.weka.io/dist/v1/install/${var.weka_version}/${var.weka_version}"
+    "INSTALL_URL"                    = local.install_weka_url
     "LOG_LEVEL"                      = var.function_app_log_level
     "SUBNET"                         = data.azurerm_subnet.subnet.address_prefix
     FUNCTION_APP_NAME                = local.function_app_name
