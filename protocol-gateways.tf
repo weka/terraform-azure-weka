@@ -25,7 +25,7 @@ module "protocol_gateways" {
   disk_size                  = var.protocol_gateway_disk_size
   frontend_num               = var.protocol_gateway_frontend_num
 
-  depends_on = [azurerm_linux_virtual_machine_scale_set.vmss, azurerm_key_vault_secret.get_weka_io_token]
+  depends_on = [azurerm_linux_virtual_machine_scale_set.vmss, azurerm_key_vault_secret.get_weka_io_token, module.network]
 }
 
 resource "azurerm_key_vault_access_policy" "gateways_vmss_key_vault" {

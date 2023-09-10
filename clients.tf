@@ -17,5 +17,5 @@ module "clients" {
   vnet_rg_name       = local.vnet_rg_name
   source_image_id    = var.source_image_id
   sg_id              = local.sg_id
-  depends_on         = [azurerm_proximity_placement_group.ppg]
+  depends_on         = [azurerm_proximity_placement_group.ppg, module.network]
 }

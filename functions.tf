@@ -91,6 +91,7 @@ resource "azurerm_subnet" "subnet_delegation" {
       actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
     }
   }
+  depends_on = [module.network]
 }
 
 resource "azurerm_service_plan" "app_service_plan" {
@@ -170,7 +171,7 @@ resource "azurerm_linux_function_app" "function_app" {
     ignore_changes = [site_config, tags]
   }
 
-  depends_on = [azurerm_storage_account.deployment_sa, azurerm_subnet.subnet_delegation]
+  depends_on = [azurerm_storage_account.deployment_sa, azurerm_subnet.subnet_delegation, module.network]
 }
 
 data "azurerm_subscription" "primary" {}

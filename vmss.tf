@@ -56,6 +56,7 @@ resource "azurerm_proximity_placement_group" "ppg" {
   lifecycle {
     ignore_changes = [tags]
   }
+  depends_on = [module.network]
 }
 
 resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
@@ -153,7 +154,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
   depends_on = [
     azurerm_lb_backend_address_pool.lb_backend_pool, azurerm_lb_probe.backend_lb_probe,
     azurerm_proximity_placement_group.ppg, azurerm_lb_rule.backend_lb_rule, azurerm_lb_rule.ui_lb_rule,
-    azurerm_linux_function_app.function_app,
+    azurerm_linux_function_app.function_app,module.network
   ]
 }
 
