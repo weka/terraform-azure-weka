@@ -17,6 +17,5 @@ module "weka_deployment" {
   set_obs_integration   = true
   cluster_size          = var.cluster_size
   tiering_ssd_percent   = 20
-  private_dns_zone_name = "weka.private.net"
   allow_ssh_ranges      = ["0.0.0.0/0"]
 }
