@@ -1,4 +1,6 @@
 provider "azurerm" {
+  subscription_id = var.subscription_id
+  partner_id      = "f13589d1-f10d-4c3b-ae42-3b1a8337eaf1"
   client_id       = var.client_id
   tenant_id       = var.tenant_id
   client_secret   = var.client_secret
