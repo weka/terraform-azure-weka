@@ -82,7 +82,7 @@ jobs:
     if: github.event_name != 'release'
     defaults:
       run:
-        working-directory: ./examples/public_network
+        working-directory: ./ci/deployment
 
     steps:
       - name: Checkout
@@ -102,12 +102,6 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
-
-      - name: Copy override provider to example folder
-        run: cp "../../ci/deployment/override.tf" .
-
-      - name: Add additional variables
-        run: cat ../../ci/deployment/additional_variables.tf >> variables.tf
 
       - name: Terraform Init
         run: terraform init
@@ -152,7 +146,7 @@ jobs:
 
       - name: Terraform Destroy
         if: always()
-        run: terraform destroy -var="rg_name=$RG_NAME" -var="get_weka_io_token=$GET_WEKA_IO_TOKEN" -var="client_id=$CLIENT_ID" -var="tenant_id=$TENANT_ID" -var="client_secret=$CLIENT_SECRET" -var="subscription_id=$SUBSCRIPTION_ID" -auto-approve
+        run: terraform destroy -var="rg_name=$RG_NAME" -var="prefix=$PREFIX" -var="cluster_name=$CLUSTER_NAME" -var="get_weka_io_token=$GET_WEKA_IO_TOKEN" -var="client_id=$CLIENT_ID" -var="tenant_id=$TENANT_ID" -var="client_secret=$CLIENT_SECRET" -var="subscription_id=$SUBSCRIPTION_ID" -var="cluster_size=$INITIAL_CAPACITY" -auto-approve
 
       - name: Delete Azure resource group
         if: always()
