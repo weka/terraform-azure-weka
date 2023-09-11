@@ -16,7 +16,7 @@ concurrency: ci
 env:
   RG_NAME: weka-ci
   PREFIX: ci
-  CLUSTER_NAME: wekacluster
+  CLUSTER_NAME: wekatest
   GET_WEKA_IO_TOKEN: ${{ secrets.GET_WEKA_IO_TOKEN }}
   SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
   CLIENT_ID: ${{ secrets.CLIENT_ID }}
@@ -113,7 +113,7 @@ jobs:
         run: terraform init
 
       - name: Terraform Apply
-        run: terraform apply -var-file vars.auto.tfvars -var="rg_name=$RG_NAME" -var="prefix=$PREFIX" -var="cluster_name=$CLUSTER_NAME" -var="get_weka_io_token=$GET_WEKA_IO_TOKEN" -var="client_id=$CLIENT_ID" -var="tenant_id=$TENANT_ID" -var="client_secret=$CLIENT_SECRET" -var="subscription_id=$SUBSCRIPTION_ID" -var="cluster_size=$INITIAL_CAPACITY" -auto-approve
+        run: terraform apply -var="rg_name=$RG_NAME" -var="prefix=$PREFIX" -var="cluster_name=$CLUSTER_NAME" -var="get_weka_io_token=$GET_WEKA_IO_TOKEN" -var="client_id=$CLIENT_ID" -var="tenant_id=$TENANT_ID" -var="client_secret=$CLIENT_SECRET" -var="subscription_id=$SUBSCRIPTION_ID" -var="cluster_size=$INITIAL_CAPACITY" -auto-approve
 
       - name: Wait for weka cluster
         uses: azure/CLI@v1
@@ -152,7 +152,7 @@ jobs:
 
       - name: Terraform Destroy
         if: always()
-        run: terraform destroy -var-file vars.auto.tfvars -var="rg_name=$RG_NAME" -var="get_weka_io_token=$GET_WEKA_IO_TOKEN" -var="client_id=$CLIENT_ID" -var="tenant_id=$TENANT_ID" -var="client_secret=$CLIENT_SECRET" -var="subscription_id=$SUBSCRIPTION_ID" -auto-approve
+        run: terraform destroy -var="rg_name=$RG_NAME" -var="get_weka_io_token=$GET_WEKA_IO_TOKEN" -var="client_id=$CLIENT_ID" -var="tenant_id=$TENANT_ID" -var="client_secret=$CLIENT_SECRET" -var="subscription_id=$SUBSCRIPTION_ID" -auto-approve
 
       - name: Delete Azure resource group
         if: always()
