@@ -4,9 +4,9 @@ variable "prefix" {
   default = "weka"
 }
 
-variable "rg_name" {
+variable "vnet_rg_name" {
   type = string
-  description = "Resource group name"
+  description = "Vnet resource group name"
 }
 
 variable "vnet_name" {
