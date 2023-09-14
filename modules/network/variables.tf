@@ -57,6 +57,12 @@ variable "vnet_rg_name" {
   description = "Resource group name of vnet"
 }
 
+variable "private_dns_rg_name" {
+  type        = string
+  description = "The private DNS zone resource group name. Required when private_dns_zone_name is set."
+  default     = null
+}
+
 variable "private_dns_zone_name" {
   type        = string
   description = "The private DNS zone name."

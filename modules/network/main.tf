@@ -8,9 +8,10 @@ data "azurerm_resource_group" "vnet_rg" {
 }
 
 locals {
-  vnet_rg          = var.vnet_rg_name == null ? data.azurerm_resource_group.rg.name : var.vnet_rg_name
-  vnet_rg_location = var.vnet_rg_name == null ? data.azurerm_resource_group.rg.location : data.azurerm_resource_group.vnet_rg[0].location
-  vnet_name        = var.vnet_name == null ? azurerm_virtual_network.vnet[0].name : data.azurerm_virtual_network.vnet_data[0].name
+  vnet_rg             = var.vnet_rg_name == null ? data.azurerm_resource_group.rg.name : var.vnet_rg_name
+  private_dns_rg_name = var.private_dns_rg_name == null ? data.azurerm_resource_group.rg.name : var.private_dns_rg_name
+  vnet_rg_location    = var.vnet_rg_name == null ? data.azurerm_resource_group.rg.location : data.azurerm_resource_group.vnet_rg[0].location
+  vnet_name           = var.vnet_name == null ? azurerm_virtual_network.vnet[0].name : data.azurerm_virtual_network.vnet_data[0].name
 }
 
 resource "azurerm_virtual_network" "vnet" {
