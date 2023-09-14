@@ -22,7 +22,7 @@ locals {
 resource "azurerm_log_analytics_workspace" "la_workspace" {
   name                = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-workspace"
   location            = data.azurerm_resource_group.rg.location
-  resource_group_name = data.azurerm_resource_group.rg.name
+  resource_group_name = var.rg_name
   sku                 = "PerGB2018"
   retention_in_days   = 30
   lifecycle {
@@ -33,7 +33,7 @@ resource "azurerm_log_analytics_workspace" "la_workspace" {
 resource "azurerm_application_insights" "application_insights" {
   name                = "${var.prefix}-${var.cluster_name}-application-insights"
   location            = data.azurerm_resource_group.rg.location
-  resource_group_name = data.azurerm_resource_group.rg.name
+  resource_group_name = var.rg_name
   workspace_id        = azurerm_log_analytics_workspace.la_workspace.id
   application_type    = "web"
   lifecycle {
@@ -80,8 +80,8 @@ resource "azurerm_monitor_diagnostic_setting" "function_diagnostic_setting" {
 resource "azurerm_subnet" "subnet_delegation" {
   count                = var.subnet_delegation_id == null ? 1 : 0
   name                 = "${var.prefix}-${var.cluster_name}-subnet-delegation"
-  resource_group_name  = var.rg_name
-  virtual_network_name = data.azurerm_virtual_network.vnet.name
+  resource_group_name  = local.vnet_rg_name
+  virtual_network_name = local.vnet_name
   address_prefixes     = [var.subnet_delegation]
 
   delegation {
@@ -95,7 +95,7 @@ resource "azurerm_subnet" "subnet_delegation" {
 
 resource "azurerm_service_plan" "app_service_plan" {
   name                = "${var.prefix}-${var.cluster_name}-app-service-plan"
-  resource_group_name = data.azurerm_resource_group.rg.name
+  resource_group_name = var.rg_name
   location            = data.azurerm_resource_group.rg.location
   os_type             = "Linux"
   sku_name            = "EP1"
@@ -106,7 +106,7 @@ resource "azurerm_service_plan" "app_service_plan" {
 
 resource "azurerm_linux_function_app" "function_app" {
   name                       = local.function_app_name
-  resource_group_name        = data.azurerm_resource_group.rg.name
+  resource_group_name        = var.rg_name
   location                   = data.azurerm_resource_group.rg.location
   service_plan_id            = azurerm_service_plan.app_service_plan.id
   storage_account_name       = local.deployment_storage_account_name
@@ -128,7 +128,7 @@ resource "azurerm_linux_function_app" "function_app" {
     "HOTSPARE"                       = var.hotspare
     "VM_USERNAME"                    = var.vm_username
     "SUBSCRIPTION_ID"                = data.azurerm_subscription.primary.subscription_id
-    "RESOURCE_GROUP_NAME"            = data.azurerm_resource_group.rg.name
+    "RESOURCE_GROUP_NAME"            = var.rg_name
     "LOCATION"                       = data.azurerm_resource_group.rg.location
     "SET_OBS"                        = var.set_obs_integration
     "SMBW_ENABLED"                   = var.smbw_enabled

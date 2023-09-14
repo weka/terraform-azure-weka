@@ -6,7 +6,7 @@ locals {
   ssh_keys_commands    = "########################################## Download ssh keys command from blob ###########################################################\n az keyvault secret download --file private.pem --encoding utf-8 --vault-name  ${local.key_vault_name} --name private-key --query \"value\" \n az keyvault secret download --file public.pub --encoding utf-8 --vault-name  ${local.key_vault_name} --name public-key --query \"value\"\n"
   blob_commands        = var.ssh_public_key == null ? local.ssh_keys_commands : ""
   private_ssh_key_path = var.ssh_public_key == null ? local.ssh_private_key_path : null
-  resource_group_name  = data.azurerm_resource_group.rg.name
+  resource_group_name  = var.rg_name
   functions_url = {
     progressing_status = {
       url = "https://${local.function_app_name}.azurewebsites.net/api/status"

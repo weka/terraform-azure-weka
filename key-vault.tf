@@ -70,7 +70,7 @@ resource "azurerm_key_vault_secret" "private-ssh-keys" {
 
 data "azurerm_function_app_host_keys" "function_keys" {
   name                = azurerm_linux_function_app.function_app.name
-  resource_group_name = data.azurerm_resource_group.rg.name
+  resource_group_name = var.rg_name
   depends_on          = [azurerm_linux_function_app.function_app]
 }
 
