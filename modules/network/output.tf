@@ -22,3 +22,8 @@ output "vnet_rg_name" {
   value = var.vnet_rg_name == null ? var.rg_name : var.vnet_rg_name
   description = "Resource group name of vnet."
 }
+
+output "private_dns_rg_name" {
+  value = var.private_dns_rg_name == null ? var.rg_name : var.private_dns_rg_name
+  description = "Resource group name of vnet."
+}

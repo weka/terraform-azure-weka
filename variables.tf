@@ -15,8 +15,8 @@ variable "rg_name" {
 
 variable "vnet_rg_name" {
   type        = string
-  description = "Resource group name of vnet"
-  default     = ""
+  description = "Resource group name of vnet. Will be used when vnet_name is not provided."
+  default     = null
 }
 
 variable "subnet_prefix" {
@@ -159,6 +159,12 @@ variable "private_dns_zone_name" {
   type        = string
   description = "The private DNS zone name."
   default     = ""
+}
+
+variable "private_dns_rg_name" {
+  type        = string
+  description = "The private DNS zone resource group name. Required when private_dns_zone_name is set."
+  default     = null
 }
 
 variable "vnet_to_peering" {
