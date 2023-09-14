@@ -28,14 +28,14 @@ variable "tags_map" {
 }
 
 variable "vnet_name" {
-  type = string
-  default = null
+  type        = string
+  default     = ""
   description = "The VNet name, if exists."
 }
 
 variable "subnet_name" {
   type        = string
-  default     = null
+  default     = ""
   description = "Subnet name, if exist."
 }
 
@@ -53,18 +53,23 @@ variable "allow_ssh_ranges" {
 
 variable "vnet_rg_name" {
   type        = string
-  default     = null
+  default     = ""
   description = "Resource group name of vnet"
 }
 
 variable "private_dns_rg_name" {
   type        = string
   description = "The private DNS zone resource group name. Required when private_dns_zone_name is set."
-  default     = null
+  default     = ""
 }
 
 variable "private_dns_zone_name" {
   type        = string
   description = "The private DNS zone name."
   default     = ""
+}
+
+variable "subnet_delegation" {
+  type        = string
+  description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service."
 }

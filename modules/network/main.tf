@@ -3,19 +3,19 @@ data "azurerm_resource_group" "rg" {
 }
 
 data "azurerm_resource_group" "vnet_rg" {
-  count = var.vnet_rg_name != null ? 1 : 0
+  count = var.vnet_rg_name != "" ? 1 : 0
   name  = var.vnet_rg_name
 }
 
 locals {
-  vnet_rg             = var.vnet_rg_name == null ? data.azurerm_resource_group.rg.name : var.vnet_rg_name
-  private_dns_rg_name = var.private_dns_rg_name == null ? data.azurerm_resource_group.rg.name : var.private_dns_rg_name
-  vnet_rg_location    = var.vnet_rg_name == null ? data.azurerm_resource_group.rg.location : data.azurerm_resource_group.vnet_rg[0].location
-  vnet_name           = var.vnet_name == null ? azurerm_virtual_network.vnet[0].name : data.azurerm_virtual_network.vnet_data[0].name
+  vnet_rg             = var.vnet_rg_name == "" ? data.azurerm_resource_group.rg.name : var.vnet_rg_name
+  private_dns_rg_name = var.private_dns_rg_name == "" ? data.azurerm_resource_group.rg.name : var.private_dns_rg_name
+  vnet_rg_location    = var.vnet_rg_name == "" ? data.azurerm_resource_group.rg.location : data.azurerm_resource_group.vnet_rg[0].location
+  vnet_name           = var.vnet_name == "" ? azurerm_virtual_network.vnet[0].name : var.vnet_name
 }
 
 resource "azurerm_virtual_network" "vnet" {
-  count               = var.vnet_name == null ? 1 : 0
+  count               = var.vnet_name == "" ? 1 : 0
   resource_group_name = local.vnet_rg
   location            = local.vnet_rg_location
   name                = "${var.prefix}-vnet"
@@ -28,13 +28,13 @@ resource "azurerm_virtual_network" "vnet" {
 }
 
 data "azurerm_virtual_network" "vnet_data" {
-  count               = var.vnet_name != null  ? 1 : 0
+  count               = var.vnet_name != ""  ? 1 : 0
   name                = var.vnet_name
   resource_group_name = local.vnet_rg
 }
 
 resource "azurerm_subnet" "subnet" {
-  count                = var.subnet_name == null ? 1 : 0
+  count                = var.subnet_name == "" ? 1 : 0
   resource_group_name  = local.vnet_rg
   name                 = "${var.prefix}-subnet-${count.index}"
   address_prefixes     = [var.subnet_prefix]
@@ -46,10 +46,25 @@ resource "azurerm_subnet" "subnet" {
 }
 
 data "azurerm_subnet" "subnets_data" {
-  count                = var.subnet_name != null ? 1 : 0
+  count                = var.subnet_name != "" ? 1 : 0
   name                 = var.subnet_name
   resource_group_name  = local.vnet_rg
-  virtual_network_name = var.vnet_name != null ? var.vnet_name : azurerm_virtual_network.vnet[0].name
+  virtual_network_name = local.vnet_name
+}
+
+resource "azurerm_subnet" "subnet_delegation" {
+  name                 = "${var.prefix}-subnet-delegation"
+  resource_group_name  = local.vnet_rg
+  virtual_network_name = local.vnet_name
+  address_prefixes     = [var.subnet_delegation]
+
+  delegation {
+    name = "subnet-delegation"
+    service_delegation {
+      name    = "Microsoft.Web/serverFarms"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
+    }
+  }
 }
 
 # ====================== sg ssh ========================== #
@@ -97,7 +112,7 @@ resource "azurerm_network_security_group" "sg" {
 }
 
 resource "azurerm_subnet_network_security_group_association" "sg-association" {
-  count                     = var.subnet_name == null ? 1 : 0
+  count                     = var.subnet_name == "" ? 1 : 0
   subnet_id                 = azurerm_subnet.subnet[count.index].id
   network_security_group_id = azurerm_network_security_group.sg.id
   depends_on                = [azurerm_network_security_group.sg]
@@ -107,7 +122,7 @@ resource "azurerm_subnet_network_security_group_association" "sg-association" {
 resource "azurerm_private_dns_zone" "dns" {
   count               = var.private_dns_zone_name == "" ? 1 : 0
   name                = "${var.prefix}.private.net"
-  resource_group_name = data.azurerm_resource_group.rg.name
+  resource_group_name = local.private_dns_rg_name
   tags                = merge(var.tags_map)
   lifecycle {
     ignore_changes = [tags]
@@ -119,7 +134,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "dns_vnet_link" {
   name                  = "${var.prefix}-private-network-link"
   resource_group_name   = data.azurerm_resource_group.rg.name
   private_dns_zone_name = azurerm_private_dns_zone.dns[0].name
-  virtual_network_id    = var.vnet_name != null ? data.azurerm_virtual_network.vnet_data[0].id : azurerm_virtual_network.vnet[0].id
+  virtual_network_id    = var.vnet_name != "" ? data.azurerm_virtual_network.vnet_data[0].id : azurerm_virtual_network.vnet[0].id
   registration_enabled  = true
   lifecycle {
     ignore_changes = [tags]

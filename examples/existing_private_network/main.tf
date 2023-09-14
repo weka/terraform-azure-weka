@@ -24,4 +24,5 @@ module "weka_deployment" {
   tiering_ssd_percent   = 20
   subscription_id       = var.subscription_id
   private_dns_zone_name = "weka.private.net"
+  private_dns_rg_name   = "dns-weka-rg"
 }

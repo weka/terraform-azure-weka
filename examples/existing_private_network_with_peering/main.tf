@@ -14,6 +14,7 @@ module "weka_deployment" {
   apt_repo_server       = "http://11.0.0.4/ubuntu/mirror/archive.ubuntu.com/ubuntu/"
   install_weka_url      = "..."
   private_dns_zone_name = "weka.private.net"
+  private_dns_rg_name   = "dns-rg"
   vnet_rg_name          = "weka-rg"
   vnet_name             = "weka-vnet"
   subnet_name           = "weka-subnet"

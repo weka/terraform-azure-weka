@@ -3,23 +3,26 @@ data "azurerm_resource_group" "rg" {
 }
 
 module "network" {
-  count               = var.subnet_name == "" ? 1 : 0
-  source              = "./modules/network"
-  prefix              = var.prefix
-  rg_name             = var.rg_name
-  vnet_rg_name        = var.vnet_rg_name
-  private_dns_rg_name = var.private_dns_rg_name
-  address_space       = var.address_space
-  subnet_prefix       = var.subnet_prefix
-  allow_ssh_ranges    = var.allow_ssh_ranges
-  private_network     = var.private_network
+  count                 = var.subnet_name == "" ? 1 : 0
+  source                = "./modules/network"
+  prefix                = var.prefix
+  rg_name               = var.rg_name
+  vnet_rg_name          = var.vnet_rg_name
+  private_dns_rg_name   = var.private_dns_rg_name
+  address_space         = var.address_space
+  subnet_prefix         = var.subnet_prefix
+  allow_ssh_ranges      = var.allow_ssh_ranges
+  private_network       = var.private_network
+  private_dns_zone_name = var.private_dns_zone_name
+  subnet_delegation     = var.subnet_delegation
 }
 
 locals {
   vnet_name             = var.vnet_name == "" ? module.network[0].vnet_name : var.vnet_name
-  vnet_rg_name          = var.vnet_rg_name == null ? module.network[0].vnet_rg_name : var.vnet_rg_name
+  vnet_rg_name          = var.vnet_rg_name == "" ? module.network[0].vnet_rg_name : var.vnet_rg_name
   subnet_name           = var.subnet_name == "" ? module.network[0].subnet_name : var.subnet_name
   sg_id                 = var.sg_id == "" ? module.network[0].sg_id : var.sg_id
+  subnet_delegation_id  = var.subnet_delegation_id == "" ? module.network[0].subnet_delegation_id :  var.subnet_delegation_id
   private_dns_zone_name = var.private_dns_zone_name == "" ? module.network[0].private_dns_zone_name : var.private_dns_zone_name
   private_dns_rg_name   = var.private_dns_rg_name == "" ? module.network[0].private_dns_rg_name : var.private_dns_rg_name
 }
@@ -46,4 +49,3 @@ data "azurerm_virtual_network" "vnet" {
   resource_group_name = local.vnet_rg_name
   depends_on          = [module.network]
 }
-

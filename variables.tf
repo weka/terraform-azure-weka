@@ -16,7 +16,7 @@ variable "rg_name" {
 variable "vnet_rg_name" {
   type        = string
   description = "Resource group name of vnet. Will be used when vnet_name is not provided."
-  default     = null
+  default     = ""
 }
 
 variable "subnet_prefix" {
@@ -93,7 +93,7 @@ variable "subnet_delegation" {
 variable "subnet_delegation_id" {
   type        = string
   description = "Subnet delegation id"
-  default     = null
+  default     = ""
 }
 
 variable "weka_version" {
@@ -164,7 +164,7 @@ variable "private_dns_zone_name" {
 variable "private_dns_rg_name" {
   type        = string
   description = "The private DNS zone resource group name. Required when private_dns_zone_name is set."
-  default     = null
+  default     = ""
 }
 
 variable "vnet_to_peering" {

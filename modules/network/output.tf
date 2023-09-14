@@ -1,10 +1,10 @@
 output "vnet_name" {
-  value = var.vnet_name != null ? var.vnet_name : azurerm_virtual_network.vnet[0].name
+  value = var.vnet_name == "" ? azurerm_virtual_network.vnet[0].name : var.vnet_name
   description = "Displays the VNet name."
 }
 
 output "subnet_name" {
-  value       = var.subnet_name == null ? azurerm_subnet.subnet[0].name : var.subnet_name
+  value       = var.subnet_name == "" ? azurerm_subnet.subnet[0].name : var.subnet_name
   description = "Displays the subnet name list."
 }
 
@@ -19,11 +19,16 @@ output "private_dns_zone_name" {
 }
 
 output "vnet_rg_name" {
-  value = var.vnet_rg_name == null ? var.rg_name : var.vnet_rg_name
+  value = var.vnet_rg_name == "" ? var.rg_name : var.vnet_rg_name
   description = "Resource group name of vnet."
 }
 
+output "subnet_delegation_id" {
+  value       = azurerm_subnet.subnet_delegation.id
+  description = "Subnet delegation id"
+}
+
 output "private_dns_rg_name" {
-  value = var.private_dns_rg_name == null ? var.rg_name : var.private_dns_rg_name
+  value = var.private_dns_rg_name == "" ? var.rg_name : var.private_dns_rg_name
   description = "Resource group name of vnet."
 }
