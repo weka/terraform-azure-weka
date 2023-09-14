@@ -14,6 +14,7 @@ resource "azurerm_lb" "ui_lb" {
   lifecycle {
     ignore_changes = [tags]
   }
+  depends_on = [module.network]
 }
 
 resource "azurerm_lb_backend_address_pool" "ui_lb_backend_pool" {
@@ -63,6 +64,7 @@ resource "azurerm_lb" "backend-lb" {
   lifecycle {
     ignore_changes = [tags]
   }
+  depends_on = [module.network]
 }
 
 resource "azurerm_lb_backend_address_pool" "lb_backend_pool" {
@@ -103,7 +105,7 @@ resource "azurerm_private_dns_a_record" "dns_a_record_backend_lb" {
   ttl                 = 300
   records             = [azurerm_lb.backend-lb.frontend_ip_configuration[0].private_ip_address]
   tags                = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
-  depends_on          = [azurerm_lb.backend-lb]
+  depends_on          = [azurerm_lb.backend-lb, module.network]
   lifecycle {
     ignore_changes = [tags]
   }
