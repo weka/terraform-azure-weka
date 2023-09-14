@@ -99,6 +99,7 @@ No modules.
 | <a name="input_address_space"></a> [address\_space](#input\_address\_space) | The range of IP addresses the virtual network uses. | `string` | `"10.0.0.0/16"` | no |
 | <a name="input_allow_ssh_ranges"></a> [allow\_ssh\_ranges](#input\_allow\_ssh\_ranges) | A list of IP addresses that can use ssh connection with a public network deployment. | `list(string)` | `[]` | no |
 | <a name="input_prefix"></a> [prefix](#input\_prefix) | The prefix for all the resource names. For example, the prefix for your system name. | `string` | `"weka"` | no |
+| <a name="input_private_dns_rg_name"></a> [private\_dns\_rg\_name](#input\_private\_dns\_rg\_name) | The private DNS zone resource group name. Required when private\_dns\_zone\_name is set. | `string` | `null` | no |
 | <a name="input_private_dns_zone_name"></a> [private\_dns\_zone\_name](#input\_private\_dns\_zone\_name) | The private DNS zone name. | `string` | `""` | no |
 | <a name="input_private_network"></a> [private\_network](#input\_private\_network) | Determines whether to enable a private or public network. The default is public network. | `bool` | `false` | no |
 | <a name="input_rg_name"></a> [rg\_name](#input\_rg\_name) | A predefined resource group in the Azure subscription. | `string` | n/a | yes |
@@ -112,6 +113,7 @@ No modules.
 
 | Name | Description |
 |------|-------------|
+| <a name="output_private_dns_rg_name"></a> [private\_dns\_rg\_name](#output\_private\_dns\_rg\_name) | Resource group name of vnet. |
 | <a name="output_private_dns_zone_name"></a> [private\_dns\_zone\_name](#output\_private\_dns\_zone\_name) | Displays the private DNS zone name. |
 | <a name="output_sg_id"></a> [sg\_id](#output\_sg\_id) | Displays the security group id. |
 | <a name="output_subnet_name"></a> [subnet\_name](#output\_subnet\_name) | Displays the subnet name list. |
