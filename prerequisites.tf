@@ -22,6 +22,7 @@ locals {
 }
 
 module "peering" {
+  count           = length(var.vnet_to_peering) > 0 ? 1 : 0
   source          = "./modules/peering_vnets"
   prefix          = var.prefix
   rg_name         = var.rg_name
