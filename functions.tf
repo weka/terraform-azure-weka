@@ -79,22 +79,6 @@ resource "azurerm_monitor_diagnostic_setting" "function_diagnostic_setting" {
   depends_on = [azurerm_linux_function_app.function_app, azurerm_log_analytics_workspace.la_workspace]
 }
 
-resource "azurerm_subnet" "subnet_delegation" {
-  count                = var.subnet_delegation_id == null ? 1 : 0
-  name                 = "${var.prefix}-${var.cluster_name}-subnet-delegation"
-  resource_group_name  = local.vnet_rg_name
-  virtual_network_name = data.azurerm_virtual_network.vnet.name
-  address_prefixes     = [var.subnet_delegation]
-
-  delegation {
-    name = "subnet-delegation"
-    service_delegation {
-      name    = "Microsoft.Web/serverFarms"
-      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
-    }
-  }
-}
-
 resource "azurerm_service_plan" "app_service_plan" {
   name                = "${var.prefix}-${var.cluster_name}-app-service-plan"
   resource_group_name = data.azurerm_resource_group.rg.name
@@ -114,7 +98,7 @@ resource "azurerm_linux_function_app" "function_app" {
   storage_account_name       = local.deployment_storage_account_name
   storage_account_access_key = var.deployment_storage_account_access_key == "" ? azurerm_storage_account.deployment_sa[0].primary_access_key : var.deployment_storage_account_access_key
   https_only                 = true
-  virtual_network_subnet_id  = var.subnet_delegation_id == null ? azurerm_subnet.subnet_delegation[0].id : var.subnet_delegation_id
+  virtual_network_subnet_id  = local.subnet_delegation_id
   site_config {
     vnet_route_all_enabled = true
   }
@@ -173,7 +157,7 @@ resource "azurerm_linux_function_app" "function_app" {
     ignore_changes = [site_config, tags]
   }
 
-  depends_on = [azurerm_storage_account.deployment_sa, azurerm_subnet.subnet_delegation]
+  depends_on = [module.network,azurerm_storage_account.deployment_sa]
 }
 
 data "azurerm_subscription" "primary" {}

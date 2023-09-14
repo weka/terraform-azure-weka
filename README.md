@@ -28,6 +28,7 @@ module "deploy-weka" {
    cluster_size          = 6
    subscription_id       = "mySubscriptionId"
    private_dns_zone_name = "myDns.private.net"
+   private_dns_rg_name   = "myResourceGroup"
 }
 
 output "deploy_weka_output" {
