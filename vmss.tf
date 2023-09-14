@@ -102,7 +102,6 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
     for_each = range(local.private_nic_first_index)
     content {
       name                          = "${var.prefix}-${var.cluster_name}-backend-nic-0"
-      network_security_group_id     = local.sg_id
       primary                       = true
       enable_accelerated_networking = var.install_cluster_dpdk
       ip_configuration {
@@ -121,7 +120,6 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
     for_each = range(local.private_nic_first_index, 1)
     content {
       name                          = "${var.prefix}-${var.cluster_name}-backend-nic-0"
-      network_security_group_id     = local.sg_id
       primary                       = true
       enable_accelerated_networking = var.install_cluster_dpdk
       ip_configuration {
@@ -136,7 +134,6 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
     for_each = range(1, local.nics_numbers)
     content {
       name                          = "${var.prefix}-${var.cluster_name}-backend-nic-${network_interface.value}"
-      network_security_group_id     = local.sg_id
       primary                       = false
       enable_accelerated_networking = var.install_cluster_dpdk
       ip_configuration {
