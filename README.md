@@ -151,8 +151,6 @@ smb_setup_protocol                         = false
 smb_cluster_name                           = ""
 smb_domain_name                            = ""
 smb_domain_netbios_name                    = ""
-smb_domain_username                        = ""
-smb_domain_password                        = ""
 smb_dns_ip_address                         = ""
 smb_share_name                             = ""
 ```
@@ -161,6 +159,11 @@ smb_share_name                             = ""
 ```hcl
 smb_setup_protocol = true
 ```
+
+<br>To join an SMB cluster in Active Directory, need to pass domain username/password,
+To join an SMB cluster in Active Directory, need to run manually command:
+
+`weka smb domain join <smb_domain_username> <smb_domain_password> [--server smb_server_name]`.
 
 <br>In order to enable SMBW, need to set variable:
 ```hcl
