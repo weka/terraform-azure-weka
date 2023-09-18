@@ -90,6 +90,22 @@ resource "azurerm_service_plan" "app_service_plan" {
   }
 }
 
+resource "azurerm_subnet" "subnet_delegation" {
+  count                = var.subnet_delegation_id == "" ? 1 : 0
+  name                 = "${var.prefix}-${var.cluster_name}-subnet-delegation"
+  resource_group_name  = local.vnet_rg_name
+  virtual_network_name = local.vnet_name
+  address_prefixes     = [var.subnet_delegation]
+
+  delegation {
+    name = "subnet-delegation"
+    service_delegation {
+      name    = "Microsoft.Web/serverFarms"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
+    }
+  }
+}
+
 resource "azurerm_linux_function_app" "function_app" {
   name                       = local.function_app_name
   resource_group_name        = data.azurerm_resource_group.rg.name
@@ -98,7 +114,7 @@ resource "azurerm_linux_function_app" "function_app" {
   storage_account_name       = local.deployment_storage_account_name
   storage_account_access_key = var.deployment_storage_account_access_key == "" ? azurerm_storage_account.deployment_sa[0].primary_access_key : var.deployment_storage_account_access_key
   https_only                 = true
-  virtual_network_subnet_id  = local.subnet_delegation_id
+  virtual_network_subnet_id  = var.subnet_delegation_id == "" ? azurerm_subnet.subnet_delegation[0].id : var.subnet_delegation_id
   site_config {
     vnet_route_all_enabled = true
   }

@@ -74,8 +74,3 @@ variable "private_dns_zone_name" {
   description = "The private DNS zone name."
   default     = ""
 }
-
-variable "subnet_delegation" {
-  type        = string
-  description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service."
-}

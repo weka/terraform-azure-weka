@@ -14,7 +14,6 @@ module "network" {
   allow_ssh_ranges      = var.allow_ssh_ranges
   private_network       = var.private_network
   private_dns_zone_name = var.private_dns_zone_name
-  subnet_delegation     = var.subnet_delegation
 }
 
 locals {
@@ -22,7 +21,6 @@ locals {
   vnet_rg_name          = var.vnet_rg_name == "" ? module.network[0].vnet_rg_name : var.vnet_rg_name
   subnet_name           = var.subnet_name == "" ? module.network[0].subnet_name : var.subnet_name
   sg_id                 = var.sg_id == "" ? module.network[0].sg_id : var.sg_id
-  subnet_delegation_id  = var.subnet_delegation_id == "" ? module.network[0].subnet_delegation_id :  var.subnet_delegation_id
   private_dns_zone_name = var.private_dns_zone_name == "" ? module.network[0].private_dns_zone_name : var.private_dns_zone_name
   private_dns_rg_name   = var.private_dns_rg_name == "" ? module.network[0].private_dns_rg_name : var.private_dns_rg_name
 }
