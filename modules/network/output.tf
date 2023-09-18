@@ -23,11 +23,6 @@ output "vnet_rg_name" {
   description = "Resource group name of vnet."
 }
 
-output "subnet_delegation_id" {
-  value       = azurerm_subnet.subnet_delegation.id
-  description = "Subnet delegation id"
-}
-
 output "private_dns_rg_name" {
   value = var.private_dns_rg_name == "" ? var.rg_name : var.private_dns_rg_name
   description = "Resource group name of vnet."

@@ -52,21 +52,6 @@ data "azurerm_subnet" "subnets_data" {
   virtual_network_name = local.vnet_name
 }
 
-resource "azurerm_subnet" "subnet_delegation" {
-  name                 = "${var.prefix}-subnet-delegation"
-  resource_group_name  = local.vnet_rg
-  virtual_network_name = local.vnet_name
-  address_prefixes     = [var.subnet_delegation]
-
-  delegation {
-    name = "subnet-delegation"
-    service_delegation {
-      name    = "Microsoft.Web/serverFarms"
-      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
-    }
-  }
-}
-
 # ====================== sg ssh ========================== #
 resource "azurerm_network_security_rule" "sg_public_ssh" {
   count                       = var.private_network ? 0 : length(var.allow_ssh_ranges)
