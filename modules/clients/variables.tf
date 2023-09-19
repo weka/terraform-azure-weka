@@ -3,7 +3,7 @@ variable "backend_lb_ip" {
   description = "The backend load balancer ip address."
 }
 
-variable "nics" {
+variable "nics_numbers" {
   type        = number
   default     = 2
   description = "Number of nics to set on each client vm"
@@ -66,14 +66,6 @@ variable "mount_clients_dpdk" {
   type        = bool
   default     = true
   description = "Install weka cluster with DPDK"
-}
-
-variable "nics_map" {
-  type = map(number)
-  default = {
-    Standard_L8s_v3  = 4
-    Standard_L16s_v3 = 8
-  }
 }
 
 variable "ppg_id" {
