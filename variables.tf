@@ -377,7 +377,7 @@ variable "client_instance_type" {
 }
 
 variable "client_nics_num" {
-  type        = string
+  type        = number
   description = "The client NICs number."
   default     = 2
 }

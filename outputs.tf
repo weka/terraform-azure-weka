@@ -1,7 +1,6 @@
 locals {
   key_vault_name       = azurerm_key_vault.key_vault.name
   vm_ips               = var.private_network ? "az vmss nic list -g ${var.rg_name} --vmss-name ${azurerm_linux_virtual_machine_scale_set.vmss.name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress" : "az vmss list-instance-public-ips -g ${var.rg_name} --name ${azurerm_linux_virtual_machine_scale_set.vmss.name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n"
-  clients_ips          = var.clients_number > 0 ? var.private_network ? "az vmss nic list -g ${var.rg_name} --vmss-name ${module.clients[0].client-name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress" : "az vmss list-instance-public-ips -g ${var.rg_name} --name ${module.clients[0].client-name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n" : ""
   nfs_protocol_gw_ips      = var.nfs_protocol_gateways_number > 0 ? var.private_network ? "az vmss nic list -g ${var.rg_name} --vmss-name ${module.nfs_protocol_gateways[0].vmss_name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress" : "az vmss list-instance-public-ips -g ${var.rg_name} --name ${module.nfs_protocol_gateways[0].vmss_name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n" : ""
   smb_protocol_gw_ips      = var.smb_protocol_gateways_number > 0 ? var.private_network ? "az vmss nic list -g ${var.rg_name} --vmss-name ${module.smb_protocol_gateways[0].vmss_name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress" : "az vmss list-instance-public-ips -g ${var.rg_name} --name ${module.smb_protocol_gateways[0].vmss_name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n" : ""
   ssh_keys_commands    = "########################################## Download ssh keys command from blob ###########################################################\n az keyvault secret download --file private.pem --encoding utf-8 --vault-name  ${local.key_vault_name} --name private-key --query \"value\" \n az keyvault secret download --file public.pub --encoding utf-8 --vault-name  ${local.key_vault_name} --name public-key --query \"value\"\n"
@@ -47,7 +46,7 @@ output "backend_ips" {
 }
 
 output "client_ips" {
-  value       = local.clients_ips
+  value       = var.clients_number > 0 ? module.clients[0].clients_ips : null
   description = "If 'private_network' is set to false, it will output clients public ips, otherwise private ips."
 }
 
