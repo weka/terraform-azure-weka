@@ -51,12 +51,12 @@ output "client_ips" {
 }
 
 output "nfs_protocol_gateway_ips" {
-  value       = local.nfs_protocol_gw_ips
+  value       = var.nfs_protocol_gateways_number > 0 ? module.nfs_protocol_gateways[0].protocol_gateways_ips : null
   description = "If 'private_network' is set to false, it will output nfs protocol gateway public ips, otherwise private ips."
 }
 
 output "smb_protocol_gateway_ips" {
-  value       = local.smb_protocol_gw_ips
+  value       = var.smb_protocol_gateways_number > 0 ? module.smb_protocol_gateways[0].protocol_gateways_ips : null
   description = "If 'private_network' is set to false, it will output smb protocol gateway public ips, otherwise private ips."
 }
 

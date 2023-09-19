@@ -35,32 +35,6 @@ get_core_ids $NUM_FRONTEND_CORES frontend_core_ids
 
 getNetStrForDpdk $(($NICS_NUM-1)) $(($NICS_NUM)) "$GATEWAYS" "$SUBNETS"
 
-echo "$(date -u): setting up weka frontend"
-# changed standart frontend port to 14000 as it should be used locally for protocol setup:
-# weka@ev-test-NFS-0:~$ weka nfs interface-group add test NFS
-# error: Error: Failed connecting to http://127.0.0.1:14000/api/v1. Make sure weka is running on this host by running
-# 	 weka local status | start
-sudo weka local setup container --name frontend0 --base-port 14000 --cores $NUM_FRONTEND_CORES --frontend-dedicated-cores $NUM_FRONTEND_CORES --allow-protocols true --failure-domain $FAILURE_DOMAIN --core-ids $frontend_core_ids $net --dedicate --join-ips ${backend_lb_ip}
-
-
-# check that frontend container is up
-ready_containers=0
-while [ $ready_containers -ne 1 ];
-do
-  sleep 10
-  ready_containers=$( weka local ps | grep -i 'running' | wc -l )
-  echo "Running containers: $ready_containers"
-done
-
-echo "$(date -u): frontend is up"
-
-# login to weka
-
-# get token for key vault access
-access_token=$(curl 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fvault.azure.net' -H Metadata:true | jq -r '.access_token')
-# get key vault secret (get-weka-io-token)
-weka_password=$(curl "${key_vault_url}secrets/weka-password?api-version=2016-10-01" -H "Authorization: Bearer $access_token" | jq -r '.value')
-
 function retry_command {
   retry_max=60
   retry_sleep=30
@@ -81,6 +55,40 @@ function retry_command {
   }
   return 0
 }
+
+# changed standart frontend port to 14000 as it should be used locally for protocol setup:
+# weka@ev-test-NFS-0:~$ weka nfs interface-group add test NFS
+# error: Error: Failed connecting to http://127.0.0.1:14000/api/v1. Make sure weka is running on this host by running
+# 	 weka local status | start
+echo "$(date -u): setting up weka frontend"
+
+run_container_cmd="weka local setup container --name frontend0 --base-port 14000 --cores $NUM_FRONTEND_CORES --frontend-dedicated-cores $NUM_FRONTEND_CORES --allow-protocols true --failure-domain $FAILURE_DOMAIN --core-ids $frontend_core_ids $net --dedicate --join-ips ${backend_lb_ip}"
+
+retry_command "$run_container_cmd"  "setting up weka frontend"
+
+echo "$(date -u): success to run weka frontend container"
+
+
+
+# check that frontend container is up
+ready_containers=0
+while [ $ready_containers -ne 1 ];
+do
+  sleep 10
+  ready_containers=$( weka local ps | grep -i 'running' | wc -l )
+  echo "Running containers: $ready_containers"
+done
+
+echo "$(date -u): frontend is up"
+
+# login to weka
+
+# get token for key vault access
+access_token=$(curl 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fvault.azure.net' -H Metadata:true | jq -r '.access_token')
+# get key vault secret (get-weka-io-token)
+weka_password=$(curl "${key_vault_url}secrets/weka-password?api-version=2016-10-01" -H "Authorization: Bearer $access_token" | jq -r '.value')
+
+
 
 echo "$(date -u): try to run weka login command"
 
