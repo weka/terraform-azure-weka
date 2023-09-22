@@ -64,6 +64,10 @@ output "private_ssh_key" {
   value = local.private_ssh_key_path
 }
 
+output "key_vault_name"{
+  value = local.key_vault_name
+}
+
 output "cluster_helper_commands" {
   value = <<EOT
 ########################################## Get function key #####################################################################
