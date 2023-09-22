@@ -7,7 +7,7 @@ locals {
   weka_sa_container                = "${var.function_app_storage_account_container_prefix}${local.location}"
   function_code_path               = "${path.module}/function-app/code"
   function_app_code_hash           = md5(join("", [for f in fileset(local.function_code_path, "**") : filemd5("${local.function_code_path}/${f}")]))
-  get_compute_memory_index         = var.add_frontend_containers ? 1 : 0
+  get_compute_memory_index         = var.add_frontend_container ? 1 : 0
   deployment_storage_account_id    = var.deployment_storage_account_name == "" ? azurerm_storage_account.deployment_sa[0].id : data.azurerm_storage_account.deployment_blob[0].id
   deployment_storage_account_name  = var.deployment_storage_account_name == "" ? azurerm_storage_account.deployment_sa[0].name : var.deployment_storage_account_name
   deployment_container_name        = var.deployment_container_name == "" ? azurerm_storage_container.deployment[0].name : var.deployment_container_name
@@ -138,8 +138,8 @@ resource "azurerm_linux_function_app" "function_app" {
     "OBS_CONTAINER_NAME"             = local.obs_container_name
     "OBS_ACCESS_KEY"                 = var.blob_obs_access_key
     NUM_DRIVE_CONTAINERS             = var.container_number_map[var.instance_type].drive
-    NUM_COMPUTE_CONTAINERS           = var.add_frontend_containers == false ? var.container_number_map[var.instance_type].compute + 1 : var.container_number_map[var.instance_type].compute
-    NUM_FRONTEND_CONTAINERS          = var.add_frontend_containers == false ? 0 : var.container_number_map[var.instance_type].frontend
+    NUM_COMPUTE_CONTAINERS           = var.add_frontend_container == false ? var.container_number_map[var.instance_type].compute + 1 : var.container_number_map[var.instance_type].compute
+    NUM_FRONTEND_CONTAINERS          = var.add_frontend_container == false ? 0 : var.container_number_map[var.instance_type].frontend
     COMPUTE_MEMORY                   = var.container_number_map[var.instance_type].memory[local.get_compute_memory_index]
     "NVMES_NUM"                      = var.container_number_map[var.instance_type].nvme
     "TIERING_SSD_PERCENT"            = var.tiering_ssd_percent

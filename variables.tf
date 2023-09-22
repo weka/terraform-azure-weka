@@ -325,7 +325,7 @@ variable "install_cluster_dpdk" {
   description = "Install weka cluster with DPDK"
 }
 
-variable "add_frontend_containers" {
+variable "add_frontend_container" {
   type        = bool
   default     = true
   description = "Create cluster with FE containers"
