@@ -366,6 +366,7 @@ proxy_url = VALUE
 | <a name="output_function_app_name"></a> [function\_app\_name](#output\_function\_app\_name) | n/a |
 | <a name="output_function_key_name"></a> [function\_key\_name](#output\_function\_key\_name) | n/a |
 | <a name="output_functions_url"></a> [functions\_url](#output\_functions\_url) | Functions url and body for api request |
+| <a name="output_key_vault_name"></a> [key\_vault\_name](#output\_key\_vault\_name) | n/a |
 | <a name="output_nfs_protocol_gateway_ips"></a> [nfs\_protocol\_gateway\_ips](#output\_nfs\_protocol\_gateway\_ips) | If 'private\_network' is set to false, it will output nfs protocol gateway public ips, otherwise private ips. |
 | <a name="output_private_ssh_key"></a> [private\_ssh\_key](#output\_private\_ssh\_key) | n/a |
 | <a name="output_smb_protocol_gateway_ips"></a> [smb\_protocol\_gateway\_ips](#output\_smb\_protocol\_gateway\_ips) | If 'private\_network' is set to false, it will output smb protocol gateway public ips, otherwise private ips. |
