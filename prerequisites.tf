@@ -12,6 +12,7 @@ module "network" {
   address_space         = var.address_space
   subnet_prefix         = var.subnet_prefix
   allow_ssh_ranges      = var.allow_ssh_ranges
+  allow_weka_api_ranges = var.allow_weka_api_ranges
   private_network       = var.private_network
   private_dns_zone_name = var.private_dns_zone_name
 }
