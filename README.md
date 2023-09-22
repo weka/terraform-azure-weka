@@ -274,7 +274,7 @@ proxy_url = VALUE
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_add_frontend_containers"></a> [add\_frontend\_containers](#input\_add\_frontend\_containers) | Create cluster with FE containers | `bool` | `true` | no |
+| <a name="input_add_frontend_container"></a> [add\_frontend\_container](#input\_add\_frontend\_container) | Create cluster with FE containers | `bool` | `true` | no |
 | <a name="input_address_space"></a> [address\_space](#input\_address\_space) | The range of IP addresses the virtual network uses. | `string` | `"10.0.0.0/16"` | no |
 | <a name="input_allow_ssh_ranges"></a> [allow\_ssh\_ranges](#input\_allow\_ssh\_ranges) | A list of IP addresses that can use ssh connection with a public network deployment. | `list(string)` | `[]` | no |
 | <a name="input_apt_repo_server"></a> [apt\_repo\_server](#input\_apt\_repo\_server) | The URL of the apt private repository. | `string` | `""` | no |
