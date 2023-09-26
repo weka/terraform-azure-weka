@@ -305,7 +305,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type = string
   description = "Function app code version (hash)"
-  default = "8af636e9ea8286ec2c163f04c464d54a"
+  default = "5a60e3dd08397aeadfc935f2a8a399e3"
 }
 
 variable "function_app_dist" {
@@ -549,5 +549,11 @@ variable "smb_share_name" {
 variable "proxy_url" {
   type        = string
   description = "Weka home proxy url"
+  default     = ""
+}
+
+variable "weka_home_url" {
+  type        = string
+  description = "Weka Home url"
   default     = ""
 }

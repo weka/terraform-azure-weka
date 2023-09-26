@@ -152,6 +152,7 @@ resource "azurerm_linux_function_app" "function_app" {
     "SUBNET"                         = data.azurerm_subnet.subnet.address_prefix
     FUNCTION_APP_NAME                = local.function_app_name
     PROXY_URL                        = var.proxy_url
+    WEKA_HOME_URL                    = var.weka_home_url
 
     https_only               = true
     FUNCTIONS_WORKER_RUNTIME = "custom"

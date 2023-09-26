@@ -248,6 +248,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	addFrontendNum, _ := strconv.Atoi(os.Getenv("NUM_FRONTEND_CONTAINERS"))
 	functionAppName := os.Getenv("FUNCTION_APP_NAME")
 	proxyUrl := os.Getenv("PROXY_URL")
+	wekaHomeUrl := os.Getenv("WEKA_HOME_URL")
 
 	addFrontend := false
 	if addFrontendNum > 0 {
@@ -300,6 +301,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			SmbwEnabled: smbwEnabled,
 			AddFrontend: addFrontend,
 			ProxyUrl:    proxyUrl,
+			WekaHomeUrl: wekaHomeUrl,
 			DataProtection: clusterize.DataProtectionParams{
 				StripeWidth:     stripeWidth,
 				ProtectionLevel: protectionLevel,
