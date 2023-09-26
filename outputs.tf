@@ -12,7 +12,7 @@ locals {
     }
     status = {
       url = "https://${local.function_app_name}.azurewebsites.net/api/status"
-      body = {"type": "progress"}
+      body = {"type": "status"}
     }
     resize = {
       uri  = "https://${local.function_app_name}.azurewebsites.net/api/resize"
