@@ -11,6 +11,10 @@ function report {
   curl ${report_function_url}?code="$function_app_key" -H 'Content-Type:application/json' -d "$json_data"
 }
 
+# get array of secondary ips (excluding the primary ip)
+secondary_ips=($(ip -o -4 addr show dev $port | awk '{print $4}' | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | grep -v $primary_ip))
+
+
 function wait_for_weka_fs(){
   filesystem_name="default"
   max_retries=30 # 30 * 10 = 5 minutes
@@ -164,8 +168,9 @@ if [[ ${smbw_enabled} == true ]]; then
     smbw_cmd_extention="--smbw --config-fs-name .config_fs"
 fi
 
+
 function create_smb_cluster {
-  cluster_create_output=$(weka smb cluster create ${cluster_name} ${domain_name} $smbw_cmd_extention --container-ids $all_container_ids_str 2>&1)
+  cluster_create_output=$(weka smb cluster create ${cluster_name} ${domain_name} $smbw_cmd_extention --container-ids $all_container_ids_str --smb-ips-pool $secondary_ips_str 2>&1)
 
   if [ $? -eq 0 ]; then
     msg="SMB cluster is created"
