@@ -125,10 +125,10 @@ locals {
     subnet_prefixes              = data.azurerm_subnet.subnet.address_prefix
     backend_lb_ip                = var.backend_lb_ip
     key_vault_url                = var.key_vault_url
+    gateways_name                = var.gateways_name
   })
 
   setup_nfs_protocol_script = templatefile("${path.module}/setup_nfs.sh", {
-    gateways_name        = var.gateways_name
     interface_group_name = var.interface_group_name
     client_group_name    = var.client_group_name
   })

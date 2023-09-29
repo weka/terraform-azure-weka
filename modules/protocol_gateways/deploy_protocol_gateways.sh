@@ -74,7 +74,7 @@ ready_containers=0
 while [ $ready_containers -ne 1 ];
 do
   sleep 10
-  ready_containers=$( weka local ps | grep -i 'running' | wc -l )
+  ready_containers=$( weka local ps | grep frontend0 | grep -i 'running' | wc -l )
   echo "Running containers: $ready_containers"
 done
 
@@ -96,3 +96,53 @@ retry_command "weka user login admin $weka_password" "login to weka cluster"
 echo "$(date -u): success to run weka login command"
 
 rm -rf $INSTALLATION_PATH
+
+
+echo "$(date -u): starting preparation for protocol setup"
+
+weka local ps
+
+current_mngmnt_ip=$(weka local resources | grep 'Management IPs' | awk '{print $NF}')
+
+# get real primary ip from Azure cloud metadata
+primary_ip=$(curl -s -H Metadata:true --noproxy "*" http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0?api-version=2023-07-01 | jq -r '.privateIpAddress')
+
+# get container id
+max_retries=12 # 12 * 10 = 2 minutes
+for ((i=0; i<max_retries; i++)); do
+  container_id=$(weka cluster container | grep frontend0 | grep ${gateways_name} | grep $current_mngmnt_ip | grep UP | awk '{print $1}')
+  if [ -n "$container_id" ]; then
+      echo "$(date -u): frontend0 container id: $container_id"
+      break
+  fi
+  echo "$(date -u): waiting for frontend0 container to be up"
+  sleep 10
+done
+if [ -z "$container_id" ]; then
+  echo "$(date -u): Failed to get the frontend0 container ID."
+  exit 1
+fi
+
+# make primary ip the management ip for the weka container
+if [ "$current_mngmnt_ip" != "$primary_ip" ]; then
+  weka cluster container management-ips $container_id $primary_ip
+  weka cluster container apply $container_id -f
+  
+  # wait for container to be up
+  max_retries=12 # 12 * 10 = 2 minutes
+  for ((i=0; i<max_retries; i++)); do
+    status=$(weka cluster container $container_id | grep $container_id | awk '{print $5}')
+    if [ "$status" == "UP" ]; then
+    	echo "$(date -u): frontend0 container status: $status"
+    	break
+    fi
+    echo "$(date -u): waiting for frontend0 container status to be UP, current status: $status"
+    sleep 10
+  done
+  if [ "$status" != "UP" ]; then
+    echo "$(date -u): failed to wait for the frontend0 container status to be UP"
+    exit 1
+  fi
+fi
+
+echo "$(date -u): finished preparation for protocol setup"
