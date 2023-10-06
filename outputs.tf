@@ -1,12 +1,17 @@
 locals {
   key_vault_name = azurerm_key_vault.key_vault.name
-  vm_ips            = var.private_network ? "az vmss nic list -g ${var.rg_name} --vmss-name ${azurerm_linux_virtual_machine_scale_set.vmss.name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress" : "az vmss list-instance-public-ips -g ${var.rg_name} --name ${azurerm_linux_virtual_machine_scale_set.vmss.name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n"
+  vmss_name      = azurerm_linux_virtual_machine_scale_set.vmss.name
+  vm_ips            = var.private_network ? "az vmss nic list -g ${var.rg_name} --vmss-name ${local.vmss_name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress" : "az vmss list-instance-public-ips -g ${var.rg_name} --name ${local.vmss_name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n"
   clients_ips       = var.clients_number > 0 ? var.private_network ? "az vmss nic list -g ${var.rg_name} --vmss-name ${module.clients[0].client-name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress" : "az vmss list-instance-public-ips -g ${var.rg_name} --name ${module.clients[0].client-name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n" : ""
   protocol_gw_ips   = var.protocol_gateways_number > 0 ? var.private_network ? "az vmss nic list -g ${var.rg_name} --vmss-name ${module.protocol_gateways[0].vmss_name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress" : "az vmss list-instance-public-ips -g ${var.rg_name} --name ${module.protocol_gateways[0].vmss_name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n" : ""
   ssh_keys_commands = "########################################## Download ssh keys command from blob ###########################################################\n az keyvault secret download --file private.pem --encoding utf-8 --vault-name  ${local.key_vault_name} --name private-key --query \"value\" \n az keyvault secret download --file public.pub --encoding utf-8 --vault-name  ${local.key_vault_name} --name public-key --query \"value\"\n"
   blob_commands     = var.ssh_public_key == null ? local.ssh_keys_commands : ""
   private_ssh_key_path     = var.ssh_public_key == null ? "${local.ssh_path}-private-key.pem" : null
   resource_group_name = data.azurerm_resource_group.rg.name
+}
+
+output "vmss_name" {
+  value = local.vmss_name
 }
 
 output "function_app_name" {
@@ -74,6 +79,9 @@ ${local.blob_commands}
 ########################################## Resize cluster #################################################################################
 function_key=$(az functionapp keys list --name ${local.function_app_name} --resource-group ${data.azurerm_resource_group.rg.name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
 curl --fail https://${local.function_app_name}.azurewebsites.net/api/resize?code=$function_key -H "Content-Type:application/json" -d '{"value":ENTER_NEW_VALUE_HERE}'
+
+########################################## pre-terraform destroy, cluster terminate function ################
+az vmss delete --name ${local.vmss_name} --resource-group ${var.rg_name} --force-deletion true --subscription ${var.subscription_id}
 
 EOT
   description = "Useful commands and script to interact with weka cluster"
