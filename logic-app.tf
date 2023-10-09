@@ -55,7 +55,7 @@ resource "azurerm_resource_group_template_deployment" "api_connections_template_
     }
 }
 TEMPLATE
-  depends_on = [azurerm_key_vault.key_vault, azurerm_linux_virtual_machine_scale_set.vmss]
+  depends_on          = [azurerm_key_vault.key_vault, azurerm_linux_virtual_machine_scale_set.vmss]
   lifecycle {
     ignore_changes = [template_content]
   }
@@ -147,7 +147,7 @@ resource "azurerm_resource_group_template_deployment" "workflow_scale_down_templ
 }
 
 TEMPLATE
-  depends_on = [azurerm_resource_group_template_deployment.api_connections_template_deployment, azurerm_linux_virtual_machine_scale_set.vmss]
+  depends_on          = [azurerm_resource_group_template_deployment.api_connections_template_deployment, azurerm_linux_virtual_machine_scale_set.vmss]
   lifecycle {
     ignore_changes = [template_content]
   }
@@ -160,27 +160,27 @@ locals {
   scale_up_logic_app_identity_id   = jsondecode(azurerm_resource_group_template_deployment.workflow_scale_up_template_deployment.output_content).logicAppServiceIdentitylId.value
 }
 
-resource "azurerm_key_vault_access_policy" "logic-app-get-secret-permission" {
+resource "azurerm_key_vault_access_policy" "logic_app_get_secret_permission" {
   key_vault_id = azurerm_key_vault.key_vault.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
   object_id    = local.scale_down_logic_app_identity_id
   secret_permissions = [
     "Get",
   ]
-  depends_on = [azurerm_key_vault.key_vault,azurerm_resource_group_template_deployment.workflow_scale_down_template_deployment]
+  depends_on = [azurerm_key_vault.key_vault, azurerm_resource_group_template_deployment.workflow_scale_down_template_deployment]
 }
 
-resource "azurerm_role_assignment" "logic-app-key-vault-secrets-user" {
+resource "azurerm_role_assignment" "logic_app_key_vault_secrets_user" {
   scope                = azurerm_key_vault.key_vault.id
   role_definition_name = "Key Vault Secrets User"
   principal_id         = local.scale_down_logic_app_identity_id
-  depends_on           = [azurerm_linux_function_app.function_app,azurerm_resource_group_template_deployment.workflow_scale_down_template_deployment]
+  depends_on           = [azurerm_linux_function_app.function_app, azurerm_resource_group_template_deployment.workflow_scale_down_template_deployment]
 }
 
 resource "azurerm_logic_app_action_custom" "scale_down_logic_app_action_get_secret" {
   name         = "get-secret"
   logic_app_id = local.scale_down_logic_app_id
-  body = <<BODY
+  body         = <<BODY
 {
   "runAfter": {},
   "type": "ApiConnection",
@@ -208,7 +208,7 @@ BODY
 resource "azurerm_logic_app_action_custom" "logic_app_action_fetch" {
   name         = "fetch"
   logic_app_id = local.scale_down_logic_app_id
-  body = <<BODY
+  body         = <<BODY
 {
     "inputs": {
         "retryPolicy": {
@@ -238,13 +238,13 @@ resource "azurerm_logic_app_action_custom" "logic_app_action_fetch" {
      }
 }
 BODY
-  depends_on   = [azurerm_linux_function_app.function_app, azurerm_resource_group_template_deployment.workflow_scale_down_template_deployment,azurerm_logic_app_action_custom.scale_down_logic_app_action_get_secret]
+  depends_on   = [azurerm_linux_function_app.function_app, azurerm_resource_group_template_deployment.workflow_scale_down_template_deployment, azurerm_logic_app_action_custom.scale_down_logic_app_action_get_secret]
 }
 
 resource "azurerm_logic_app_action_custom" "logic_app_action_scale_down" {
   name         = "scale-down"
   logic_app_id = local.scale_down_logic_app_id
-  body = <<BODY
+  body         = <<BODY
 {
     "inputs": {
         "retryPolicy": {
@@ -274,13 +274,13 @@ resource "azurerm_logic_app_action_custom" "logic_app_action_scale_down" {
   }
 }
 BODY
-  depends_on   = [azurerm_linux_function_app.function_app, azurerm_resource_group_template_deployment.workflow_scale_down_template_deployment,azurerm_logic_app_action_custom.logic_app_action_fetch]
+  depends_on   = [azurerm_linux_function_app.function_app, azurerm_resource_group_template_deployment.workflow_scale_down_template_deployment, azurerm_logic_app_action_custom.logic_app_action_fetch]
 }
 
 resource "azurerm_logic_app_action_custom" "logic_app_action_terminate" {
   name         = "terminate"
   logic_app_id = local.scale_down_logic_app_id
-  body = <<BODY
+  body         = <<BODY
 {
     "inputs": {
         "retryPolicy": {
@@ -303,13 +303,13 @@ resource "azurerm_logic_app_action_custom" "logic_app_action_terminate" {
   }
 }
 BODY
-  depends_on   = [azurerm_linux_function_app.function_app, azurerm_resource_group_template_deployment.workflow_scale_down_template_deployment,azurerm_logic_app_action_custom.logic_app_action_scale_down]
+  depends_on   = [azurerm_linux_function_app.function_app, azurerm_resource_group_template_deployment.workflow_scale_down_template_deployment, azurerm_logic_app_action_custom.logic_app_action_scale_down]
 }
 
 resource "azurerm_logic_app_action_custom" "logic_app_action_transient" {
   name         = "transient"
   logic_app_id = local.scale_down_logic_app_id
-  body = <<BODY
+  body         = <<BODY
 {
     "inputs": {
         "retryPolicy": {
@@ -332,7 +332,7 @@ resource "azurerm_logic_app_action_custom" "logic_app_action_transient" {
   }
 }
 BODY
-  depends_on = [azurerm_linux_function_app.function_app, azurerm_resource_group_template_deployment.workflow_scale_down_template_deployment,azurerm_logic_app_action_custom.logic_app_action_terminate]
+  depends_on   = [azurerm_linux_function_app.function_app, azurerm_resource_group_template_deployment.workflow_scale_down_template_deployment, azurerm_logic_app_action_custom.logic_app_action_terminate]
 }
 
 resource "azurerm_monitor_diagnostic_setting" "logic_app_diagnostic_setting" {
@@ -348,7 +348,7 @@ resource "azurerm_monitor_diagnostic_setting" "logic_app_diagnostic_setting" {
     }
   }
   lifecycle {
-    ignore_changes = [metric,log_analytics_destination_type]
+    ignore_changes = [metric, log_analytics_destination_type]
   }
   depends_on = [azurerm_resource_group_template_deployment.workflow_scale_down_template_deployment]
 }
@@ -439,33 +439,33 @@ resource "azurerm_resource_group_template_deployment" "workflow_scale_up_templat
 }
 
 TEMPLATE
-  depends_on = [azurerm_resource_group_template_deployment.api_connections_template_deployment, azurerm_linux_virtual_machine_scale_set.vmss]
+  depends_on          = [azurerm_resource_group_template_deployment.api_connections_template_deployment, azurerm_linux_virtual_machine_scale_set.vmss]
   lifecycle {
     ignore_changes = [template_content]
   }
 }
 
-resource "azurerm_key_vault_access_policy" "scale-up-logic-app-get-secret-permission" {
+resource "azurerm_key_vault_access_policy" "scale_up_logic_app_get_secret_permission" {
   key_vault_id = azurerm_key_vault.key_vault.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
   object_id    = local.scale_up_logic_app_identity_id
   secret_permissions = [
     "Get",
   ]
-  depends_on = [azurerm_key_vault.key_vault,azurerm_resource_group_template_deployment.workflow_scale_up_template_deployment]
+  depends_on = [azurerm_key_vault.key_vault, azurerm_resource_group_template_deployment.workflow_scale_up_template_deployment]
 }
 
-resource "azurerm_role_assignment" "scale-up-logic-app-key-vault-secrets-user" {
+resource "azurerm_role_assignment" "scale_up_logic_app_key_vault_secrets_user" {
   scope                = azurerm_key_vault.key_vault.id
   role_definition_name = "Key Vault Secrets User"
   principal_id         = local.scale_up_logic_app_identity_id
-  depends_on           = [azurerm_linux_function_app.function_app,azurerm_resource_group_template_deployment.workflow_scale_up_template_deployment]
+  depends_on           = [azurerm_linux_function_app.function_app, azurerm_resource_group_template_deployment.workflow_scale_up_template_deployment]
 }
 
 resource "azurerm_logic_app_action_custom" "scale_up_logic_app_action_get_secret" {
   name         = "get-secret"
   logic_app_id = local.scale_up_logic_app_id
-  body = <<BODY
+  body         = <<BODY
 {
   "runAfter": {},
   "type": "ApiConnection",
@@ -493,7 +493,7 @@ BODY
 resource "azurerm_logic_app_action_custom" "logic_app_action_scale_up" {
   name         = "scale-up"
   logic_app_id = local.scale_up_logic_app_id
-  body = <<BODY
+  body         = <<BODY
 {
     "inputs": {
         "retryPolicy": {
@@ -532,7 +532,7 @@ resource "azurerm_monitor_diagnostic_setting" "scale_up_logic_app_diagnostic_set
     }
   }
   lifecycle {
-    ignore_changes = [metric,log_analytics_destination_type]
+    ignore_changes = [metric, log_analytics_destination_type]
   }
   depends_on = [azurerm_resource_group_template_deployment.workflow_scale_up_template_deployment]
 }

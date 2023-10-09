@@ -17,7 +17,7 @@ function_app_code_hash="$($current_script_dir/get_function_app_hash.sh ${os_name
 zip_path="$function_zip_dir/${function_app_code_hash}.zip"
 az_filename="${DIST}/${function_app_code_hash}.zip"
 
-while read region; do 
+while read region; do
     echo "Uploading to region: $region"
 
     storage_account="weka${region}"

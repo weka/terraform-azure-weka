@@ -1,4 +1,4 @@
 variable "subscription_id" {
-  type = string
+  type        = string
   description = "Subscription id for deployment"
 }

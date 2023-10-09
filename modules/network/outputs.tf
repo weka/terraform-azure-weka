@@ -1,5 +1,5 @@
 output "vnet_name" {
-  value = var.vnet_name == "" ? azurerm_virtual_network.vnet[0].name : var.vnet_name
+  value       = var.vnet_name == "" ? azurerm_virtual_network.vnet[0].name : var.vnet_name
   description = "Displays the VNet name."
 }
 
@@ -19,11 +19,11 @@ output "private_dns_zone_name" {
 }
 
 output "vnet_rg_name" {
-  value = var.vnet_rg_name == "" ? var.rg_name : var.vnet_rg_name
+  value       = var.vnet_rg_name == "" ? var.rg_name : var.vnet_rg_name
   description = "Resource group name of vnet."
 }
 
 output "private_dns_rg_name" {
-  value = var.private_dns_rg_name == "" ? var.rg_name : var.private_dns_rg_name
+  value       = var.private_dns_rg_name == "" ? var.rg_name : var.private_dns_rg_name
   description = "Resource group name of vnet."
 }

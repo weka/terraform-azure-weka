@@ -25,7 +25,7 @@ module "weka_deployment" {
   set_obs_integration   = true
   tiering_ssd_percent   = 20
   subscription_id       = var.subscription_id
-  vnet_to_peering       = [{
+  vnet_to_peering = [{
     vnet = "ubuntu-apt-repo-vnet"
     rg   = "ubuntu-apt-repo-rg"
   }]

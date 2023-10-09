@@ -25,21 +25,21 @@ variable "client_secret" {
 }
 
 variable "rg_name" {
-  type = string
+  type        = string
   description = "Resource group name"
 }
 
 variable "prefix" {
-  type = string
+  type        = string
   description = "Prefix for all resources"
 }
 
 variable "cluster_name" {
-  type = string
+  type        = string
   description = "Name of the cluster"
 }
 
 variable "cluster_size" {
-  type = number
+  type        = number
   description = "Number of nodes in the cluster"
 }

@@ -33,7 +33,7 @@ resource "azurerm_storage_blob" "state" {
   }
 }
 
-data azurerm_storage_account "deployment_blob" {
+data "azurerm_storage_account" "deployment_blob" {
   count               = var.deployment_storage_account_name != "" ? 1 : 0
   name                = var.deployment_storage_account_name
   resource_group_name = var.rg_name

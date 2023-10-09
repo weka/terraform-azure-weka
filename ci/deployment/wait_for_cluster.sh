@@ -49,4 +49,3 @@ else
   echo "weka cluster didn't reach expected state during $timeout minutes!"
   exit 1
 fi
-

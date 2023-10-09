@@ -204,7 +204,7 @@ variable "smb_dns_ip_address" {
 }
 
 variable "smb_share_name" {
-  type       = string
+  type        = string
   description = "The name of the SMB share"
   default     = ""
 }

@@ -1,11 +1,11 @@
 resource "azurerm_storage_account" "sa" {
-  name                     = "weka${var.region}"  // can only consist of lowercase letters and numbers, and must be between 3 and 24 characters long
+  name                     = "weka${var.region}" # can only consist of lowercase letters and numbers, and must be between 3 and 24 characters long
   location                 = var.region
   resource_group_name      = var.rg_name
   account_kind             = "StorageV2"
   account_tier             = "Standard"
   account_replication_type = "ZRS"
-  
+
   blob_properties {
     last_access_time_enabled = true
   }
@@ -38,9 +38,9 @@ resource "azurerm_storage_management_policy" "retention_policy" {
     }
     actions {
       base_blob {
-        tier_to_cool_after_days_since_last_access_time_greater_than    = 20
-        delete_after_days_since_last_access_time_greater_than          = 30
-        auto_tier_to_hot_from_cool_enabled = true
+        tier_to_cool_after_days_since_last_access_time_greater_than = 20
+        delete_after_days_since_last_access_time_greater_than       = 30
+        auto_tier_to_hot_from_cool_enabled                          = true
       }
     }
   }

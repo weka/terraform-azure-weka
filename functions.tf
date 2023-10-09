@@ -14,11 +14,9 @@ locals {
   deployment_storage_account_scope = "${local.deployment_storage_account_id}/blobServices/default/containers/${local.deployment_container_name}"
   obs_storage_account_name         = var.obs_name == "" ? "${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}obs" : var.obs_name
   obs_container_name               = var.obs_container_name == "" ? "${var.prefix}-${var.cluster_name}-obs" : var.obs_container_name
-  obs_id                           = var.obs_name != "" ? data.azurerm_storage_account.obs_sa[0].id : ""
   obs_scope                        = var.obs_name != "" ? "${data.azurerm_storage_account.obs_sa[0].id}/blobServices/default/containers/${local.obs_container_name}" : ""
   function_app_name                = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-function-app"
   install_weka_url                 = var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.weka.io/dist/v1/install/${var.weka_version}/${var.weka_version}"
-
 }
 
 resource "azurerm_log_analytics_workspace" "la_workspace" {
@@ -174,12 +172,12 @@ resource "azurerm_linux_function_app" "function_app" {
     ignore_changes = [site_config, tags]
   }
 
-  depends_on = [module.network,azurerm_storage_account.deployment_sa]
+  depends_on = [module.network, azurerm_storage_account.deployment_sa]
 }
 
 data "azurerm_subscription" "primary" {}
 
-resource "azurerm_role_assignment" "storage-blob-data-contributor" {
+resource "azurerm_role_assignment" "storage_blob_data_contributor" {
   scope                = local.deployment_storage_account_scope
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
@@ -201,28 +199,28 @@ resource "azurerm_role_assignment" "obs_storage_blob_data_contributor" {
   depends_on           = [azurerm_linux_function_app.function_app, azurerm_storage_account.deployment_sa]
 }
 
-resource "azurerm_role_assignment" "function-app-key-vault-secrets-user" {
+resource "azurerm_role_assignment" "function_app_key_vault_secrets_user" {
   scope                = data.azurerm_resource_group.rg.id
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
   depends_on           = [azurerm_linux_function_app.function_app]
 }
 
-resource "azurerm_role_assignment" "function-app-key-user-access-admin" {
+resource "azurerm_role_assignment" "function_app_key_user_access_admin" {
   scope                = data.azurerm_resource_group.rg.id
   role_definition_name = "User Access Administrator"
   principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
   depends_on           = [azurerm_linux_function_app.function_app]
 }
 
-resource "azurerm_role_assignment" "function-app-reader" {
+resource "azurerm_role_assignment" "function_app_reader" {
   scope                = data.azurerm_resource_group.rg.id
   role_definition_name = "Reader"
   principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
   depends_on           = [azurerm_linux_function_app.function_app]
 }
 
-resource "azurerm_role_assignment" "function-app-scale-set-machine-owner" {
+resource "azurerm_role_assignment" "function_app_scale_set_machine_owner" {
   scope                = azurerm_linux_virtual_machine_scale_set.vmss.id
   role_definition_name = "Contributor"
   principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id

@@ -28,7 +28,7 @@ resource "azurerm_virtual_network" "vnet" {
 }
 
 data "azurerm_virtual_network" "vnet_data" {
-  count               = var.vnet_name != ""  ? 1 : 0
+  count               = var.vnet_name != "" ? 1 : 0
   name                = var.vnet_name
   resource_group_name = local.vnet_rg
 }
@@ -43,13 +43,6 @@ resource "azurerm_subnet" "subnet" {
     ignore_changes = [service_endpoint_policy_ids, service_endpoints]
   }
   depends_on = [data.azurerm_resource_group.rg, azurerm_virtual_network.vnet]
-}
-
-data "azurerm_subnet" "subnets_data" {
-  count                = var.subnet_name != "" ? 1 : 0
-  name                 = var.subnet_name
-  resource_group_name  = local.vnet_rg
-  virtual_network_name = local.vnet_name
 }
 
 # ====================== sg ssh ========================== #
@@ -96,7 +89,7 @@ resource "azurerm_network_security_group" "sg" {
   depends_on = [data.azurerm_resource_group.rg]
 }
 
-resource "azurerm_subnet_network_security_group_association" "sg-association" {
+resource "azurerm_subnet_network_security_group_association" "sg_association" {
   count                     = var.subnet_name == "" ? 1 : 0
   subnet_id                 = azurerm_subnet.subnet[count.index].id
   network_security_group_id = azurerm_network_security_group.sg.id

@@ -10,7 +10,7 @@ data "azurerm_resource_group" "rg" {
   name = var.resource_group_name
 }
 
-module "create-sa" {
+module "create_sa" {
   source   = "./create_sa"
   for_each = local.supported_regions_map
 

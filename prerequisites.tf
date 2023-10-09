@@ -29,7 +29,6 @@ locals {
 module "peering" {
   count           = length(var.vnet_to_peering)
   source          = "./modules/peering_vnets"
-  prefix          = var.prefix
   vnet_rg_name    = local.vnet_rg_name
   vnet_name       = local.vnet_name
   vnet_to_peering = var.vnet_to_peering
@@ -41,10 +40,4 @@ data "azurerm_subnet" "subnet" {
   virtual_network_name = local.vnet_name
   name                 = local.subnet_name
   depends_on           = [module.network]
-}
-
-data "azurerm_virtual_network" "vnet" {
-  name                = local.vnet_name
-  resource_group_name = local.vnet_rg_name
-  depends_on          = [module.network]
 }

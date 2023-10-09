@@ -3,7 +3,6 @@ provider "azurerm" {
 }
 
 data "azuread_client_config" "current" {}
-data "azurerm_subscription" "primary" {}
 
 
 resource "azuread_application" "main" {

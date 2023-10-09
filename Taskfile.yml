@@ -10,7 +10,7 @@ tasks:
     cmds:
       - ./zip_function_app_creation/get_function_app_hash.sh {{OS}} ${FUNCTION_CODE_PATH}
     silent: true
-  
+
   create_function_app_zip:
     cmds:
       - ./zip_function_app_creation/create_function_app_zip.sh {{OS}} ${FUNCTION_CODE_PATH} ${FUNCTION_ZIP_DIR}

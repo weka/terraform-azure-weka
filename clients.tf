@@ -10,7 +10,7 @@ module "clients" {
   vnet_name          = local.vnet_name
   nics_numbers       = var.mount_clients_dpdk ? var.client_nics_num : 1
   instance_type      = var.client_instance_type
-  backend_lb_ip      = azurerm_lb.backend-lb.private_ip_address
+  backend_lb_ip      = azurerm_lb.backend_lb.private_ip_address
   ssh_public_key     = var.ssh_public_key == null ? tls_private_key.ssh_key[0].public_key_openssh : var.ssh_public_key
   ppg_id             = local.placement_group_id
   assign_public_ip   = var.assign_public_ip

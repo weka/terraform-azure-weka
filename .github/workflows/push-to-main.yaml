@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  
+
 jobs:
   update_function_app_dist:
     name: Update function_app_dist
@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Update function_app_dist default to 'release'
-        run: sed -i 's/^\( *default =\) "dev"/\1 "release"/' variables.tf 
+        run: sed -i 's/^\( *default =\) "dev"/\1 "release"/' variables.tf
 
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v4
