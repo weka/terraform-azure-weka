@@ -57,6 +57,12 @@ In order to mount clients in udp mode you should pass the following param (in ad
 mount_clients_dpdk = false
 ```
 
+# TF Module upgrade
+Upgrade is supported from version 3.0.5 and higher.
+
+Upgrade from versions 3.0.x (`<3.0.6`) to 3.0.6 and higher requires additional step before changing module version:
+`terraform state rm module.deploy-weka.null_resource.force-delete-vmss`
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
