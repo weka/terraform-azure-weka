@@ -53,7 +53,7 @@ jobs:
         with:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-        
+
       - name: Authenticate to Azure Cloud
         uses: azure/login@v1
         with:
@@ -63,7 +63,7 @@ jobs:
       - name: Run create_and_upload_zip
         if: github.event_name != 'workflow_dispatch'
         run: task create_and_upload_zip DIST=$DIST
-     
+
       - name: Run create_and_upload_zip (workflow_dispatch)
         if: github.event_name == 'workflow_dispatch'
         run: task create_and_upload_zip DIST=${{ inputs.dist }}
@@ -101,7 +101,7 @@ jobs:
             az group create --name $RG_NAME --location eastus
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v1
+        uses: hashicorp/setup-terraform@v2
 
       - name: Terraform Init
         run: terraform init
@@ -142,7 +142,7 @@ jobs:
         with:
           inlineScript: |
             chmod +x $GITHUB_WORKSPACE/ci/deployment/wait_for_cluster.sh
-            $GITHUB_WORKSPACE/ci/deployment/wait_for_cluster.sh $PREFIX $CLUSTER_NAME $RG_NAME $SUBSCRIPTION_ID $INITIAL_CAPACITY $SCALE_DOWN_TIMEOUT      
+            $GITHUB_WORKSPACE/ci/deployment/wait_for_cluster.sh $PREFIX $CLUSTER_NAME $RG_NAME $SUBSCRIPTION_ID $INITIAL_CAPACITY $SCALE_DOWN_TIMEOUT
 
       - name: Terraform Destroy
         if: always()

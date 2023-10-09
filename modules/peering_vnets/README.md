@@ -41,13 +41,14 @@ No outputs.
 
 | Name | Version |
 |------|---------|
-| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~>3.69.0 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.4.6 |
+| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~>3.75.0 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | ~>3.69.0 |
+| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | ~>3.75.0 |
 
 ## Modules
 
@@ -66,10 +67,9 @@ No modules.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_prefix"></a> [prefix](#input\_prefix) | Prefix for all resources | `string` | `"weka"` | no |
 | <a name="input_vnet_name"></a> [vnet\_name](#input\_vnet\_name) | Vnet name | `string` | n/a | yes |
 | <a name="input_vnet_rg_name"></a> [vnet\_rg\_name](#input\_vnet\_rg\_name) | Vnet resource group name | `string` | n/a | yes |
-| <a name="input_vnet_to_peering"></a> [vnet\_to\_peering](#input\_vnet\_to\_peering) | List of vnet and rg for setting peering | <pre>list(object({<br>      vnet = string<br>      rg   = string<br>  }))</pre> | n/a | yes |
+| <a name="input_vnet_to_peering"></a> [vnet\_to\_peering](#input\_vnet\_to\_peering) | List of vnet and rg for setting peering | <pre>list(object({<br>    vnet = string<br>    rg   = string<br>  }))</pre> | n/a | yes |
 
 ## Outputs
 

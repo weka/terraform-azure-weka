@@ -10,7 +10,7 @@ locals {
   alphanumeric_prefix_name  = lower(replace(var.prefix, "/\\W|_|\\s/", ""))
   subnet_range              = data.azurerm_subnet.subnet.address_prefix
   nics_numbers              = var.install_cluster_dpdk ? var.container_number_map[var.instance_type].nics : 1
-  custom_data_script        = templatefile("${path.module}/user-data.sh", {
+  custom_data_script = templatefile("${path.module}/user-data.sh", {
     apt_repo_server          = var.apt_repo_server
     user                     = var.vm_username
     install_cluster_dpdk     = var.install_cluster_dpdk
@@ -73,7 +73,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
   disable_password_authentication = true
   proximity_placement_group_id    = local.placement_group_id
   source_image_id                 = var.source_image_id
-  tags                            = merge(var.tags_map, {
+  tags = merge(var.tags_map, {
     "weka_cluster" : var.cluster_name, "user_id" : data.azurerm_client_config.current.object_id
   })
 
@@ -158,7 +158,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
 }
 
 
-resource "null_resource" "force-delete-vmss" {
+resource "null_resource" "force_delete_vmss" {
   triggers = {
     vmss_name       = azurerm_linux_virtual_machine_scale_set.vmss.name
     rg_name         = data.azurerm_resource_group.rg.name

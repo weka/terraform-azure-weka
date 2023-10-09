@@ -1,18 +1,18 @@
 variable "prefix" {
-  type = string
+  type        = string
   description = "The prefix for all the resource names. For example, the prefix for your system name."
-  default = "weka"
+  default     = "weka"
 }
 
 variable "rg_name" {
-  type = string
-  description =  "A predefined resource group in the Azure subscription."
+  type        = string
+  description = "A predefined resource group in the Azure subscription."
 }
 
 variable "address_space" {
-  type = string
+  type        = string
   description = "The range of IP addresses the virtual network uses."
-  default = "10.0.0.0/16"
+  default     = "10.0.0.0/16"
 }
 
 variable "subnet_prefix" {
@@ -22,8 +22,8 @@ variable "subnet_prefix" {
 }
 
 variable "tags_map" {
-  type = map(string)
-  default = {"env": "dev", "creator": "tf"}
+  type        = map(string)
+  default     = { "env" : "dev", "creator" : "tf" }
   description = "A map of tags to assign the same metadata to all resources in the environment. Format: key:value."
 }
 
@@ -39,7 +39,7 @@ variable "subnet_name" {
   description = "Subnet name, if exist."
 }
 
-variable "private_network" {
+variable "private_network" { # tflint-ignore: terraform_unused_declarations
   type        = bool
   default     = false
   description = "Determines whether to enable a private or public network. The default is public network."

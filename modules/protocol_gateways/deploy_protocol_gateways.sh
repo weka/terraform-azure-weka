@@ -97,4 +97,3 @@ retry_command "weka user login admin $weka_password" "login to weka cluster"
 echo "$(date -u): success to run weka login command"
 
 rm -rf $INSTALLATION_PATH
-

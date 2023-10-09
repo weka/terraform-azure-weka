@@ -33,7 +33,7 @@ resource "azurerm_network_interface" "primary_gateway_nic_public" {
     public_ip_address_id          = azurerm_public_ip.this[count.index].id
   }
 
-  // secondary ips (floating ip)
+  # secondary ips (floating ip)
   dynamic "ip_configuration" {
     for_each = range(var.secondary_ips_per_nic)
     content {
@@ -42,6 +42,12 @@ resource "azurerm_network_interface" "primary_gateway_nic_public" {
       private_ip_address_allocation = "Dynamic"
     }
   }
+}
+
+resource "azurerm_network_interface_security_group_association" "primary_gateway_nic_public" {
+  count                     = var.assign_public_ip ? var.gateways_number : 0
+  network_interface_id      = azurerm_network_interface.primary_gateway_nic_public[count.index].id
+  network_security_group_id = var.sg_id
 }
 
 resource "azurerm_network_interface" "primary_gateway_nic_private" {
@@ -58,7 +64,7 @@ resource "azurerm_network_interface" "primary_gateway_nic_private" {
     private_ip_address_allocation = "Dynamic"
   }
 
-  // secondary ips (floating ip)
+  # secondary ips (floating ip)
   dynamic "ip_configuration" {
     for_each = range(var.secondary_ips_per_nic)
     content {
@@ -67,6 +73,12 @@ resource "azurerm_network_interface" "primary_gateway_nic_private" {
       private_ip_address_allocation = "Dynamic"
     }
   }
+}
+
+resource "azurerm_network_interface_security_group_association" "primary_gateway_nic_private" {
+  count                     = var.assign_public_ip ? 0 : var.gateways_number
+  network_interface_id      = azurerm_network_interface.primary_gateway_nic_private[count.index].id
+  network_security_group_id = var.sg_id
 }
 
 locals {
@@ -86,6 +98,12 @@ resource "azurerm_network_interface" "secondary_gateway_nic" {
     subnet_id                     = data.azurerm_subnet.subnet.id
     private_ip_address_allocation = "Dynamic"
   }
+}
+
+resource "azurerm_network_interface_security_group_association" "secondary_gateway_nic" {
+  count                     = local.secondary_nics_num
+  network_interface_id      = azurerm_network_interface.secondary_gateway_nic[count.index].id
+  network_security_group_id = var.sg_id
 }
 
 locals {
@@ -188,7 +206,7 @@ resource "azurerm_linux_virtual_machine" "this" {
       error_message = "The number of secondary IPs per single NIC per protocol gateway virtual machine must be at most 3 for SMB."
     }
   }
-  depends_on = [azurerm_network_interface.primary_gateway_nic_private,azurerm_network_interface.primary_gateway_nic_public,azurerm_network_interface.secondary_gateway_nic]
+  depends_on = [azurerm_network_interface.primary_gateway_nic_private, azurerm_network_interface.primary_gateway_nic_public, azurerm_network_interface.secondary_gateway_nic]
 }
 
 resource "azurerm_managed_disk" "this" {

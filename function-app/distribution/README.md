@@ -3,19 +3,20 @@
 
 | Name | Version |
 |------|---------|
-| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~>3.50.0 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.4.6 |
+| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~>3.75.0 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | ~>3.50.0 |
+| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | ~>3.75.0 |
 
 ## Modules
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_create-sa"></a> [create-sa](#module\_create-sa) | ./create_sa | n/a |
+| <a name="module_create_sa"></a> [create\_sa](#module\_create\_sa) | ./create_sa | n/a |
 
 ## Resources
 

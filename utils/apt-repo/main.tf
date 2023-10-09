@@ -26,7 +26,7 @@ resource "azurerm_public_ip" "public_ip" {
   sku                 = "Standard"
   domain_name_label   = "${var.prefix}-apt-repo"
   lifecycle {
-    ignore_changes = [tags,zones,ip_tags]
+    ignore_changes = [tags, zones, ip_tags]
   }
 }
 
@@ -59,17 +59,17 @@ resource "azurerm_network_security_group" "nsg" {
   }
 }
 
-resource "azurerm_network_interface_security_group_association" "sg-association" {
-  network_interface_id      = azurerm_network_interface.vm-interface.id
+resource "azurerm_network_interface_security_group_association" "sg_association" {
+  network_interface_id      = azurerm_network_interface.vm_interface.id
   network_security_group_id = azurerm_network_security_group.nsg.id
 }
 
-resource "azurerm_virtual_machine" "apt-repo-vm-linux" {
+resource "azurerm_virtual_machine" "apt_repo_vm_linux" {
   name                          = "${var.prefix}-apt-repo-vm"
   location                      = azurerm_resource_group.rg.location
   resource_group_name           = azurerm_resource_group.rg.name
   vm_size                       = var.vm_size
-  network_interface_ids         = [azurerm_network_interface.vm-interface.id]
+  network_interface_ids         = [azurerm_network_interface.vm_interface.id]
   delete_os_disk_on_termination = true
 
   storage_image_reference {
@@ -101,10 +101,10 @@ resource "azurerm_virtual_machine" "apt-repo-vm-linux" {
       key_data = file(var.ssh_public_key)
     }
   }
-  depends_on = [azurerm_network_interface.vm-interface,azurerm_network_security_group.nsg]
+  depends_on = [azurerm_network_interface.vm_interface, azurerm_network_security_group.nsg]
 }
 
-resource "azurerm_network_interface" "vm-interface" {
+resource "azurerm_network_interface" "vm_interface" {
   name                          = "${var.prefix}-vm-nic"
   location                      = azurerm_resource_group.rg.location
   resource_group_name           = azurerm_resource_group.rg.name
@@ -118,4 +118,3 @@ resource "azurerm_network_interface" "vm-interface" {
   }
   depends_on = [azurerm_public_ip.public_ip]
 }
-

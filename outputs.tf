@@ -7,16 +7,16 @@ locals {
   resource_group_name  = data.azurerm_resource_group.rg.name
   functions_url = {
     progressing_status = {
-      url = "https://${local.function_app_name}.azurewebsites.net/api/status"
-      body = {"type": "progress"}
+      url  = "https://${local.function_app_name}.azurewebsites.net/api/status"
+      body = { "type" : "progress" }
     }
     status = {
-      url = "https://${local.function_app_name}.azurewebsites.net/api/status"
-      body = {"type": "status"}
+      url  = "https://${local.function_app_name}.azurewebsites.net/api/status"
+      body = { "type" : "status" }
     }
     resize = {
       uri  = "https://${local.function_app_name}.azurewebsites.net/api/resize"
-      body = {"value":7}
+      body = { "value" : 7 }
     }
   }
 }
@@ -62,12 +62,12 @@ output "private_ssh_key" {
   value = local.private_ssh_key_path
 }
 
-output "key_vault_name"{
+output "key_vault_name" {
   value = local.key_vault_name
 }
 
 output "cluster_helper_commands" {
-  value = <<EOT
+  value       = <<EOT
 ########################################## Get function key #####################################################################
 az functionapp keys list --name ${local.function_app_name} --resource-group ${local.resource_group_name} --subscription ${var.subscription_id} --query functionKeys -o tsv
 

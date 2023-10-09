@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Usage:
-# build_function_code.sh <os_name> <function_code_path> <function_zip_dir> 
+# build_function_code.sh <os_name> <function_code_path> <function_zip_dir>
 
 set -e
 

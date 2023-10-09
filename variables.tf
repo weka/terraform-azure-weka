@@ -1,5 +1,5 @@
 variable "prefix" {
-  type = string
+  type        = string
   description = "Prefix for all resources"
   validation {
     condition     = can(regex("^[a-zA-Z][a-zA-Z\\-\\_0-9]{1,64}$", var.prefix))
@@ -73,7 +73,7 @@ variable "cluster_size" {
   default     = 6
 
   validation {
-    condition = var.cluster_size >= 6
+    condition     = var.cluster_size >= 6
     error_message = "Cluster size should be at least 6."
   }
 }
@@ -116,7 +116,7 @@ variable "get_weka_io_token" {
 }
 
 variable "cluster_name" {
-  type = string
+  type        = string
   description = "Cluster name"
   validation {
     condition     = can(regex("^[a-zA-Z][a-zA-Z\\-\\_0-9]{1,64}$", var.cluster_name))
@@ -126,8 +126,8 @@ variable "cluster_name" {
 }
 
 variable "tags_map" {
-  type = map(string)
-  default = {"env": "dev", "creator": "tf"}
+  type        = map(string)
+  default     = { "env" : "dev", "creator" : "tf" }
   description = "A map of tags to assign the same metadata to all resources in the environment. Format: key:value."
 }
 
@@ -199,7 +199,7 @@ variable "container_number_map" {
       frontend = 1
       nvme     = 1
       nics     = 4
-      memory   = ["33GB","31GB"]
+      memory   = ["33GB", "31GB"]
     },
     Standard_L16s_v3 = {
       compute  = 4
@@ -207,7 +207,7 @@ variable "container_number_map" {
       frontend = 1
       nvme     = 2
       nics     = 8
-      memory   = ["79GB","72GB"]
+      memory   = ["79GB", "72GB"]
     },
     Standard_L32s_v3 = {
       compute  = 4
@@ -215,7 +215,7 @@ variable "container_number_map" {
       frontend = 1
       nvme     = 4
       nics     = 8
-      memory   = ["197GB","189GB"]
+      memory   = ["197GB", "189GB"]
     },
     Standard_L48s_v3 = {
       compute  = 3
@@ -223,7 +223,7 @@ variable "container_number_map" {
       frontend = 1
       nvme     = 6
       nics     = 8
-      memory   = ["314GB","306GB"]
+      memory   = ["314GB", "306GB"]
     },
     Standard_L64s_v3 = {
       compute  = 4
@@ -231,7 +231,7 @@ variable "container_number_map" {
       frontend = 1
       nvme     = 8
       nics     = 8
-      memory   = ["357GB","418GB"]
+      memory   = ["357GB", "418GB"]
     }
   }
 }
@@ -254,8 +254,8 @@ variable "subscription_id" {
 }
 
 variable "protection_level" {
-  type = number
-  default = 2
+  type        = number
+  default     = 2
   description = "Cluster data protection level."
   validation {
     condition     = var.protection_level == 2 || var.protection_level == 4
@@ -264,8 +264,8 @@ variable "protection_level" {
 }
 
 variable "stripe_width" {
-  type = number
-  default = -1
+  type        = number
+  default     = -1
   description = "Stripe width = cluster_size - protection_level - 1 (by default)."
   validation {
     condition     = var.stripe_width == -1 || var.stripe_width >= 3 && var.stripe_width <= 16
@@ -274,47 +274,47 @@ variable "stripe_width" {
 }
 
 variable "hotspare" {
-  type = number
-  default = 1
+  type        = number
+  default     = 1
   description = "Hot-spare value."
 }
 
 variable "function_app_log_level" {
-  type = number
-  default = 1
+  type        = number
+  default     = 1
   description = "Log level for function app (from -1 to 5). See https://github.com/rs/zerolog#leveled-logging"
 
   validation {
-    condition = var.function_app_log_level >= -1 && var.function_app_log_level <= 5
+    condition     = var.function_app_log_level >= -1 && var.function_app_log_level <= 5
     error_message = "Allowed values for log level are from -1 to 5."
   }
 }
 
 variable "function_app_storage_account_prefix" {
-  type = string
+  type        = string
   description = "Weka storage account name prefix"
-  default = "weka"
+  default     = "weka"
 }
 
 variable "function_app_storage_account_container_prefix" {
-  type = string
+  type        = string
   description = "Weka storage account container name prefix"
-  default = "weka-tf-functions-deployment-"
+  default     = "weka-tf-functions-deployment-"
 }
 
 variable "function_app_version" {
-  type = string
+  type        = string
   description = "Function app code version (hash)"
   default = "11dc92b3aba9bd6f8f439cc4588d7fae"
 }
 
 variable "function_app_dist" {
-  type = string
+  type        = string
   description = "Function app code dist"
-  default = "release"
+  default     = "release"
 
   validation {
-    condition = contains(["dev", "release"], var.function_app_dist)
+    condition     = contains(["dev", "release"], var.function_app_dist)
     error_message = "Valid value is one of the following: dev, release."
   }
 }
@@ -333,33 +333,33 @@ variable "add_frontend_container" {
 
 ################################################## obs variables ###################################################
 variable "obs_name" {
-  type = string
-  default = ""
+  type        = string
+  default     = ""
   description = "Name of existing obs storage account"
 }
 
 variable "obs_container_name" {
-  type = string
-  default = ""
+  type        = string
+  default     = ""
   description = "Name of existing obs conatiner name"
 }
 
 variable "set_obs_integration" {
-  type = bool
-  default = false
+  type        = bool
+  default     = false
   description = "Determines whether to enable object stores integration with the Weka cluster. Set true to enable the integration."
 }
 
 variable "blob_obs_access_key" {
-  type = string
+  type        = string
   description = "The access key of the existing Blob object store container."
   sensitive   = true
-  default = ""
+  default     = ""
 }
 
 variable "tiering_ssd_percent" {
-  type = number
-  default = 20
+  type        = number
+  default     = 20
   description = "When set_obs_integration is true, this variable sets the capacity percentage of the filesystem that resides on SSD. For example, for an SSD with a total capacity of 20GB, and the tiering_ssd_percent is set to 20, the total available capacity is 100GB."
 }
 
@@ -413,7 +413,7 @@ variable "deployment_storage_account_access_key" {
   default     = ""
 }
 
-variable "zone"{
+variable "zone" {
   type        = string
   description = "The zone in which the resources should be created."
   default     = "1"
@@ -421,7 +421,7 @@ variable "zone"{
 
 ############################################### nfs protocol gateways variables ###################################################
 variable "nfs_protocol_gateways_number" {
-  type = number
+  type        = number
   description = "The number of protocol gateway virtual machines to deploy."
   default     = 0
 }
@@ -464,7 +464,7 @@ variable "nfs_setup_protocol" {
 
 ############################################### smb protocol gateways variables ###################################################
 variable "smb_protocol_gateways_number" {
-  type = number
+  type        = number
   description = "The number of protocol gateway virtual machines to deploy."
   default     = 0
 }
@@ -541,7 +541,7 @@ variable "smb_dns_ip_address" {
 }
 
 variable "smb_share_name" {
-  type       = string
+  type        = string
   description = "The name of the SMB share"
   default     = "default"
 }
