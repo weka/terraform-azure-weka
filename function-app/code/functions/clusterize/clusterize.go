@@ -46,8 +46,8 @@ func GetObsScript(obsParams AzureObsParams) string {
 
 func GetWekaDebugOverrideCmds() string {
 	s := `
-	weka debug override add --key allow_uncomputed_backend_checksum
-	weka debug override add --key allow_azure_auto_detection
+	weka debug override add --key allow_uncomputed_backend_checksum || true
+	weka debug override add --key allow_azure_auto_detection || true
 	`
 	return dedent.Dedent(s)
 }
