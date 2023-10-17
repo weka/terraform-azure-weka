@@ -17,7 +17,6 @@ import (
 	"github.com/weka/go-cloud-lib/join"
 	"github.com/weka/go-cloud-lib/logging"
 	"github.com/weka/go-cloud-lib/protocol"
-	"github.com/weka/go-cloud-lib/weka_events"
 
 	"github.com/lithammer/dedent"
 )
@@ -163,14 +162,6 @@ func GetDeployScript(
 			FuncDef:            funcDef,
 		}
 		bashScript = joinScriptGenerator.GetJoinScript(ctx)
-
-		emitEventParams := weka_events.EmitEventParams{
-			Username:   joinParams.WekaUsername,
-			Password:   joinParams.WekaPassword,
-			BackendIps: joinParams.IPs,
-			Message:    fmt.Sprintf("Scale up operation in progress on host %s.", vmName),
-		}
-		weka_events.EmitCustomEvent(ctx, emitEventParams)
 	}
 	bashScript = dedent.Dedent(bashScript)
 	return
