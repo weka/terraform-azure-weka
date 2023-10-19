@@ -11,8 +11,8 @@ function report {
   curl ${report_function_url}?code="$function_app_key" -H 'Content-Type:application/json' -d "$json_data"
 }
 
-# get array of secondary ips (excluding the primary ip)
-secondary_ips=($(ip -o -4 addr show dev $port | awk '{print $4}' | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | grep -v $primary_ip))
+all_secondary_ips=(${secondary_ips})
+echo "$(date -u): all_secondary_ips: $${all_secondary_ips[@]}"
 
 
 function wait_for_weka_fs(){
@@ -168,6 +168,8 @@ if [[ ${smbw_enabled} == true ]]; then
     smbw_cmd_extention="--smbw --config-fs-name .config_fs"
 fi
 
+# get all secondary ips separated by comma
+secondary_ips_str=$(IFS=,; printf "%s" "$${all_secondary_ips[*]}")
 
 function create_smb_cluster {
   cluster_create_output=$(weka smb cluster create ${cluster_name} ${domain_name} $smbw_cmd_extention --container-ids $all_container_ids_str --smb-ips-pool $secondary_ips_str 2>&1)

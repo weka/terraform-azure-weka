@@ -111,6 +111,13 @@ locals {
   first_nic_ids         = var.assign_public_ip ? azurerm_network_interface.primary_gateway_nic_public[*].id : azurerm_network_interface.primary_gateway_nic_private[*].id
   first_nic_private_ips = var.assign_public_ip ? azurerm_network_interface.primary_gateway_nic_public[*].private_ip_address : azurerm_network_interface.primary_gateway_nic_private[*].private_ip_address
   nics_numbers          = var.frontend_container_cores_num + 1
+  // foreach private_ip_addresses except the value equal to private_ip_address
+  first_nic_secondary_ips = flatten([
+    for nic in  var.assign_public_ip ? azurerm_network_interface.primary_gateway_nic_public : azurerm_network_interface.primary_gateway_nic_private : [
+      for ip in nic.private_ip_addresses : ip if ip != nic.private_ip_address
+    ]
+  ])
+
   init_script = templatefile("${path.module}/init.sh", {
     apt_repo_server  = var.apt_repo_server
     nics_num         = local.nics_numbers
@@ -144,6 +151,7 @@ locals {
     report_function_url          = format("https://%s.azurewebsites.net/api/report", var.function_app_name)
     vault_function_app_key_name  = var.vault_function_app_key_name
     key_vault_url                = var.key_vault_url
+    secondary_ips                = join(" ", local.first_nic_secondary_ips)
   })
 
   protocol_script = var.protocol == "NFS" ? local.setup_nfs_protocol_script : local.setup_smb_protocol_script
