@@ -231,8 +231,12 @@ variable "container_number_map" {
       frontend = 1
       nvme     = 8
       nics     = 8
-      memory   = ["357GB", "418GB"]
+      memory   = ["357GB", "384GB"]
     }
+  }
+  validation {
+    condition = alltrue([for m in flatten([for i in values(var.container_number_map): (flatten(i.memory))]): tonumber(trimsuffix(m, "GB")) <= 384])
+    error_message = "Compute memory can not be more then 384GB"
   }
 }
 
