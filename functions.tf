@@ -80,7 +80,7 @@ resource "azurerm_monitor_diagnostic_setting" "function_diagnostic_setting" {
 resource "azurerm_subnet" "subnet_delegation" {
   count                = var.subnet_delegation_id == null ? 1 : 0
   name                 = "${var.prefix}-${var.cluster_name}-subnet-delegation"
-  resource_group_name  = var.rg_name
+  resource_group_name  = var.vnet_rg_name
   virtual_network_name = data.azurerm_virtual_network.vnet.name
   address_prefixes     = [var.subnet_delegation]
 
