@@ -3,7 +3,7 @@ data "azurerm_resource_group" "rg" {
 }
 
 module "network" {
-  count                 = var.subnet_name == "" ? 1 : 0
+  count                 = 1
   source                = "./modules/network"
   prefix                = var.prefix
   rg_name               = var.rg_name
