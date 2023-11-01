@@ -3,7 +3,6 @@ data "azurerm_resource_group" "rg" {
 }
 
 module "network" {
-  count                 = var.subnet_name == "" ? 1 : 0
   source                = "./modules/network"
   prefix                = var.prefix
   rg_name               = var.rg_name
@@ -18,12 +17,12 @@ module "network" {
 }
 
 locals {
-  vnet_name             = var.vnet_name == "" ? module.network[0].vnet_name : var.vnet_name
-  vnet_rg_name          = var.vnet_rg_name == "" ? module.network[0].vnet_rg_name : var.vnet_rg_name
-  subnet_name           = var.subnet_name == "" ? module.network[0].subnet_name : var.subnet_name
-  sg_id                 = var.sg_id == "" ? module.network[0].sg_id : var.sg_id
-  private_dns_zone_name = var.private_dns_zone_name == "" ? module.network[0].private_dns_zone_name : var.private_dns_zone_name
-  private_dns_rg_name   = var.private_dns_rg_name == "" ? module.network[0].private_dns_rg_name : var.private_dns_rg_name
+  vnet_name             = var.vnet_name == "" ? module.network.vnet_name : var.vnet_name
+  vnet_rg_name          = var.vnet_rg_name == "" ? module.network.vnet_rg_name : var.vnet_rg_name
+  subnet_name           = var.subnet_name == "" ? module.network.subnet_name : var.subnet_name
+  sg_id                 = var.sg_id == "" ? module.network.sg_id : var.sg_id
+  private_dns_zone_name = var.private_dns_zone_name == "" ? module.network.private_dns_zone_name : var.private_dns_zone_name
+  private_dns_rg_name   = var.private_dns_rg_name == "" ? module.network.private_dns_rg_name : var.private_dns_rg_name
 }
 
 module "peering" {
