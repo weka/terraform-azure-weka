@@ -12,7 +12,7 @@ resource "azurerm_subnet" "logicapp_subnet_delegation" {
   resource_group_name  = local.vnet_rg_name
   virtual_network_name = local.vnet_name
   address_prefixes     = [var.logicapp_subnet_delegation_cdir]
-
+  service_endpoints    = ["Microsoft.KeyVault","Microsoft.Web"]
   delegation {
     name = "logic-delegation"
     service_delegation {

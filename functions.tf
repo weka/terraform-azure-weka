@@ -87,7 +87,7 @@ resource "azurerm_subnet" "subnet_delegation" {
   resource_group_name  = local.vnet_rg_name
   virtual_network_name = local.vnet_name
   address_prefixes     = [var.subnet_delegation]
-
+  service_endpoints    = ["Microsoft.Storage","Microsoft.KeyVault","Microsoft.Web"]
   delegation {
     name = "subnet-delegation"
     service_delegation {

@@ -39,6 +39,7 @@ resource "azurerm_subnet" "subnet" {
   name                 = "${var.prefix}-subnet-${count.index}"
   address_prefixes     = [var.subnet_prefix]
   virtual_network_name = local.vnet_name
+  service_endpoints    = ["Microsoft.Storage","Microsoft.KeyVault","Microsoft.Web"]
   lifecycle {
     ignore_changes = [service_endpoint_policy_ids, service_endpoints]
   }
