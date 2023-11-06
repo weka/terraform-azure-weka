@@ -33,13 +33,12 @@ while fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1;
    sleep 2
 done
 
-apt update -y
-
 # set apt private repo
 if [[ "${apt_repo_server}" ]]; then
   mv /etc/apt/sources.list /etc/apt/sources.list.bak
   echo "deb ${apt_repo_server} focal main restricted universe" > /etc/apt/sources.list
   echo "deb ${apt_repo_server} focal-updates main restricted" >> /etc/apt/sources.list
+  apt update -y
 fi
 
 INSTALLATION_PATH="/tmp/weka"
@@ -141,6 +140,12 @@ while ! curl ${deploy_url}?code="${function_app_default_key}" --fail -H "Content
   retry=$((retry + 1))
   sleep 5
 done
+
+weka_dir="/opt/weka/data"
+mkdir -p $weka_dir
+mv /root/weka-prepackaged $weka_dir
+
+az login --identity --debug --allow-no-subscriptions
 
 if [ $retry -gt 0 ]; then
   msg="Deploy script generation retried $retry times"

@@ -105,7 +105,7 @@ variable "subnet_delegation_id" {
 variable "weka_version" {
   type        = string
   description = "The Weka version to deploy."
-  default     = "4.2.1"
+  default     = "4.2.5"
 }
 
 variable "get_weka_io_token" {
@@ -135,12 +135,6 @@ variable "ssh_public_key" {
   type        = string
   description = "Ssh public key to pass to vms."
   default     = null
-}
-
-variable "private_network" {
-  type        = bool
-  default     = false
-  description = "Determines whether to enable a private or public network. The default is public network."
 }
 
 variable "assign_public_ip" {
@@ -235,7 +229,7 @@ variable "container_number_map" {
     }
   }
   validation {
-    condition = alltrue([for m in flatten([for i in values(var.container_number_map): (flatten(i.memory))]): tonumber(trimsuffix(m, "GB")) <= 384])
+    condition     = alltrue([for m in flatten([for i in values(var.container_number_map) : (flatten(i.memory))]) : tonumber(trimsuffix(m, "GB")) <= 384])
     error_message = "Compute memory can not be more then 384GB"
   }
 }
@@ -309,7 +303,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "a8869aa0754029a68533b49450bbb00c"
+  default     = "42262f2a96fc9005bba84a4786cca95e"
 }
 
 variable "function_app_dist" {
@@ -560,4 +554,25 @@ variable "weka_home_url" {
   type        = string
   description = "Weka Home url"
   default     = ""
+}
+
+#### private blob
+variable "weka_tar_storage_account_id" {
+  default = ""
+}
+
+variable "logicapp_subnet_delegation_id" {
+  type    = string
+  default = ""
+}
+
+variable "logicapp_subnet_delegation_cdir" {
+  type    = string
+  default = "10.0.6.0/24"
+}
+
+variable "function_public_network_access_enabled" {
+  type        = bool
+  default     = true
+  description = "Allow public access, Access restrictions apply to inbound access only"
 }
