@@ -44,9 +44,7 @@ You can as well create it on your own subscription and use it.
 
 
 ### Private network deployment:
-```hcl
-private_network = true
-```
+
 #### To avoid public ip assignment:
 ```hcl
 assign_public_ip   = false

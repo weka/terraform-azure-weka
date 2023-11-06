@@ -158,6 +158,14 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
 }
 
 
+resource "azurerm_role_assignment" "storage_blob_data_reader" {
+  count                = var.weka_tar_storage_account_id != "" ? 1 : 0
+  scope                = var.weka_tar_storage_account_id
+  role_definition_name = "Storage Blob Data Reader"
+  principal_id         = azurerm_linux_virtual_machine_scale_set.vmss.identity[0].principal_id
+  depends_on           = [azurerm_linux_virtual_machine_scale_set.vmss]
+}
+
 resource "null_resource" "force_delete_vmss" {
   triggers = {
     vmss_name       = azurerm_linux_virtual_machine_scale_set.vmss.name

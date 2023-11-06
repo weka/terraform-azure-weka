@@ -1,4 +1,5 @@
 locals {
+  create_private_function          = var.function_public_network_access_enabled ? 0 : 1
   stripe_width_calculated          = var.cluster_size - var.protection_level - 1
   stripe_width                     = local.stripe_width_calculated < 16 ? local.stripe_width_calculated : 16
   location                         = data.azurerm_resource_group.rg.location
@@ -48,10 +49,6 @@ resource "azurerm_monitor_diagnostic_setting" "insights_diagnostic_setting" {
   log_analytics_workspace_id = azurerm_log_analytics_workspace.la_workspace.id
   enabled_log {
     category = "AppTraces"
-
-    retention_policy {
-      enabled = false
-    }
   }
   lifecycle {
     ignore_changes = [metric, log_analytics_destination_type]
@@ -66,10 +63,6 @@ resource "azurerm_monitor_diagnostic_setting" "function_diagnostic_setting" {
   log_analytics_workspace_id = azurerm_log_analytics_workspace.la_workspace.id
   enabled_log {
     category = "FunctionAppLogs"
-
-    retention_policy {
-      enabled = false
-    }
   }
   lifecycle {
     ignore_changes = [metric, log_analytics_destination_type]
@@ -105,16 +98,26 @@ resource "azurerm_subnet" "subnet_delegation" {
 }
 
 resource "azurerm_linux_function_app" "function_app" {
-  name                       = local.function_app_name
-  resource_group_name        = data.azurerm_resource_group.rg.name
-  location                   = data.azurerm_resource_group.rg.location
-  service_plan_id            = azurerm_service_plan.app_service_plan.id
-  storage_account_name       = local.deployment_storage_account_name
-  storage_account_access_key = var.deployment_storage_account_access_key == "" ? azurerm_storage_account.deployment_sa[0].primary_access_key : var.deployment_storage_account_access_key
-  https_only                 = true
-  virtual_network_subnet_id  = var.subnet_delegation_id == "" ? azurerm_subnet.subnet_delegation[0].id : var.subnet_delegation_id
+  name                          = local.function_app_name
+  resource_group_name           = data.azurerm_resource_group.rg.name
+  location                      = data.azurerm_resource_group.rg.location
+  service_plan_id               = azurerm_service_plan.app_service_plan.id
+  storage_account_name          = local.deployment_storage_account_name
+  storage_account_access_key    = var.deployment_storage_account_access_key == "" ? azurerm_storage_account.deployment_sa[0].primary_access_key : var.deployment_storage_account_access_key
+  https_only                    = true
+  public_network_access_enabled = var.function_public_network_access_enabled
+  virtual_network_subnet_id     = var.subnet_delegation_id == "" ? azurerm_subnet.subnet_delegation[0].id : var.subnet_delegation_id
   site_config {
     vnet_route_all_enabled = true
+    dynamic "ip_restriction" {
+      for_each = range(local.create_private_function)
+      content {
+        virtual_network_subnet_id = data.azurerm_subnet.subnet.id
+        action                    = "Allow"
+        priority                  = 300
+        name                      = "VirtualNetwork"
+      }
+    }
   }
 
   app_settings = {

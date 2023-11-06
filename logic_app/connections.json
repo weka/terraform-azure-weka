@@ -1,0 +1,18 @@
+{
+  "serviceProviderConnections": {
+    "keyVault": {
+      "parameterValues": {
+        "VaultUri": "https://${keyvault_name}.vault.azure.net",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity"
+        }
+      },
+      "parameterSetName": "ManagedServiceIdentity",
+      "serviceProvider": {
+        "id": "/serviceProviders/keyVault"
+      },
+      "displayName": "keyvault-connection"
+    }
+  },
+  "managedApiConnections": {}
+}

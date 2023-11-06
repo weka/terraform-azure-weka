@@ -39,12 +39,6 @@ variable "subnet_name" {
   description = "Subnet name, if exist."
 }
 
-variable "private_network" { # tflint-ignore: terraform_unused_declarations
-  type        = bool
-  default     = false
-  description = "Determines whether to enable a private or public network. The default is public network."
-}
-
 variable "allow_ssh_ranges" {
   type        = list(string)
   description = "A list of IP addresses that can use ssh connection with a public network deployment."

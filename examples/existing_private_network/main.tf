@@ -6,23 +6,19 @@ provider "azurerm" {
 }
 
 module "weka_deployment" {
-  source                = "../.."
-  prefix                = "weka"
-  rg_name               = "weka-rg"
-  cluster_name          = "poc"
-  subnet_name           = "weka-subnet"
-  vnet_name             = "weka-vnet"
-  vnet_rg_name          = "weka-rg"
-  sg_id                 = "/subscriptions/../resourceGroups/../providers/Microsoft.Network/networkSecurityGroups/.."
-  apt_repo_server       = "http://11.0.0.4/ubuntu/mirror/archive.ubuntu.com/ubuntu/"
-  install_weka_url      = "..."
-  subnet_delegation_id  = "/subscriptions/../resourceGroups/../providers/Microsoft.Network/virtualNetworks/../subnets/.."
-  private_network       = true
-  assign_public_ip      = true
-  cluster_size          = 6
-  set_obs_integration   = true
-  tiering_ssd_percent   = 20
-  subscription_id       = var.subscription_id
-  private_dns_zone_name = "weka.private.net"
-  private_dns_rg_name   = "dns-weka-rg"
+  source                                 = "../.."
+  prefix                                 = "weka"
+  rg_name                                = "rg-name"
+  cluster_name                           = "poc"
+  subnet_name                            = "subnet-name"
+  vnet_name                              = "vnet-name"
+  vnet_rg_name                           = "vnet-rg-name"
+  sg_id                                  = "/subscriptions/../resourceGroups/../providers/Microsoft.Network/networkSecurityGroups/.."
+  install_weka_url                       = "https://wekatars.blob.core.windows.net/tars/weka-4.2.5.tar"
+  assign_public_ip                       = false
+  cluster_size                           = 6
+  set_obs_integration                    = true
+  subscription_id                        = var.subscription_id
+  weka_tar_storage_account_id            = "/subscriptions/../resourceGroups/../providers/Microsoft.Storage/storageAccounts/.."
+  function_public_network_access_enabled = false
 }
