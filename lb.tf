@@ -1,4 +1,11 @@
 # ================= ui lb =========================== #
+resource "azurerm_public_ip" "ui_lb_ip" {
+  name                = "${var.prefix}-${var.cluster_name}-ui-ip"
+  location            = local.location
+  resource_group_name = var.rg_name
+  allocation_method   = "Static"
+}
+
 resource "azurerm_lb" "ui_lb" {
   name                = "${var.prefix}-${var.cluster_name}-ui-lb"
   resource_group_name = var.rg_name
@@ -7,8 +14,9 @@ resource "azurerm_lb" "ui_lb" {
   frontend_ip_configuration {
     name                          = "${var.prefix}-${var.cluster_name}-ui-lb-frontend"
     subnet_id                     = data.azurerm_subnet.subnet.id
-    private_ip_address_allocation = "Dynamic"
-    private_ip_address_version    = "IPv4"
+    #private_ip_address_allocation = "Dynamic"
+    #private_ip_address_version    = "IPv4"
+    public_ip_address_id = azurerm_public_ip.ui_lb_ip.id
   }
   tags = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
   lifecycle {
@@ -49,6 +57,13 @@ resource "azurerm_lb_rule" "ui_lb_rule" {
 }
 
 # ================= backend lb =========================== #
+resource "azurerm_public_ip" "lb_ip" {
+  name                = "${var.prefix}-${var.cluster_name}-ip"
+  location            = local.location
+  resource_group_name = var.rg_name
+  allocation_method   = "Static"
+}
+
 resource "azurerm_lb" "backend_lb" {
   name                = "${var.prefix}-${var.cluster_name}-backend-lb"
   resource_group_name = var.rg_name
@@ -56,10 +71,10 @@ resource "azurerm_lb" "backend_lb" {
   sku                 = "Standard"
   tags                = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
   frontend_ip_configuration {
-    name                          = "${var.prefix}-${var.cluster_name}-backend-lb-frontend"
-    subnet_id                     = data.azurerm_subnet.subnet.id
-    private_ip_address_allocation = "Dynamic"
-    private_ip_address_version    = "IPv4"
+    name                 = "${var.prefix}-${var.cluster_name}-backend-lb-frontend"
+    subnet_id            = data.azurerm_subnet.subnet.id
+   # name                 = "PublicIPAddress"
+    public_ip_address_id = azurerm_public_ip.lb_ip.id
   }
   lifecycle {
     ignore_changes = [tags]
