@@ -7,11 +7,11 @@ resource "azurerm_storage_account" "logicapp" {
 }
 
 resource "azurerm_subnet" "logicapp_subnet_delegation" {
-  count                = var.logicapp_subnet_delegation_id == "" ? 1 : 0
+  count                = var.logic_app_subnet_delegation_id == "" ? 1 : 0
   name                 = "${var.prefix}-${var.cluster_name}-logicapp-delegation"
   resource_group_name  = local.vnet_rg_name
   virtual_network_name = local.vnet_name
-  address_prefixes     = [var.logicapp_subnet_delegation_cdir]
+  address_prefixes     = [var.logic_app_subnet_delegation_cidr]
   service_endpoints    = ["Microsoft.KeyVault", "Microsoft.Web"]
   delegation {
     name = "logic-delegation"
@@ -59,7 +59,7 @@ resource "azurerm_logic_app_standard" "logic_app_standard" {
     "FUNCTIONS_WORKER_RUNTIME"     = "node"
     "WEBSITE_NODE_DEFAULT_VERSION" = "~18"
   }
-  virtual_network_subnet_id = var.logicapp_subnet_delegation_id == "" ? azurerm_subnet.logicapp_subnet_delegation[0].id : var.logicapp_subnet_delegation_id
+  virtual_network_subnet_id = var.logic_app_subnet_delegation_id == "" ? azurerm_subnet.logicapp_subnet_delegation[0].id : var.logic_app_subnet_delegation_id
   depends_on                = [azurerm_service_plan.logicapp_service_plan, azurerm_subnet.logicapp_subnet_delegation, azurerm_storage_account.logicapp]
   lifecycle {
     ignore_changes = [site_config]
@@ -113,16 +113,25 @@ locals {
 resource "local_file" "scale_down_workflow_file" {
   content  = local.scale_down_workflow
   filename = "/tmp/scale-down.json"
+  lifecycle {
+    ignore_changes = [content]
+  }
 }
 
 resource "local_file" "scale_up_workflow_file" {
   content  = local.scale_up_workflow
   filename = "/tmp/scale-up.json"
+  lifecycle {
+    ignore_changes = [content]
+  }
 }
 
 resource "local_file" "connections_workflow_file" {
   content  = local.connections_workflow
   filename = "/tmp/connections.json"
+  lifecycle {
+    ignore_changes = [content]
+  }
 }
 
 resource "azurerm_storage_share_file" "scale_down_share_file" {

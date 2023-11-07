@@ -48,7 +48,7 @@ resource "azurerm_subnet" "subnet" {
 
 # ====================== sg ssh ========================== #
 resource "azurerm_network_security_rule" "sg_public_ssh" {
-  count                       = length(var.allow_ssh_ranges)
+  count                       = var.sg_id == "" ?  length(var.allow_ssh_cidrs) : 0
   name                        = "${var.prefix}-ssh-sg-${count.index}"
   resource_group_name         = data.azurerm_resource_group.rg.name
   priority                    = 100 + (count.index + 1)
@@ -57,14 +57,14 @@ resource "azurerm_network_security_rule" "sg_public_ssh" {
   protocol                    = "Tcp"
   source_port_range           = "*"
   destination_port_range      = "22"
-  source_address_prefix       = element(var.allow_ssh_ranges, count.index)
+  source_address_prefix       = element(var.allow_ssh_cidrs, count.index)
   destination_address_prefix  = "*"
-  network_security_group_name = azurerm_network_security_group.sg.name
+  network_security_group_name = azurerm_network_security_group.sg[0].name
 }
 
 # ====================== sg  ========================== #
 resource "azurerm_network_security_rule" "sg_weka_ui" {
-  count                       = length(var.allow_weka_api_ranges)
+  count                       = var.sg_id == "" ? length(var.allow_weka_api_cidrs) : 0
   name                        = "${var.prefix}-ui-sg-${count.index}"
   resource_group_name         = data.azurerm_resource_group.rg.name
   priority                    = 200 + (count.index + 1)
@@ -73,12 +73,28 @@ resource "azurerm_network_security_rule" "sg_weka_ui" {
   protocol                    = "Tcp"
   source_port_range           = "*"
   destination_port_range      = "14000"
-  source_address_prefix       = element(var.allow_weka_api_ranges, count.index)
+  source_address_prefix       = element(var.allow_weka_api_cidrs, count.index)
   destination_address_prefix  = "*"
-  network_security_group_name = azurerm_network_security_group.sg.name
+  network_security_group_name = azurerm_network_security_group.sg[0].name
+}
+
+resource "azurerm_network_security_rule" "sg_deny_outbound_internet" {
+  count                       = var.subnet_autocreate_as_private && var.sg_id == "" ? 1 : 0
+  name                        = "${var.prefix}-deny-outbound-internet"
+  resource_group_name         = data.azurerm_resource_group.rg.name
+  priority                    = 100
+  direction                   = "Outbound"
+  access                      = "Deny"
+  protocol                    = "*"
+  source_port_range           = "*"
+  source_address_prefix       = "*"
+  destination_port_range      = "*"
+  destination_address_prefix  = "Internet"
+  network_security_group_name = azurerm_network_security_group.sg[0].name
 }
 
 resource "azurerm_network_security_group" "sg" {
+  count               = var.sg_id == "" ? 1 : 0
   name                = "${var.prefix}-sg"
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = data.azurerm_resource_group.rg.name
@@ -91,9 +107,9 @@ resource "azurerm_network_security_group" "sg" {
 }
 
 resource "azurerm_subnet_network_security_group_association" "sg_association" {
-  count                     = var.subnet_name == "" ? 1 : 0
+  count                     = var.sg_id == "" ? 0 : length(azurerm_subnet.subnet)
   subnet_id                 = azurerm_subnet.subnet[count.index].id
-  network_security_group_id = azurerm_network_security_group.sg.id
+  network_security_group_id = azurerm_network_security_group.sg[0].id
   depends_on                = [azurerm_network_security_group.sg]
 }
 
@@ -114,8 +130,8 @@ resource "azurerm_private_dns_zone_virtual_network_link" "dns_vnet_link" {
   resource_group_name   = data.azurerm_resource_group.rg.name
   private_dns_zone_name = azurerm_private_dns_zone.dns[0].name
   virtual_network_id    = var.vnet_name != "" ? data.azurerm_virtual_network.vnet_data[0].id : azurerm_virtual_network.vnet[0].id
-  registration_enabled  = true
   lifecycle {
     ignore_changes = [tags]
   }
+  depends_on = [azurerm_private_dns_zone.dns,azurerm_virtual_network.vnet]
 }

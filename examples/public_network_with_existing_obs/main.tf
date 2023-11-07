@@ -6,18 +6,17 @@ provider "azurerm" {
 }
 
 module "weka_deployment" {
-  source                = "../.."
-  prefix                = "weka"
-  rg_name               = "weka-rg"
-  cluster_name          = "poc"
-  cluster_size          = 6
-  allow_ssh_ranges      = ["0.0.0.0/0"]
-  allow_weka_api_ranges = ["0.0.0.0/0"]
-  subscription_id       = var.subscription_id
-  get_weka_io_token     = var.get_weka_io_token
-  set_obs_integration   = true
-  obs_name              = "obs"
-  obs_container_name    = "obs-container"
-  blob_obs_access_key   = "..."
-  tiering_ssd_percent   = 20
+  source                         = "../.."
+  prefix                         = "weka"
+  rg_name                        = "weka-rg"
+  cluster_name                   = "poc"
+  cluster_size                   = 6
+  allow_ssh_cidrs                = ["0.0.0.0/0"]
+  allow_weka_api_cidrs           = ["0.0.0.0/0"]
+  subscription_id                = var.subscription_id
+  get_weka_io_token              = var.get_weka_io_token
+  tiering_enable_obs_integration = true
+  tiering_obs_name               = "obs"
+  tiering_obs_container_name     = "obs-container"
+  tiering_blob_obs_access_key    = "..."
 }

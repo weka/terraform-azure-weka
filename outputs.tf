@@ -1,6 +1,6 @@
 locals {
   key_vault_name       = azurerm_key_vault.key_vault.name
-  vm_ips               = var.assign_public_ip ? "az vmss list-instance-public-ips -g ${var.rg_name} --name ${azurerm_linux_virtual_machine_scale_set.vmss.name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n" : "az vmss nic list -g ${var.rg_name} --vmss-name ${azurerm_linux_virtual_machine_scale_set.vmss.name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress"
+  vm_ips               = var.assign_public_ip ? "az vmss list-instance-public-ips -g ${var.rg_name} --name ${azurerm_linux_virtual_machine_scale_set.vmss.name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n" : "az vmss nic list -g ${var.rg_name} --vmss-name ${azurerm_linux_virtual_machine_scale_set.vmss.name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress \n"
   ssh_keys_commands    = "########################################## Download ssh keys command from blob ###########################################################\n az keyvault secret download --file private.pem --encoding utf-8 --vault-name  ${local.key_vault_name} --name private-key --query \"value\" \n az keyvault secret download --file public.pub --encoding utf-8 --vault-name  ${local.key_vault_name} --name public-key --query \"value\"\n"
   blob_commands        = var.ssh_public_key == null ? local.ssh_keys_commands : ""
   private_ssh_key_path = var.ssh_public_key == null ? local.ssh_private_key_path : null
@@ -27,11 +27,13 @@ output "functions_url" {
 }
 
 output "function_app_name" {
-  value = local.function_app_name
+  value       = local.function_app_name
+  description = "Function app name"
 }
 
 output "function_key_name" {
-  value = "functionKeys"
+  value       = "functionKeys"
+  description = "Function app key name"
 }
 
 output "ssh_user" {
@@ -40,7 +42,8 @@ output "ssh_user" {
 }
 
 output "backend_ips" {
-  value = local.vm_ips
+  value       = local.vm_ips
+  description = "If 'assign_public_ip' is set to true, it will output the public ips, If no it will output the private ips"
 }
 
 output "client_ips" {
@@ -59,11 +62,13 @@ output "smb_protocol_gateway_ips" {
 }
 
 output "private_ssh_key" {
-  value = local.private_ssh_key_path
+  value       = local.private_ssh_key_path
+  description = "If 'ssh_public_key' is set to null and no file provided, it will output the private ssh key location."
 }
 
 output "key_vault_name" {
-  value = local.key_vault_name
+  value       = local.key_vault_name
+  description = "Keyault name"
 }
 
 output "cluster_helper_commands" {

@@ -39,15 +39,15 @@ variable "subnet_name" {
   description = "Subnet name, if exist."
 }
 
-variable "allow_ssh_ranges" {
+variable "allow_ssh_cidrs" {
   type        = list(string)
-  description = "A list of IP addresses that can use ssh connection with a public network deployment."
+  description = "Allow port 22, if not provided, i.e leaving the default empty list, the rule will not be included in the SG"
   default     = []
 }
 
-variable "allow_weka_api_ranges" {
+variable "allow_weka_api_cidrs" {
   type        = list(string)
-  description = "Allow port 14000, if not provided, i.e leaving the default empty list, the rule will not be included in the SG"
+  description = "Allow connection to port 14000 on weka backends from specified CIDRs, by default no CIDRs are allowed. All ports (including 14000) are allowed within Vnet"
   default     = []
 }
 
@@ -66,5 +66,17 @@ variable "private_dns_rg_name" {
 variable "private_dns_zone_name" {
   type        = string
   description = "The private DNS zone name."
+  default     = ""
+}
+
+variable "subnet_autocreate_as_private" {
+  type        = bool
+  default     = false
+  description = "Create private subnet without outbound to internet route traffic. The default is public network. Relevant only when sg_id is empty."
+}
+
+variable "sg_id" {
+  type        = string
+  description = "The security group id."
   default     = ""
 }
