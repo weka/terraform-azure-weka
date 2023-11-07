@@ -12,7 +12,7 @@ resource "azurerm_subnet" "logicapp_subnet_delegation" {
   resource_group_name  = local.vnet_rg_name
   virtual_network_name = local.vnet_name
   address_prefixes     = [var.logicapp_subnet_delegation_cdir]
-  service_endpoints    = ["Microsoft.KeyVault","Microsoft.Web"]
+  service_endpoints    = ["Microsoft.KeyVault", "Microsoft.Web"]
   delegation {
     name = "logic-delegation"
     service_delegation {
@@ -169,4 +169,3 @@ resource "azurerm_role_assignment" "logic_app_standard_reader_smb_data" {
   principal_id         = azurerm_logic_app_standard.logic_app_standard.identity[0].principal_id
   depends_on           = [azurerm_logic_app_standard.logic_app_standard, azurerm_storage_account.logicapp]
 }
-

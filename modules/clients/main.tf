@@ -9,7 +9,7 @@ data "azurerm_subnet" "subnet" {
 }
 
 locals {
-  first_nic_ids = var.assign_public_ip ? azurerm_network_interface.public_first_nic.*.id : azurerm_network_interface.private_first_nic.*.id
+  first_nic_ids = var.assign_public_ip ? azurerm_network_interface.public_first_nic[*].id : azurerm_network_interface.private_first_nic[*].id
   preparation_script = templatefile("${path.module}/init.sh", {
     apt_repo_server = var.apt_repo_server
     nics_num        = var.nics_numbers
@@ -110,7 +110,7 @@ resource "azurerm_linux_virtual_machine" "this" {
   size                = var.instance_type
   network_interface_ids = concat([
     local.first_nic_ids[count.index]
-  ], slice(azurerm_network_interface.private_nics.*.id, (var.nics_numbers - 1) * count.index, (var.nics_numbers - 1) * (count.index + 1)))
+  ], slice(azurerm_network_interface.private_nics[*].id, (var.nics_numbers - 1) * count.index, (var.nics_numbers - 1) * (count.index + 1)))
 
   proximity_placement_group_id    = var.ppg_id
   disable_password_authentication = true
