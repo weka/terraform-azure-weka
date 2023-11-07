@@ -40,7 +40,7 @@ data "azurerm_storage_account" "deployment_blob" {
 }
 
 data "azurerm_storage_account" "obs_sa" {
-  count               = var.obs_name != "" ? 1 : 0
-  name                = var.obs_name
+  count               = var.tiering_obs_name != "" ? 1 : 0
+  name                = var.tiering_obs_name
   resource_group_name = var.rg_name
 }

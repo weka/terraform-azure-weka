@@ -1,5 +1,5 @@
 locals {
-  create_private_function          = var.function_public_network_access_enabled ? 0 : 1
+  create_private_function          = var.function_access_restriction_enabled ? 1 : 0
   stripe_width_calculated          = var.cluster_size - var.protection_level - 1
   stripe_width                     = local.stripe_width_calculated < 16 ? local.stripe_width_calculated : 16
   location                         = data.azurerm_resource_group.rg.location
@@ -8,14 +8,14 @@ locals {
   weka_sa_container                = "${var.function_app_storage_account_container_prefix}${local.location}"
   function_code_path               = "${path.module}/function-app/code"
   function_app_code_hash           = md5(join("", [for f in fileset(local.function_code_path, "**") : filemd5("${local.function_code_path}/${f}")]))
-  get_compute_memory_index         = var.add_frontend_container ? 1 : 0
+  get_compute_memory_index         = var.set_dedicated_fe_container ? 1 : 0
   deployment_storage_account_id    = var.deployment_storage_account_name == "" ? azurerm_storage_account.deployment_sa[0].id : data.azurerm_storage_account.deployment_blob[0].id
   deployment_storage_account_name  = var.deployment_storage_account_name == "" ? azurerm_storage_account.deployment_sa[0].name : var.deployment_storage_account_name
   deployment_container_name        = var.deployment_container_name == "" ? azurerm_storage_container.deployment[0].name : var.deployment_container_name
   deployment_storage_account_scope = "${local.deployment_storage_account_id}/blobServices/default/containers/${local.deployment_container_name}"
-  obs_storage_account_name         = var.obs_name == "" ? "${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}obs" : var.obs_name
-  obs_container_name               = var.obs_container_name == "" ? "${var.prefix}-${var.cluster_name}-obs" : var.obs_container_name
-  obs_scope                        = var.obs_name != "" ? "${data.azurerm_storage_account.obs_sa[0].id}/blobServices/default/containers/${local.obs_container_name}" : ""
+  obs_storage_account_name         = var.tiering_obs_name == "" ? "${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}obs" : var.tiering_obs_name
+  obs_container_name               = var.tiering_obs_container_name == "" ? "${var.prefix}-${var.cluster_name}-obs" : var.tiering_obs_container_name
+  obs_scope                        = var.tiering_obs_name != "" ? "${data.azurerm_storage_account.obs_sa[0].id}/blobServices/default/containers/${local.obs_container_name}" : ""
   function_app_name                = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-function-app"
   install_weka_url                 = var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.weka.io/dist/v1/install/${var.weka_version}/${var.weka_version}"
 }
@@ -82,11 +82,11 @@ resource "azurerm_service_plan" "app_service_plan" {
 }
 
 resource "azurerm_subnet" "subnet_delegation" {
-  count                = var.subnet_delegation_id == "" ? 1 : 0
+  count                = var.function_app_subnet_delegation_id == "" ? 1 : 0
   name                 = "${var.prefix}-${var.cluster_name}-subnet-delegation"
   resource_group_name  = local.vnet_rg_name
   virtual_network_name = local.vnet_name
-  address_prefixes     = [var.subnet_delegation]
+  address_prefixes     = [var.function_app_subnet_delegation_cidr]
   service_endpoints    = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.Web"]
   delegation {
     name = "subnet-delegation"
@@ -98,15 +98,14 @@ resource "azurerm_subnet" "subnet_delegation" {
 }
 
 resource "azurerm_linux_function_app" "function_app" {
-  name                          = local.function_app_name
-  resource_group_name           = data.azurerm_resource_group.rg.name
-  location                      = data.azurerm_resource_group.rg.location
-  service_plan_id               = azurerm_service_plan.app_service_plan.id
-  storage_account_name          = local.deployment_storage_account_name
-  storage_account_access_key    = var.deployment_storage_account_access_key == "" ? azurerm_storage_account.deployment_sa[0].primary_access_key : var.deployment_storage_account_access_key
-  https_only                    = true
-  public_network_access_enabled = var.function_public_network_access_enabled
-  virtual_network_subnet_id     = var.subnet_delegation_id == "" ? azurerm_subnet.subnet_delegation[0].id : var.subnet_delegation_id
+  name                       = local.function_app_name
+  resource_group_name        = data.azurerm_resource_group.rg.name
+  location                   = data.azurerm_resource_group.rg.location
+  service_plan_id            = azurerm_service_plan.app_service_plan.id
+  storage_account_name       = local.deployment_storage_account_name
+  storage_account_access_key = var.deployment_storage_account_access_key == "" ? azurerm_storage_account.deployment_sa[0].primary_access_key : var.deployment_storage_account_access_key
+  https_only                 = true
+  virtual_network_subnet_id  = var.function_app_subnet_delegation_id == "" ? azurerm_subnet.subnet_delegation[0].id : var.function_app_subnet_delegation_id
   site_config {
     vnet_route_all_enabled = true
     dynamic "ip_restriction" {
@@ -115,6 +114,15 @@ resource "azurerm_linux_function_app" "function_app" {
         virtual_network_subnet_id = data.azurerm_subnet.subnet.id
         action                    = "Allow"
         priority                  = 300
+        name                      = "VirtualNetwork"
+      }
+    }
+    dynamic "ip_restriction" {
+      for_each = range(local.create_private_function)
+      content {
+        virtual_network_subnet_id = var.logic_app_subnet_delegation_id == "" ? azurerm_subnet.logicapp_subnet_delegation[0].id : var.logic_app_subnet_delegation_id
+        action                    = "Allow"
+        priority                  = 301
         name                      = "VirtualNetwork"
       }
     }
@@ -133,17 +141,17 @@ resource "azurerm_linux_function_app" "function_app" {
     "SUBSCRIPTION_ID"                = data.azurerm_subscription.primary.subscription_id
     "RESOURCE_GROUP_NAME"            = data.azurerm_resource_group.rg.name
     "LOCATION"                       = data.azurerm_resource_group.rg.location
-    "SET_OBS"                        = var.set_obs_integration
+    "SET_OBS"                        = var.tiering_enable_obs_integration
     "SMBW_ENABLED"                   = var.smbw_enabled
     "OBS_NAME"                       = local.obs_storage_account_name
     "OBS_CONTAINER_NAME"             = local.obs_container_name
-    "OBS_ACCESS_KEY"                 = var.blob_obs_access_key
+    "OBS_ACCESS_KEY"                 = var.tiering_blob_obs_access_key
     NUM_DRIVE_CONTAINERS             = var.container_number_map[var.instance_type].drive
-    NUM_COMPUTE_CONTAINERS           = var.add_frontend_container == false ? var.container_number_map[var.instance_type].compute + 1 : var.container_number_map[var.instance_type].compute
-    NUM_FRONTEND_CONTAINERS          = var.add_frontend_container == false ? 0 : var.container_number_map[var.instance_type].frontend
+    NUM_COMPUTE_CONTAINERS           = var.set_dedicated_fe_container == false ? var.container_number_map[var.instance_type].compute + 1 : var.container_number_map[var.instance_type].compute
+    NUM_FRONTEND_CONTAINERS          = var.set_dedicated_fe_container == false ? 0 : var.container_number_map[var.instance_type].frontend
     COMPUTE_MEMORY                   = var.container_number_map[var.instance_type].memory[local.get_compute_memory_index]
     "NVMES_NUM"                      = var.container_number_map[var.instance_type].nvme
-    "TIERING_SSD_PERCENT"            = var.tiering_ssd_percent
+    "TIERING_SSD_PERCENT"            = var.tiering_enable_ssd_percent
     "PREFIX"                         = var.prefix
     "KEY_VAULT_URI"                  = azurerm_key_vault.key_vault.vault_uri
     "INSTALL_DPDK"                   = var.install_cluster_dpdk
@@ -175,7 +183,7 @@ resource "azurerm_linux_function_app" "function_app" {
     ignore_changes = [site_config, tags]
   }
 
-  depends_on = [module.network, azurerm_storage_account.deployment_sa]
+  depends_on = [module.network, azurerm_storage_account.deployment_sa, azurerm_subnet.logicapp_subnet_delegation]
 }
 
 data "azurerm_subscription" "primary" {}
@@ -195,7 +203,7 @@ resource "azurerm_role_assignment" "storage_account_contributor" {
 }
 
 resource "azurerm_role_assignment" "obs_storage_blob_data_contributor" {
-  count                = var.obs_name != "" ? 1 : 0
+  count                = var.tiering_obs_name != "" ? 1 : 0
   scope                = local.obs_scope
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id

@@ -9,7 +9,7 @@ output "subnet_name" {
 }
 
 output "sg_id" {
-  value       = azurerm_network_security_group.sg.id
+  value       = var.sg_id == "" ? azurerm_network_security_group.sg[0].id : var.sg_id
   description = "Displays the security group id."
 }
 

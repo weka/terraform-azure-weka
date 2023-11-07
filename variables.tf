@@ -25,15 +25,15 @@ variable "subnet_prefix" {
   default     = "10.0.2.0/24"
 }
 
-variable "allow_ssh_ranges" {
+variable "allow_ssh_cidrs" {
   type        = list(string)
   description = "Allow port 22, if not provided, i.e leaving the default empty list, the rule will not be included in the SG"
   default     = []
 }
 
-variable "allow_weka_api_ranges" {
+variable "allow_weka_api_cidrs" {
   type        = list(string)
-  description = "Allow port 14000, if not provided, i.e leaving the default empty list, the rule will not be included in the SG"
+  description = "Allow connection to port 14000 on weka backends from specified CIDRs, by default no CIDRs are allowed. All ports (including 14000) are allowed within Vnet"
   default     = []
 }
 
@@ -45,7 +45,7 @@ variable "address_space" {
 
 variable "vm_username" {
   type        = string
-  description = "The user name for logging in to the virtual machines."
+  description = "Provided as part of output for automated use of terraform, in case of custom AMI and automated use of outputs replace this with user that should be used for ssh connection"
   default     = "weka"
 }
 
@@ -65,6 +65,12 @@ variable "subnet_name" {
   type        = string
   description = "The subnet name."
   default     = ""
+}
+
+variable "subnet_autocreate_as_private" {
+  type        = bool
+  default     = false
+  description = "Create private subnet without outbound to internet route traffic. The default is public network. Relevant only when sg_id is empty."
 }
 
 variable "cluster_size" {
@@ -90,16 +96,28 @@ variable "sg_id" {
   default     = ""
 }
 
-variable "subnet_delegation" {
+variable "function_app_subnet_delegation_cidr" {
   type        = string
   description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service."
   default     = "10.0.1.0/25"
 }
 
-variable "subnet_delegation_id" {
+variable "function_app_subnet_delegation_id" {
   type        = string
-  description = "Subnet delegation id"
+  description = "Required to specify if subnet_name were used to specify pre-defined subnets for weka. Function subnet delegation requires an additional subnet, and in the case of pre-defined networking this one also should be pre-defined"
   default     = ""
+}
+
+variable "logic_app_subnet_delegation_id" {
+  type        = string
+  default     = ""
+  description = "Required to specify if subnet_name were used to specify pre-defined subnets for weka. Logicapp subnet delegation requires an additional subnet, and in the case of pre-defined networking this one also should be pre-defined"
+}
+
+variable "logic_app_subnet_delegation_cidr" {
+  type        = string
+  default     = "10.0.3.0/25"
+  description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service."
 }
 
 variable "weka_version" {
@@ -140,7 +158,7 @@ variable "ssh_public_key" {
 variable "assign_public_ip" {
   type        = bool
   default     = true
-  description = "Determines whether to assign public ip."
+  description = "Determines whether to assign public IP to all instances deployed by TF module. Includes backends, clients and protocol gateways."
 }
 
 variable "install_weka_url" {
@@ -274,7 +292,7 @@ variable "stripe_width" {
 variable "hotspare" {
   type        = number
   default     = 1
-  description = "Hot-spare value."
+  description = "Number of hotspares to set on weka cluster. Refer to https://docs.weka.io/overview/ssd-capacity-management#hot-spare"
 }
 
 variable "function_app_log_level" {
@@ -323,42 +341,42 @@ variable "install_cluster_dpdk" {
   description = "Install weka cluster with DPDK"
 }
 
-variable "add_frontend_container" {
+variable "set_dedicated_fe_container" {
   type        = bool
   default     = true
   description = "Create cluster with FE containers"
 }
 
 ################################################## obs variables ###################################################
-variable "obs_name" {
+variable "tiering_obs_name" {
   type        = string
   default     = ""
   description = "Name of existing obs storage account"
 }
 
-variable "obs_container_name" {
-  type        = string
-  default     = ""
-  description = "Name of existing obs conatiner name"
-}
-
-variable "set_obs_integration" {
+variable "tiering_enable_obs_integration" {
   type        = bool
   default     = false
   description = "Determines whether to enable object stores integration with the Weka cluster. Set true to enable the integration."
 }
 
-variable "blob_obs_access_key" {
+variable "tiering_enable_ssd_percent" {
+  type        = number
+  default     = 20
+  description = "When set_obs_integration is true, this variable sets the capacity percentage of the filesystem that resides on SSD. For example, for an SSD with a total capacity of 20GB, and the tiering_ssd_percent is set to 20, the total available capacity is 100GB."
+}
+
+variable "tiering_obs_container_name" {
+  type        = string
+  default     = ""
+  description = "Name of existing obs conatiner name"
+}
+
+variable "tiering_blob_obs_access_key" {
   type        = string
   description = "The access key of the existing Blob object store container."
   sensitive   = true
   default     = ""
-}
-
-variable "tiering_ssd_percent" {
-  type        = number
-  default     = 20
-  description = "When set_obs_integration is true, this variable sets the capacity percentage of the filesystem that resides on SSD. For example, for an SSD with a total capacity of 20GB, and the tiering_ssd_percent is set to 20, the total available capacity is 100GB."
 }
 
 ############################### clients ############################
@@ -374,16 +392,28 @@ variable "client_instance_type" {
   default     = "Standard_D8_v5"
 }
 
+variable "client_source_image_id" {
+  type        = string
+  default     = "/communityGalleries/WekaIO-d7d3f308-d5a1-4c45-8e8a-818aed57375a/images/ubuntu20.04/versions/latest"
+  description = "Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1"
+}
+
+variable "clients_use_dpdk" {
+  type        = bool
+  default     = true
+  description = "Mount weka clients in DPDK mode"
+}
+
+variable "client_placement_group_id" {
+  type        = string
+  description = "The client instances placement group id. Backend placement group can be reused. If not specified placement group will be created automatically"
+  default     = ""
+}
+
 variable "client_nics_num" {
   type        = number
   description = "The client NICs number."
   default     = 2
-}
-
-variable "mount_clients_dpdk" {
-  type        = bool
-  default     = true
-  description = "Mount weka clients in DPDK mode"
 }
 
 variable "placement_group_id" {
@@ -558,22 +588,11 @@ variable "weka_home_url" {
 
 #### private blob
 variable "weka_tar_storage_account_id" {
-  type    = string
   default = ""
 }
 
-variable "logicapp_subnet_delegation_id" {
-  type    = string
-  default = ""
-}
-
-variable "logicapp_subnet_delegation_cdir" {
-  type    = string
-  default = "10.0.6.0/24"
-}
-
-variable "function_public_network_access_enabled" {
+variable "function_access_restriction_enabled" {
   type        = bool
-  default     = true
-  description = "Allow public access, Access restrictions apply to inbound access only"
+  default     = false
+  description = "Allow public access, Access restrictions apply to inbound access to internal vent"
 }
