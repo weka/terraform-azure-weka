@@ -108,8 +108,8 @@ resource "azurerm_network_interface_security_group_association" "secondary_gatew
 
 locals {
   disk_size             = var.disk_size + var.traces_per_frontend * var.frontend_cores_num
-  first_nic_ids         = var.assign_public_ip ? azurerm_network_interface.primary_gateway_nic_public.*.id : azurerm_network_interface.primary_gateway_nic_private.*.id
-  first_nic_private_ips = var.assign_public_ip ? azurerm_network_interface.primary_gateway_nic_public.*.private_ip_address : azurerm_network_interface.primary_gateway_nic_private.*.private_ip_address
+  first_nic_ids         = var.assign_public_ip ? azurerm_network_interface.primary_gateway_nic_public[*].id : azurerm_network_interface.primary_gateway_nic_private[*].id
+  first_nic_private_ips = var.assign_public_ip ? azurerm_network_interface.primary_gateway_nic_public[*].private_ip_address : azurerm_network_interface.primary_gateway_nic_private[*].private_ip_address
 
   init_script = templatefile("${path.module}/init.sh", {
     apt_repo_server  = var.apt_repo_server
@@ -173,7 +173,7 @@ resource "azurerm_linux_virtual_machine" "this" {
 
   network_interface_ids = concat(
     [local.first_nic_ids[count.index]],
-    slice(azurerm_network_interface.secondary_gateway_nic.*.id, (var.nics_numbers - 1) * count.index, (var.nics_numbers - 1) * (count.index + 1))
+    slice(azurerm_network_interface.secondary_gateway_nic[*].id, (var.nics_numbers - 1) * count.index, (var.nics_numbers - 1) * (count.index + 1))
   )
 
   os_disk {

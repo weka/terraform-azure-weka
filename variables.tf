@@ -558,6 +558,7 @@ variable "weka_home_url" {
 
 #### private blob
 variable "weka_tar_storage_account_id" {
+  type    = string
   default = ""
 }
 
