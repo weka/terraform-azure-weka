@@ -48,7 +48,7 @@ resource "azurerm_subnet" "subnet" {
 
 # ====================== sg ssh ========================== #
 resource "azurerm_network_security_rule" "sg_public_ssh" {
-  count                       = var.sg_id == "" ?  length(var.allow_ssh_cidrs) : 0
+  count                       = var.sg_id == "" ? length(var.allow_ssh_cidrs) : 0
   name                        = "${var.prefix}-ssh-sg-${count.index}"
   resource_group_name         = data.azurerm_resource_group.rg.name
   priority                    = 100 + (count.index + 1)
@@ -133,5 +133,5 @@ resource "azurerm_private_dns_zone_virtual_network_link" "dns_vnet_link" {
   lifecycle {
     ignore_changes = [tags]
   }
-  depends_on = [azurerm_private_dns_zone.dns,azurerm_virtual_network.vnet]
+  depends_on = [azurerm_private_dns_zone.dns, azurerm_virtual_network.vnet]
 }
