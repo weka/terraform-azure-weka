@@ -382,4 +382,5 @@ proxy_url = VALUE
 | <a name="output_private_ssh_key"></a> [private\_ssh\_key](#output\_private\_ssh\_key) | If 'ssh\_public\_key' is set to null and no file provided, it will output the private ssh key location. |
 | <a name="output_smb_protocol_gateway_ips"></a> [smb\_protocol\_gateway\_ips](#output\_smb\_protocol\_gateway\_ips) | If 'private\_network' is set to false, it will output smb protocol gateway public ips, otherwise private ips. |
 | <a name="output_ssh_user"></a> [ssh\_user](#output\_ssh\_user) | ssh user for weka cluster |
+| <a name="output_vmss_name"></a> [vmss\_name](#output\_vmss\_name) | n/a |
 <!-- END_TF_DOCS -->
