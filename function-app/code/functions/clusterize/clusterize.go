@@ -245,7 +245,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	protectionLevel, _ := strconv.Atoi(os.Getenv("PROTECTION_LEVEL"))
 	hotspare, _ := strconv.Atoi(os.Getenv("HOTSPARE"))
 	installDpdk, _ := strconv.ParseBool(os.Getenv("INSTALL_DPDK"))
-	addFrontendNum, _ := strconv.Atoi(os.Getenv("NUM_FRONTEND_CONTAINERS"))
+	addFrontendNum, _ := strconv.Atoi(os.Getenv("FRONTEND_CONTAINER_CORES_NUM"))
 	functionAppName := os.Getenv("FUNCTION_APP_NAME")
 	proxyUrl := os.Getenv("PROXY_URL")
 	wekaHomeUrl := os.Getenv("WEKA_HOME_URL")

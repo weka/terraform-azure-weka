@@ -4,12 +4,12 @@ locals {
   ssh_public_key_path       = "${local.ssh_path}-public-key.pub"
   ssh_private_key_path      = "${local.ssh_path}-private-key.pem"
   public_ssh_key            = var.ssh_public_key == null ? tls_private_key.ssh_key[0].public_key_openssh : var.ssh_public_key
-  disk_size                 = var.default_disk_size + var.traces_per_ionode * (var.container_number_map[var.instance_type].compute + var.container_number_map[var.instance_type].drive + var.container_number_map[var.instance_type].frontend)
+  disk_size                 = var.default_disk_size + var.traces_per_ionode * (var.containers_config_map[var.instance_type].compute + var.containers_config_map[var.instance_type].drive + var.containers_config_map[var.instance_type].frontend)
   private_nic_first_index   = var.assign_public_ip ? 1 : 0
   alphanumeric_cluster_name = lower(replace(var.cluster_name, "/\\W|_|\\s/", ""))
   alphanumeric_prefix_name  = lower(replace(var.prefix, "/\\W|_|\\s/", ""))
   subnet_range              = data.azurerm_subnet.subnet.address_prefix
-  nics_numbers              = var.install_cluster_dpdk ? var.container_number_map[var.instance_type].nics : 1
+  nics_numbers              = var.install_cluster_dpdk ? var.containers_config_map[var.instance_type].nics : 1
   custom_data_script = templatefile("${path.module}/user-data.sh", {
     apt_repo_server          = var.apt_repo_server
     user                     = var.vm_username

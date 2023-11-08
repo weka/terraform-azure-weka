@@ -146,16 +146,16 @@ resource "azurerm_linux_function_app" "function_app" {
     "OBS_NAME"                       = local.obs_storage_account_name
     "OBS_CONTAINER_NAME"             = local.obs_container_name
     "OBS_ACCESS_KEY"                 = var.tiering_blob_obs_access_key
-    NUM_DRIVE_CONTAINERS             = var.container_number_map[var.instance_type].drive
-    NUM_COMPUTE_CONTAINERS           = var.set_dedicated_fe_container == false ? var.container_number_map[var.instance_type].compute + 1 : var.container_number_map[var.instance_type].compute
-    NUM_FRONTEND_CONTAINERS          = var.set_dedicated_fe_container == false ? 0 : var.container_number_map[var.instance_type].frontend
-    COMPUTE_MEMORY                   = var.container_number_map[var.instance_type].memory[local.get_compute_memory_index]
-    "NVMES_NUM"                      = var.container_number_map[var.instance_type].nvme
+    DRIVE_CONTAINER_CORES_NUM        = var.containers_config_map[var.instance_type].drive
+    COMPUTE_CONTAINER_CORES_NUM      = var.set_dedicated_fe_container == false ? var.containers_config_map[var.instance_type].compute + 1 : var.containers_config_map[var.instance_type].compute
+    FRONTEND_CONTAINER_CORES_NUM     = var.set_dedicated_fe_container == false ? 0 : var.containers_config_map[var.instance_type].frontend
+    COMPUTE_MEMORY                   = var.containers_config_map[var.instance_type].memory[local.get_compute_memory_index]
+    "NVMES_NUM"                      = var.containers_config_map[var.instance_type].nvme
     "TIERING_SSD_PERCENT"            = var.tiering_enable_ssd_percent
     "PREFIX"                         = var.prefix
     "KEY_VAULT_URI"                  = azurerm_key_vault.key_vault.vault_uri
     "INSTALL_DPDK"                   = var.install_cluster_dpdk
-    "NICS_NUM"                       = var.container_number_map[var.instance_type].nics
+    "NICS_NUM"                       = var.containers_config_map[var.instance_type].nics
     "INSTALL_URL"                    = local.install_weka_url
     "LOG_LEVEL"                      = var.function_app_log_level
     "SUBNET"                         = data.azurerm_subnet.subnet.address_prefix

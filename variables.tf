@@ -194,7 +194,7 @@ variable "vnet_to_peering" {
   default     = []
 }
 
-variable "container_number_map" {
+variable "containers_config_map" {
   type = map(object({
     compute  = number
     drive    = number
@@ -247,7 +247,7 @@ variable "container_number_map" {
     }
   }
   validation {
-    condition     = alltrue([for m in flatten([for i in values(var.container_number_map) : (flatten(i.memory))]) : tonumber(trimsuffix(m, "GB")) <= 384])
+    condition     = alltrue([for m in flatten([for i in values(var.containers_config_map) : (flatten(i.memory))]) : tonumber(trimsuffix(m, "GB")) <= 384])
     error_message = "Compute memory can not be more then 384GB"
   }
 }
@@ -321,7 +321,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "5419c035c1cd5033d5c97eececc9ef0d"
+  default     = "391ed415689efb58761ba4a21a64dda6"
 }
 
 variable "function_app_dist" {
