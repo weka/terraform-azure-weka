@@ -1,18 +1,79 @@
 {
+  "functionConnections": {
+    "scale-up-connection": {
+      "authentication": {
+        "name": "Code",
+        "type": "QueryString",
+        "value": "@appsetting('function_app_key')"
+      },
+      "displayName": "scale-up",
+      "function": {
+        "id": "${function_id}/functions/scale_up"
+      },
+      "triggerUrl": "https://${function_name}.azurewebsites.net/api/scale_up"
+    },
+    "fetch-connection": {
+      "authentication": {
+        "name": "Code",
+        "type": "QueryString",
+        "value": "@appsetting('function_app_key')"
+      },
+      "displayName": "fetch",
+      "function": {
+        "id": "${function_id}/functions/fetch"
+      },
+      "triggerUrl": "https://${function_name}.azurewebsites.net/api/fetch"
+    },
+    "scale-down-connection": {
+      "authentication": {
+        "name": "Code",
+        "type": "QueryString",
+        "value": "@appsetting('function_app_key')"
+      },
+      "displayName": "scale-down",
+      "function": {
+        "id": "${function_id}/functions/scale_down"
+      },
+      "triggerUrl": "https://${function_name}.azurewebsites.net/api/scale_down"
+    },
+    "terminate-connection": {
+      "authentication": {
+        "name": "Code",
+        "type": "QueryString",
+        "value": "@appsetting('function_app_key')"
+      },
+      "displayName": "terminate",
+      "function": {
+        "id": "${function_id}/functions/terminate"
+      },
+      "triggerUrl": "https://${function_name}.azurewebsites.net/api/terminate"
+    },
+    "transient-connection": {
+      "authentication": {
+        "name": "Code",
+        "type": "QueryString",
+        "value": "@appsetting('function_app_key')"
+      },
+      "displayName": "transient",
+      "function": {
+        "id": "${function_id}/functions/transient"
+      },
+      "triggerUrl": "https://${function_name}.azurewebsites.net/api/transient"
+    }
+  },
   "serviceProviderConnections": {
     "keyVault": {
+      "displayName": "keyvault",
+      "parameterSetName": "ManagedServiceIdentity",
       "parameterValues": {
-        "VaultUri": "https://${keyvault_name}.vault.azure.net",
+        "VaultUri": "@appsetting('keyVaultUri')",
         "authProvider": {
           "Type": "ManagedServiceIdentity"
         }
       },
-      "parameterSetName": "ManagedServiceIdentity",
       "serviceProvider": {
         "id": "/serviceProviders/keyVault"
-      },
-      "displayName": "keyvault-connection"
+      }
     }
-  },
-  "managedApiConnections": {}
+  }
 }

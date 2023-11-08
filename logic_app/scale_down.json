@@ -4,48 +4,12 @@
     "actions": {
       "fetch": {
         "inputs": {
-          "authentication": {
-            "type": "ManagedServiceIdentity"
-          },
-          "headers": {
-            "x-functions-key": "@{body('get-secret')?['value']}"
+          "function": {
+            "connectionName": "fetch-connection"
           },
           "method": "POST",
           "retryPolicy": {
             "type": "none"
-          },
-          "uri": "https://${function_name}.azurewebsites.net/api/fetch"
-        },
-        "runAfter": {
-          "get-secret": [
-            "SUCCEEDED"
-          ]
-        },
-        "runtimeConfiguration": {
-          "contentTransfer": {
-            "transferMode": "Chunked"
-          },
-          "secureData": {
-            "properties": [
-              "inputs",
-              "outputs"
-            ]
-          }
-        },
-        "type": "Http"
-      },
-      "get-secret": {
-        "inputs": {
-          "parameters": {
-            "secretName": "${function_app_key_name}"
-          },
-          "retryPolicy": {
-            "type": "none"
-          },
-          "serviceProviderConfiguration": {
-            "connectionName": "keyVault",
-            "operationId": "getSecret",
-            "serviceProviderId": "/serviceProviders/keyVault"
           }
         },
         "runAfter": {},
@@ -56,22 +20,18 @@
             ]
           }
         },
-        "type": "ServiceProvider"
+        "type": "Function"
       },
       "scale-down": {
         "inputs": {
-          "authentication": {
-            "type": "ManagedServiceIdentity"
-          },
-          "body": "@outputs('fetch')",
-          "headers": {
-            "x-functions-key": "@{body('get-secret')?['value']}"
+          "body": "@body('fetch')",
+          "function": {
+            "connectionName": "scale-down-connection"
           },
           "method": "POST",
           "retryPolicy": {
             "type": "none"
-          },
-          "uri": "https://${function_name}.azurewebsites.net/api/scale_down"
+          }
         },
         "runAfter": {
           "fetch": [
@@ -79,9 +39,6 @@
           ]
         },
         "runtimeConfiguration": {
-          "contentTransfer": {
-            "transferMode": "Chunked"
-          },
           "secureData": {
             "properties": [
               "inputs",
@@ -89,67 +46,43 @@
             ]
           }
         },
-        "type": "Http"
+        "type": "Function"
       },
       "terminate": {
         "inputs": {
-          "authentication": {
-            "type": "ManagedServiceIdentity"
-          },
-          "body": "@outputs('scale-down')",
-          "headers": {
-            "x-functions-key": "@{body('get-secret')?['value']}"
+          "body": "@body('scale-down')",
+          "function": {
+            "connectionName": "terminate-connection"
           },
           "method": "POST",
           "retryPolicy": {
             "type": "none"
-          },
-          "uri": "https://${function_name}.azurewebsites.net/api/terminate"
+          }
         },
         "runAfter": {
           "scale-down": [
             "SUCCEEDED"
           ]
         },
-        "runtimeConfiguration": {
-          "contentTransfer": {
-            "transferMode": "Chunked"
-          },
-          "secureData": {
-            "properties": [
-              "inputs",
-              "outputs"
-            ]
-          }
-        },
-        "type": "Http"
+        "type": "Function"
       },
       "transient": {
         "inputs": {
-          "authentication": {
-            "type": "ManagedServiceIdentity"
-          },
-          "body": "@outputs('terminate')",
-          "headers": {
-            "x-functions-key": "@{body('get-secret')?['value']}"
+          "body": "@body('terminate')",
+          "function": {
+            "connectionName": "transient-connection"
           },
           "method": "POST",
           "retryPolicy": {
             "type": "none"
-          },
-          "uri": "https://${function_name}.azurewebsites.net/api/transient"
+          }
         },
         "runAfter": {
           "terminate": [
             "SUCCEEDED"
           ]
         },
-        "runtimeConfiguration": {
-          "contentTransfer": {
-            "transferMode": "Chunked"
-          }
-        },
-        "type": "Http"
+        "type": "Function"
       }
     },
     "contentVersion": "1.0.0.0",
