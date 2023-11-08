@@ -75,7 +75,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		resData["body"] = err.Error()
 	} else {
-		resData["body"] = fmt.Sprintf("New cluster size: %d", *size.Value)
+		resData["body"] = fmt.Sprintf("Updated the desizred cluster size to %d successfully", *size.Value)
 	}
 
 	outputs["res"] = resData
@@ -109,7 +109,7 @@ func updateDesiredClusterSize(ctx context.Context, newSize int, subscriptionId, 
 	}
 
 	if oldSize < newSize {
-		err = common.UpdateVmScaleSetNum(ctx, subscriptionId, resourceGroupName, vmScaleSetName, int64(newSize))
+		err = common.ScaleUp(ctx, subscriptionId, resourceGroupName, vmScaleSetName, int64(newSize))
 		if err != nil {
 			err = fmt.Errorf("cannot increase scale set %s capacity from %d to %d: %v", vmScaleSetName, oldSize, newSize, err)
 			return err
