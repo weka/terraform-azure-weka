@@ -63,9 +63,6 @@ resource "azurerm_logic_app_standard" "logic_app_standard" {
   }
   virtual_network_subnet_id = var.logic_app_subnet_delegation_id == "" ? azurerm_subnet.logicapp_subnet_delegation[0].id : var.logic_app_subnet_delegation_id
   depends_on                = [azurerm_service_plan.logicapp_service_plan, azurerm_subnet.logicapp_subnet_delegation, azurerm_storage_account.logicapp]
-  lifecycle {
-    ignore_changes = [site_config]
-  }
 }
 
 resource "azurerm_key_vault_access_policy" "standard_logic_app_get_secret_permission" {
@@ -99,25 +96,41 @@ data "azurerm_storage_share" "storage_share" {
 }
 
 locals {
-  connections_workflow = templatefile("${path.module}/logic_app/connections.json", {
+  connections_workflow_path = "${path.module}/logic_app/connections.json"
+  connections_workflow = templatefile(local.connections_workflow_path, {
     function_name = azurerm_linux_function_app.function_app.name
     function_id   = azurerm_linux_function_app.function_app.id
   })
+  connections_workflow_hash     = md5(join("", [for f in fileset(local.connections_workflow, "**") : filemd5("${local.connections_workflow}/${f}")]))
+  connections_workflow_filename = "/tmp/connections_workflow_${local.connections_workflow_hash}"
+  scale_up_workflow_path        = "${path.module}/logic_app/scale_up.json"
+  scale_up_workflow_hash        = md5(join("", [for f in fileset(local.scale_up_workflow_path, "**") : filemd5("${local.scale_up_workflow_path}/${f}")]))
+  scale_up_workflow_filename    = "/tmp/scale_up_workflow_${local.scale_up_workflow_hash}"
+  scale_down_workflow_path      = "${path.module}/logic_app/scale_down.json"
+  scale_down_workflow_hash      = md5(join("", [for f in fileset(local.scale_down_workflow_path, "**") : filemd5("${local.scale_down_workflow_path}/${f}")]))
+  scale_down_workflow_filename  = "/tmp/scale_down_workflow_${local.scale_down_workflow_hash}"
 }
 
 resource "local_file" "connections_workflow_file" {
   content  = local.connections_workflow
-  filename = "/tmp/connections.json"
-  lifecycle {
-    ignore_changes = [content]
-  }
+  filename = local.connections_workflow_filename
+}
+
+resource "local_file" "scale_up_workflow_file" {
+  content  = file(local.scale_up_workflow_path)
+  filename = local.scale_up_workflow_filename
+}
+
+resource "local_file" "scale_down_workflow_file" {
+  content  = file(local.scale_down_workflow_path)
+  filename = local.scale_down_workflow_filename
 }
 
 resource "azurerm_storage_share_file" "scale_down_share_file" {
   name             = "workflow.json"
   path             = azurerm_storage_share_directory.share_directory_scale_down.name
   storage_share_id = data.azurerm_storage_share.storage_share.id
-  source           = "${path.module}/logic_app/scale_down.json"
+  source           = local.scale_down_workflow_filename
   depends_on       = [azurerm_storage_share_directory.share_directory_scale_down, data.azurerm_storage_share.storage_share]
 }
 
@@ -125,7 +138,7 @@ resource "azurerm_storage_share_file" "scale_up_share_file" {
   name             = "workflow.json"
   path             = azurerm_storage_share_directory.share_directory_scale_up.name
   storage_share_id = data.azurerm_storage_share.storage_share.id
-  source           = "${path.module}/logic_app/scale_up.json"
+  source           = local.scale_up_workflow_filename
   depends_on       = [azurerm_storage_share_directory.share_directory_scale_up, data.azurerm_storage_share.storage_share]
 }
 
