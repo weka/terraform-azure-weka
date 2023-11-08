@@ -124,7 +124,6 @@ locals {
     frontend_cores_num = var.frontend_cores_num
     subnet_prefixes    = data.azurerm_subnet.subnet.address_prefix
     backend_lb_ip      = var.backend_lb_ip
-    nics_num           = var.nics_numbers
     key_vault_url      = data.azurerm_key_vault.this.vault_uri
   })
 
@@ -204,6 +203,10 @@ resource "azurerm_linux_virtual_machine" "this" {
     precondition {
       condition     = var.protocol == "SMB" ? var.secondary_ips_per_nic <= 3 : true
       error_message = "The number of secondary IPs per single NIC per protocol gateway virtual machine must be at most 3 for SMB."
+    }
+    precondition {
+      condition     = var.frontend_cores_num < var.nics_numbers
+      error_message = "The number of frontends must be less than the number of NICs."
     }
   }
   depends_on = [azurerm_network_interface.primary_gateway_nic_private, azurerm_network_interface.primary_gateway_nic_public, azurerm_network_interface.secondary_gateway_nic]
