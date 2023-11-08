@@ -2,55 +2,18 @@
   "definition": {
     "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
     "actions": {
-      "get-secret": {
-        "inputs": {
-          "parameters": {
-            "secretName": "${function_app_key_name}"
-          },
-          "retryPolicy": {
-            "type": "none"
-          },
-          "serviceProviderConfiguration": {
-            "connectionName": "keyVault",
-            "operationId": "getSecret",
-            "serviceProviderId": "/serviceProviders/keyVault"
-          }
-        },
-        "runAfter": {},
-        "runtimeConfiguration": {
-          "secureData": {
-            "properties": [
-              "outputs"
-            ]
-          }
-        },
-        "type": "ServiceProvider"
-      },
       "scale-up": {
         "inputs": {
-          "authentication": {
-            "type": "ManagedServiceIdentity"
-          },
-          "headers": {
-            "x-functions-key": "@{body('get-secret')?['value']}"
+          "function": {
+            "connectionName": "scale-up-connection"
           },
           "method": "POST",
           "retryPolicy": {
             "type": "none"
-          },
-          "uri": "https://${function_name}.azurewebsites.net/api/scale_up"
-        },
-        "runAfter": {
-          "get-secret": [
-            "SUCCEEDED"
-          ]
-        },
-        "runtimeConfiguration": {
-          "contentTransfer": {
-            "transferMode": "Chunked"
           }
         },
-        "type": "Http"
+        "runAfter": {},
+        "type": "Function"
       }
     },
     "contentVersion": "1.0.0.0",

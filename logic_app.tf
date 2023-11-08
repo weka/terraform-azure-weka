@@ -58,6 +58,8 @@ resource "azurerm_logic_app_standard" "logic_app_standard" {
   app_settings = {
     "FUNCTIONS_WORKER_RUNTIME"     = "node"
     "WEBSITE_NODE_DEFAULT_VERSION" = "~18"
+    "function_app_key"             = data.azurerm_function_app_host_keys.function_keys.default_function_key
+    "keyVaultUri"                  = azurerm_key_vault.key_vault.vault_uri
   }
   virtual_network_subnet_id = var.logic_app_subnet_delegation_id == "" ? azurerm_subnet.logicapp_subnet_delegation[0].id : var.logic_app_subnet_delegation_id
   depends_on                = [azurerm_service_plan.logicapp_service_plan, azurerm_subnet.logicapp_subnet_delegation, azurerm_storage_account.logicapp]
@@ -78,14 +80,14 @@ resource "azurerm_key_vault_access_policy" "standard_logic_app_get_secret_permis
 
 
 resource "azurerm_storage_share_directory" "share_directory_scale_down" {
-  name                 = "site/wwwroot/scale_down"
+  name                 = "site/wwwroot/scale-down"
   share_name           = "${azurerm_logic_app_standard.logic_app_standard.name}-content"
   storage_account_name = azurerm_storage_account.logicapp.name
   depends_on           = [azurerm_storage_account.logicapp]
 }
 
 resource "azurerm_storage_share_directory" "share_directory_scale_up" {
-  name                 = "site/wwwroot/scale_up"
+  name                 = "site/wwwroot/scale-up"
   share_name           = "${azurerm_logic_app_standard.logic_app_standard.name}-content"
   storage_account_name = azurerm_storage_account.logicapp.name
   depends_on           = [azurerm_storage_account.logicapp]
@@ -97,33 +99,10 @@ data "azurerm_storage_share" "storage_share" {
 }
 
 locals {
-  scale_down_workflow = templatefile("${path.module}/logic_app/scale_down.json", {
-    function_name         = azurerm_linux_function_app.function_app.name
-    function_app_key_name = azurerm_key_vault_secret.function_app_default_key.name
-  })
-  scale_up_workflow = templatefile("${path.module}/logic_app/scale_up.json", {
-    function_name         = azurerm_linux_function_app.function_app.name
-    function_app_key_name = azurerm_key_vault_secret.function_app_default_key.name
-  })
   connections_workflow = templatefile("${path.module}/logic_app/connections.json", {
-    keyvault_name = azurerm_key_vault.key_vault.name
+    function_name = azurerm_linux_function_app.function_app.name
+    function_id   = azurerm_linux_function_app.function_app.id
   })
-}
-
-resource "local_file" "scale_down_workflow_file" {
-  content  = local.scale_down_workflow
-  filename = "/tmp/scale-down.json"
-  lifecycle {
-    ignore_changes = [content]
-  }
-}
-
-resource "local_file" "scale_up_workflow_file" {
-  content  = local.scale_up_workflow
-  filename = "/tmp/scale-up.json"
-  lifecycle {
-    ignore_changes = [content]
-  }
 }
 
 resource "local_file" "connections_workflow_file" {
@@ -136,18 +115,18 @@ resource "local_file" "connections_workflow_file" {
 
 resource "azurerm_storage_share_file" "scale_down_share_file" {
   name             = "workflow.json"
-  path             = "site/wwwroot/scale_down"
+  path             = azurerm_storage_share_directory.share_directory_scale_down.name
   storage_share_id = data.azurerm_storage_share.storage_share.id
-  source           = local_file.scale_down_workflow_file.filename
-  depends_on       = [azurerm_storage_share_directory.share_directory_scale_down, data.azurerm_storage_share.storage_share, local_file.scale_down_workflow_file]
+  source           = "${path.module}/logic_app/scale_down.json"
+  depends_on       = [azurerm_storage_share_directory.share_directory_scale_down, data.azurerm_storage_share.storage_share]
 }
 
 resource "azurerm_storage_share_file" "scale_up_share_file" {
   name             = "workflow.json"
-  path             = "site/wwwroot/scale_up"
+  path             = azurerm_storage_share_directory.share_directory_scale_up.name
   storage_share_id = data.azurerm_storage_share.storage_share.id
-  source           = local_file.scale_up_workflow_file.filename
-  depends_on       = [azurerm_storage_share_directory.share_directory_scale_up, data.azurerm_storage_share.storage_share, local_file.scale_up_workflow_file]
+  source           = "${path.module}/logic_app/scale_up.json"
+  depends_on       = [azurerm_storage_share_directory.share_directory_scale_up, data.azurerm_storage_share.storage_share]
 }
 
 resource "azurerm_storage_share_file" "connections_share_file" {
@@ -155,7 +134,7 @@ resource "azurerm_storage_share_file" "connections_share_file" {
   path             = "site/wwwroot"
   storage_share_id = data.azurerm_storage_share.storage_share.id
   source           = local_file.connections_workflow_file.filename
-  depends_on       = [azurerm_storage_share_directory.share_directory_scale_down, data.azurerm_storage_share.storage_share]
+  depends_on       = [azurerm_storage_share_directory.share_directory_scale_down, data.azurerm_storage_share.storage_share, local_file.connections_workflow_file]
 }
 
 resource "azurerm_role_assignment" "logic_app_standard_reader" {
