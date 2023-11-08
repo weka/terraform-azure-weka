@@ -132,6 +132,9 @@ resource "azurerm_storage_share_file" "scale_down_share_file" {
   storage_share_id = data.azurerm_storage_share.storage_share.id
   source           = local.scale_down_workflow_filename
   depends_on       = [azurerm_storage_share_directory.share_directory_scale_down, data.azurerm_storage_share.storage_share]
+  lifecycle {
+    replace_triggered_by = [local_file.scale_down_workflow_file.content_md5]
+  }
 }
 
 resource "azurerm_storage_share_file" "scale_up_share_file" {
@@ -140,6 +143,9 @@ resource "azurerm_storage_share_file" "scale_up_share_file" {
   storage_share_id = data.azurerm_storage_share.storage_share.id
   source           = local.scale_up_workflow_filename
   depends_on       = [azurerm_storage_share_directory.share_directory_scale_up, data.azurerm_storage_share.storage_share]
+  lifecycle {
+    replace_triggered_by = [local_file.scale_up_workflow_file.content_md5]
+  }
 }
 
 resource "azurerm_storage_share_file" "connections_share_file" {
@@ -148,6 +154,9 @@ resource "azurerm_storage_share_file" "connections_share_file" {
   storage_share_id = data.azurerm_storage_share.storage_share.id
   source           = local_file.connections_workflow_file.filename
   depends_on       = [azurerm_storage_share_directory.share_directory_scale_down, data.azurerm_storage_share.storage_share, local_file.connections_workflow_file]
+  lifecycle {
+    replace_triggered_by = [local_file.connections_workflow_file.content_md5]
+  }
 }
 
 resource "azurerm_role_assignment" "logic_app_standard_reader" {
