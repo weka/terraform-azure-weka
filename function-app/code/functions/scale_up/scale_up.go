@@ -28,7 +28,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		if !state.Clusterized {
 			resData["body"] = "Not clusterized yet, skipping..."
 		} else {
-			err = common.UpdateVmScaleSetNum(ctx, subscriptionId, resourceGroupName, vmScaleSetName, int64(state.DesiredSize))
+			err = common.ScaleUp(ctx, subscriptionId, resourceGroupName, vmScaleSetName, int64(state.DesiredSize))
 			if err != nil {
 				resData["body"] = err.Error()
 			} else {

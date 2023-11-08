@@ -500,7 +500,7 @@ func GetVmsPrivateIps(ctx context.Context, subscriptionId, resourceGroupName, vm
 	return
 }
 
-func UpdateVmScaleSetNum(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, newSize int64) (err error) {
+func ScaleUp(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, newSize int64) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("updating scale set vms num")
 
@@ -512,6 +512,19 @@ func UpdateVmScaleSetNum(ctx context.Context, subscriptionId, resourceGroupName,
 	client, err := armcompute.NewVirtualMachineScaleSetsClient(subscriptionId, credential, nil)
 	if err != nil {
 		logger.Error().Err(err).Send()
+		return
+	}
+
+	response, err := client.Get(ctx, resourceGroupName, vmScaleSetName, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	scaleSetCapacity := *response.SKU.Capacity
+	if scaleSetCapacity >= newSize {
+		logger.Info().Msgf(
+			"scale set %s capacity:%d desired capacity:%d, skipping scale up", vmScaleSetName, scaleSetCapacity, newSize)
 		return
 	}
 
