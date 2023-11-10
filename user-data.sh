@@ -112,10 +112,23 @@ systemctl start remove-routes.service
 systemctl status remove-routes.service || true # show status of remove-routes.service
 ip route # show routes after removing
 
+# attach disk
 while ! [ "$(lsblk | grep ${disk_size}G | awk '{print $1}')" ] ; do
   echo "waiting for disk to be ready"
   sleep 5
 done
+wekaiosw_device=/dev/"$(lsblk | grep ${disk_size}G | awk '{print $1}')"
+
+status=0
+mkfs.ext4 -L wekaiosw $wekaiosw_device 2>&1 | tee /tmp/output  || status=$?
+handle_error $status "$(cat /tmp/output)"
+mkdir -p /opt/weka 2>&1 | tee /tmp/output || status=$?
+handle_error $status "$(cat /tmp/output)"
+mount $wekaiosw_device /opt/weka  2>&1 | tee /tmp/output || status=$?
+handle_error $status "$(cat /tmp/output)"
+rm /tmp/output
+
+echo "LABEL=wekaiosw /opt/weka ext4 defaults 0 2" >>/etc/fstab
 
 rm -rf $INSTALLATION_PATH
 

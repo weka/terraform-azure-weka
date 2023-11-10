@@ -46,8 +46,7 @@ func GetDeployScript(
 	installUrl,
 	keyVaultUri,
 	proxyUrl,
-	vm,
-	diskSize string,
+	vm string,
 	computeMemory string,
 	computeContainerNum int,
 	frontendContainerNum int,
@@ -102,7 +101,6 @@ func GetDeployScript(
 			FuncDef:          funcDef,
 			Params:           deploymentParams,
 			FailureDomainCmd: getHashedIpCommand,
-			DeviceNameCmd:    GetDeviceName(diskSize),
 		}
 		bashScript = deployScriptGenerator.GetDeployScript()
 	} else {
@@ -162,7 +160,6 @@ func GetDeployScript(
 			ScriptBase:         dedent.Dedent(scriptBase),
 			Params:             joinParams,
 			FuncDef:            funcDef,
-			DeviceNameCmd:      GetDeviceName(diskSize),
 		}
 		bashScript = joinScriptGenerator.GetJoinScript(ctx)
 	}
@@ -225,7 +222,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	nicsNumInt, _ := strconv.Atoi(nicsNum)
 	subnet := os.Getenv("SUBNET")
 	functionAppName := os.Getenv("FUNCTION_APP_NAME")
-	diskSize := os.Getenv("DISK_SIZE")
 
 	installUrl := os.Getenv("INSTALL_URL")
 	proxyUrl := os.Getenv("PROXY_URL")
@@ -279,7 +275,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		keyVaultUri,
 		proxyUrl,
 		data.Vm,
-		diskSize,
 		computeMemory,
 		computeContainerNum,
 		frontendContainerNum,
@@ -296,9 +291,4 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		resData["body"] = bashScript
 	}
 	writeResponse(w, outputs, resData, err)
-}
-
-func GetDeviceName(diskSize string) string {
-	template := "/dev/\"$(lsblk | grep %sG | awk '{print $1}')\""
-	return fmt.Sprintf(dedent.Dedent(template), diskSize)
 }
