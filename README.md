@@ -9,30 +9,130 @@ Applying the Terraform variables file performs the following:
 
 <br> You can find [here](https://github.com/weka/terraform-azure-weka-essential) our essential deployment which creates only vms and placement group.
 
-## Usage
+## Weke deployment prerequisites:
+- resource group for deployment
+- vnet
+- subnet
+- 2 subnets delegations - one for our function app and one for our logic app
+- security group (needs to allow network inside the vnet)
+- dns zone
+
+## Resource group
+We have 3 variables that define resource group:
+- rg_name
+- vnet_rg_name
+- private_dns_rg_name
+#### rg_name:
+The resource group were weka cluster and all necessary resources will be deployed.
+#### vnet_rg_name:
+The resource group of the vnet and subnet.
+#### private_dns_rg_name:
+The private DNS zone resource group name.
+
+<br>If `vnet_rg_name` isn't set by the user, we assume that the
+vnet and subnet resource group is the as the weka deployment resource group.
+<br> i.e we assume `vnet_rg_name = rg_name`
+<br>Same goes for `private_dns_rg_name`.
+<br>If `private_dns_rg_name` isn't set by the user, we assume that the
+private dns resource group name is the same as the weka deployment resource group.
+<br> i.e we assume `private_dns_rg_name = rg_name`
+
+## Network deployment options
+This weka deployment can use existing network, or create network resources (vmet, subnet, security group etc.) automatically.
+<br>Check our [examples](examples).
+<br>In case you want to use an existing vnet and subnet, you **must** provide them.
+<br>**Example**:
 ```hcl
-module "deploy-weka" {
-   source                = "weka/weka/azure"
-   version               = "3.0.5"
-   prefix                = "weka"
-   rg_name               = "myResourceGroup"
-   vnet_name             = "weka-vpc-0"
-   vnet_rg_name          = "myVnetResourceGroup"
-   subnet_name           = "weka-subnet-0"
-   sg_id                 = "security-group-id"
-   get_weka_io_token     = "get_weka_io_token"
-   cluster_name          = "myCluster"
-   subnet_delegation      = "10.0.1.0/25"
-   set_obs_integration   = false
-   instance_type         = "Standard_L8s_v3"
-   cluster_size          = 6
-   subscription_id       = "mySubscriptionId"
-   private_dns_zone_name = "myDns.private.net"
-   private_dns_rg_name   = "myResourceGroup"
+vnet_name           = "my-vnet"
+subnet_name         = "my-subnet"
+```
+<br>In case you want to use an existing subnet delegations, you **must** provide them.
+<br>**Example**:
+```hcl
+function_app_subnet_delegation_id      = "subnet-delegation-id1"
+logic_app_subnet_delegation_id         = "subnet-delegation-id2"
+```
+<br>In case you want to use an existing security group, you **must** provide it.
+<br>**Example**:
+```hcl
+sg_id      = "sg-id"
+```
+<br>In case you want to use a dns zone, you **must** provide it.
+<br>**Example**:
+```hcl
+private_dns_zone_name             = "myDns.private.net"
+private_dns_rg_name               = "myResourceGroup"
+```
+**If you don't pass these params, we will automatically create the network resources for you.**
+
+## Usage example
+```hcl
+provider "azurerm" {
+  subscription_id = "mySubscriptionId"
+  partner_id      = "f13589d1-f10d-4c3b-ae42-3b1a8337eaf1"
+  features {
+  }
+}
+
+terraform {
+  backend "azurerm" {
+    resource_group_name  = "myStateResourceGroup"
+    storage_account_name = "myStateStorageAccount"
+    container_name       = "myStateContainer"
+    key                  = "state.terraform.tfstate"
+  }
+}
+
+
+module "deploy_weka" {
+  source                            = "weka/weka/azure"
+  version                           = "3.0.5"
+  prefix                            = "weka"
+  rg_name                           = "myResourceGroup"
+  vnet_name                         = "weka-vpc-0"
+  vnet_rg_name                      = "myVnetResourceGroup"
+  subnet_name                       = "weka-subnet-0"
+  sg_id                             = "security-group-id"
+  get_weka_io_token                 = "get_weka_io_token"
+  cluster_name                      = "myCluster"
+  function_app_subnet_delegation_id = "subnet-delegation-id1"
+  logic_app_subnet_delegation_id    = "subnet-delegation-id2"
+  set_obs_integration               = true
+  instance_type                     = "Standard_L8s_v3"
+  cluster_size                      = 6
+  assign_public_ip                  = false
+  subscription_id                   = "mySubscriptionId"
+  private_dns_zone_name             = "myDns.private.net"
+  private_dns_rg_name               = "myResourceGroup"
 }
 
 output "deploy_weka_output" {
   value = module.deploy_weka
+}
+```
+
+### Private network deployment:
+#### To avoid public ip assignment:
+```hcl
+assign_public_ip   = false
+``` 
+#### Vms with no internet outbound:
+In case your vms don't have internet access, you should supply weka tar file url, apt repo url and service endpoints:
+```hcl
+apt_repo_url = "..."
+install_weka_url = "..."
+```
+#### Service endpoints:
+The deployment and delegation subnets must include the following service endpoints:
+- "Microsoft.Storage"
+- "Microsoft.KeyVault"
+- "Microsoft.Web"
+
+The delegation subnets must include the following action action:
+```hcl
+service_delegation {
+  name    = "Microsoft.Web/serverFarms"
+  actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
 }
 ```
 
@@ -42,13 +142,6 @@ This is a community image that we created and uploaded to azure.
 In case you would like to view how we created the image you can find it [here](https://github.com/weka/terraform-azure-weka-custom-image).
 You can as well create it on your own subscription and use it.
 
-
-### Private network deployment:
-
-#### To avoid public ip assignment:
-```hcl
-assign_public_ip   = false
-```
 
 ## Ssh keys
 The username for ssh into vms is `weka`.
@@ -169,8 +262,7 @@ smbw_enabled = true
 ```
 
 ## Weka installation with proxy url
-We support weka installation with proxy url.
-<br>In order to create you need to provide the proxy url(by default the number is ""),
+We support weka installation using custom proxy url.
 ```hcl
 proxy_url = VALUE
 ```

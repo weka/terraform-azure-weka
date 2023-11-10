@@ -25,5 +25,5 @@ output "vnet_rg_name" {
 
 output "private_dns_rg_name" {
   value       = var.private_dns_rg_name == "" ? var.rg_name : var.private_dns_rg_name
-  description = "Resource group name of vnet."
+  description = "The private DNS zone resource group name."
 }
