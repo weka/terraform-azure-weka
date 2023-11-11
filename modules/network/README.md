@@ -116,7 +116,7 @@ No modules.
 
 | Name | Description |
 |------|-------------|
-| <a name="output_private_dns_rg_name"></a> [private\_dns\_rg\_name](#output\_private\_dns\_rg\_name) | Resource group name of vnet. |
+| <a name="output_private_dns_rg_name"></a> [private\_dns\_rg\_name](#output\_private\_dns\_rg\_name) | The private DNS zone resource group name. |
 | <a name="output_private_dns_zone_name"></a> [private\_dns\_zone\_name](#output\_private\_dns\_zone\_name) | Displays the private DNS zone name. |
 | <a name="output_sg_id"></a> [sg\_id](#output\_sg\_id) | Displays the security group id. |
 | <a name="output_subnet_name"></a> [subnet\_name](#output\_subnet\_name) | Displays the subnet name list. |
