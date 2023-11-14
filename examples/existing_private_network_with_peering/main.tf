@@ -11,7 +11,7 @@ module "weka_deployment" {
   rg_name                             = "weka-rg"
   assign_public_ip                    = false
   apt_repo_server                     = "http://11.0.0.4/ubuntu/mirror/archive.ubuntu.com/ubuntu/"
-  install_weka_url                    = "..."
+  install_weka_url                    = "https://wekatars.blob.core.windows.net/tars/weka-4.2.5.tar?<SAS_TOKEN>"
   vnet_rg_name                        = "weka-rg"
   vnet_name                           = "weka-vnet"
   subnet_name                         = "weka-subnet"
@@ -20,7 +20,6 @@ module "weka_deployment" {
   cluster_size                        = 6
   tiering_enable_obs_integration      = true
   subscription_id                     = var.subscription_id
-  weka_tar_storage_account_id         = "/subscriptions/../resourceGroups/../providers/Microsoft.Storage/storageAccounts/.."
   function_access_restriction_enabled = true
   vnet_to_peering = [{
     vnet = "ubuntu-apt-repo-vnet"

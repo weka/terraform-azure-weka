@@ -254,3 +254,11 @@ resource "azurerm_role_assignment" "gateways_vmss_key_vault" {
   principal_id         = azurerm_linux_virtual_machine.this[count.index].identity[0].principal_id
   depends_on           = [azurerm_linux_virtual_machine.this]
 }
+
+resource "azurerm_role_assignment" "storage_blob_data_reader" {
+  count                = var.weka_tar_storage_account_id != "" ? var.gateways_number : 0
+  scope                = var.weka_tar_storage_account_id
+  role_definition_name = "Storage Blob Data Reader"
+  principal_id         = azurerm_linux_virtual_machine.this[count.index].identity[0].principal_id
+  depends_on           = [azurerm_linux_virtual_machine.this]
+}

@@ -202,3 +202,8 @@ variable "smb_share_name" {
   description = "The name of the SMB share"
   default     = ""
 }
+
+variable "weka_tar_storage_account_id" {
+  type    = string
+  default = ""
+}

@@ -69,14 +69,14 @@ variable "private_dns_zone_name" {
   default     = ""
 }
 
-variable "subnet_autocreate_as_private" {
-  type        = bool
-  default     = false
-  description = "Create private subnet without outbound to internet route traffic. The default is public network. Relevant only when sg_id is empty."
-}
-
 variable "sg_id" {
   type        = string
   description = "The security group id."
   default     = ""
+}
+
+variable "create_nat_gateway" {
+  type        = bool
+  default     = false
+  description = "NAT needs to be created when no public ip is assigned to the backend, to allow internet access"
 }
