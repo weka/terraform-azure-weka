@@ -12,6 +12,7 @@ locals {
   private_dns_rg_name = var.private_dns_rg_name == "" ? data.azurerm_resource_group.rg.name : var.private_dns_rg_name
   vnet_rg_location    = var.vnet_rg_name == "" ? data.azurerm_resource_group.rg.location : data.azurerm_resource_group.vnet_rg[0].location
   vnet_name           = var.vnet_name == "" ? azurerm_virtual_network.vnet[0].name : var.vnet_name
+  subnet_id           = var.subnet_name == "" ? azurerm_subnet.subnet[0].id : data.azurerm_subnet.subnet_data[0].id
 }
 
 resource "azurerm_virtual_network" "vnet" {
@@ -33,6 +34,13 @@ data "azurerm_virtual_network" "vnet_data" {
   resource_group_name = local.vnet_rg
 }
 
+data "azurerm_subnet" "subnet_data" {
+  count                = var.subnet_name != "" ? 1 : 0
+  name                 = var.subnet_name
+  resource_group_name  = local.vnet_rg
+  virtual_network_name = local.vnet_name
+}
+
 resource "azurerm_subnet" "subnet" {
   count                = var.subnet_name == "" ? 1 : 0
   resource_group_name  = local.vnet_rg
@@ -44,6 +52,40 @@ resource "azurerm_subnet" "subnet" {
     ignore_changes = [service_endpoint_policy_ids, service_endpoints]
   }
   depends_on = [data.azurerm_resource_group.rg, azurerm_virtual_network.vnet]
+}
+
+# ====================== NAT ============================= #
+resource "azurerm_public_ip_prefix" "nat_ip" {
+  count               = var.create_nat_gateway ? 1 : 0
+  name                = "${var.prefix}-nat-ip"
+  resource_group_name = local.vnet_rg
+  location            = local.vnet_rg_location
+  ip_version          = "IPv4"
+  prefix_length       = 29
+  sku                 = "Standard"
+}
+
+resource "azurerm_nat_gateway" "nat_gateway" {
+  count                   = var.create_nat_gateway ? 1 : 0
+  name                    = "${var.prefix}-nat-gateway"
+  resource_group_name     = local.vnet_rg
+  location                = local.vnet_rg_location
+  sku_name                = "Standard"
+  idle_timeout_in_minutes = 10
+}
+
+resource "azurerm_nat_gateway_public_ip_prefix_association" "nat_ip_association" {
+  count               = var.create_nat_gateway ? 1 : 0
+  nat_gateway_id      = azurerm_nat_gateway.nat_gateway[0].id
+  public_ip_prefix_id = azurerm_public_ip_prefix.nat_ip[0].id
+  depends_on          = [azurerm_nat_gateway.nat_gateway, azurerm_public_ip_prefix.nat_ip]
+}
+
+resource "azurerm_subnet_nat_gateway_association" "subnet_nat_gateway_association" {
+  count          = var.create_nat_gateway ? 1 : 0
+  subnet_id      = local.subnet_id
+  nat_gateway_id = azurerm_nat_gateway.nat_gateway[0].id
+  depends_on     = [azurerm_subnet.subnet, azurerm_nat_gateway.nat_gateway, data.azurerm_subnet.subnet_data]
 }
 
 # ====================== sg ssh ========================== #
@@ -75,21 +117,6 @@ resource "azurerm_network_security_rule" "sg_weka_ui" {
   destination_port_range      = "14000"
   source_address_prefix       = element(var.allow_weka_api_cidrs, count.index)
   destination_address_prefix  = "*"
-  network_security_group_name = azurerm_network_security_group.sg[0].name
-}
-
-resource "azurerm_network_security_rule" "sg_deny_outbound_internet" {
-  count                       = var.subnet_autocreate_as_private && var.sg_id == "" ? 1 : 0
-  name                        = "${var.prefix}-deny-outbound-internet"
-  resource_group_name         = data.azurerm_resource_group.rg.name
-  priority                    = 100
-  direction                   = "Outbound"
-  access                      = "Deny"
-  protocol                    = "*"
-  source_port_range           = "*"
-  source_address_prefix       = "*"
-  destination_port_range      = "*"
-  destination_address_prefix  = "Internet"
   network_security_group_name = azurerm_network_security_group.sg[0].name
 }
 

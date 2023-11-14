@@ -180,10 +180,11 @@ for ((i=0; i<max_retries; i++)); do
 done
 
 # install weka
-if [[ "${install_weka_url}" == *.tar ]]; then
-    wget -P $INSTALLATION_PATH "${install_weka_url}"
-    IFS='/' read -ra tar_str <<< "\"${install_weka_url}\""
-    pkg_name=$(cut -d'/' -f"$${#tar_str[@]}" <<< "${install_weka_url}")
+if [[ "${install_weka_url}" == *.tar || "${install_weka_url}" == *".tar?"* ]]; then
+    tar_url=$(echo "${install_weka_url}" | awk -F'?' '{print $1}')
+    IFS='/' read -ra tar_name <<< "$tar_url"
+    pkg_name=$(cut -d'/' -f"$${#tar_name[@]}" <<< "$tar_url")
+    wget -P $INSTALLATION_PATH "${install_weka_url}" -O "$INSTALLATION_PATH/$pkg_name"
     cd $INSTALLATION_PATH
     tar -xvf $pkg_name
     tar_folder=$(echo $pkg_name | sed 's/.tar//')

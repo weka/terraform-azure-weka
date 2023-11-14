@@ -15,8 +15,8 @@ module "network" {
   allow_ssh_cidrs              = var.allow_ssh_cidrs
   allow_weka_api_cidrs         = var.allow_weka_api_cidrs
   private_dns_zone_name        = var.private_dns_zone_name
-  subnet_autocreate_as_private = var.subnet_autocreate_as_private
   sg_id                        = var.sg_id
+  create_nat_gateway           = var.create_nat_gateway
 }
 
 locals {

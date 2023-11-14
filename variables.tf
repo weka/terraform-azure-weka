@@ -25,6 +25,12 @@ variable "subnet_prefix" {
   default     = "10.0.2.0/24"
 }
 
+variable "create_nat_gateway" {
+  type        = bool
+  default     = false
+  description = "NAT needs to be created when no public ip is assigned to the backend, to allow internet access"
+}
+
 variable "allow_ssh_cidrs" {
   type        = list(string)
   description = "Allow port 22, if not provided, i.e leaving the default empty list, the rule will not be included in the SG"
@@ -321,7 +327,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "391ed415689efb58761ba4a21a64dda6"
+  default     = "4e73a06484097c691d737bccb53d1131"
 }
 
 variable "function_app_dist" {

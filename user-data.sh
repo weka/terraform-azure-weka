@@ -145,8 +145,6 @@ weka_dir="/opt/weka/data"
 mkdir -p $weka_dir
 mv /root/weka-prepackaged $weka_dir
 
-az login --identity --debug --allow-no-subscriptions
-
 if [ $retry -gt 0 ]; then
   msg="Deploy script generation retried $retry times"
   echo "$msg"
