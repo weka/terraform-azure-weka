@@ -82,7 +82,7 @@ resource "azurerm_network_interface_security_group_association" "primary_gateway
 }
 
 locals {
-  secondary_nics_num = (var.nics_numbers - 1) * var.gateways_number
+  secondary_nics_num = (local.nics_numbers - 1) * var.gateways_number
 }
 
 resource "azurerm_network_interface" "secondary_gateway_nic" {
@@ -110,10 +110,10 @@ locals {
   disk_size             = var.disk_size + var.traces_per_frontend * var.frontend_cores_num
   first_nic_ids         = var.assign_public_ip ? azurerm_network_interface.primary_gateway_nic_public[*].id : azurerm_network_interface.primary_gateway_nic_private[*].id
   first_nic_private_ips = var.assign_public_ip ? azurerm_network_interface.primary_gateway_nic_public[*].private_ip_address : azurerm_network_interface.primary_gateway_nic_private[*].private_ip_address
-
+  nics_numbers          = var.frontend_cores_num + 1
   init_script = templatefile("${path.module}/init.sh", {
     apt_repo_server  = var.apt_repo_server
-    nics_num         = var.nics_numbers
+    nics_num         = local.nics_numbers
     subnet_range     = data.azurerm_subnet.subnet.address_prefix
     disk_size        = local.disk_size
     install_weka_url = var.install_weka_url
@@ -172,7 +172,7 @@ resource "azurerm_linux_virtual_machine" "this" {
 
   network_interface_ids = concat(
     [local.first_nic_ids[count.index]],
-    slice(azurerm_network_interface.secondary_gateway_nic[*].id, (var.nics_numbers - 1) * count.index, (var.nics_numbers - 1) * (count.index + 1))
+    slice(azurerm_network_interface.secondary_gateway_nic[*].id, (local.nics_numbers - 1) * count.index, (local.nics_numbers - 1) * (count.index + 1))
   )
 
   os_disk {
@@ -205,7 +205,7 @@ resource "azurerm_linux_virtual_machine" "this" {
       error_message = "The number of secondary IPs per single NIC per protocol gateway virtual machine must be at most 3 for SMB."
     }
     precondition {
-      condition     = var.frontend_cores_num < var.nics_numbers
+      condition     = var.frontend_cores_num < local.nics_numbers
       error_message = "The number of frontends must be less than the number of NICs."
     }
   }

@@ -89,17 +89,6 @@ variable "vm_username" {
   default     = "weka"
 }
 
-variable "nics_numbers" {
-  type        = number
-  default     = 2
-  description = "Number of nics to set on each vm"
-
-  validation {
-    condition     = var.nics_numbers >= 2
-    error_message = "The amount of NICs per protocol gateway VM should be at least 2."
-  }
-}
-
 variable "ssh_public_key" {
   type        = string
   description = "The VM public key. If it is not set, the keys are auto-generated."
