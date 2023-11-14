@@ -466,12 +466,6 @@ variable "nfs_protocol_gateway_instance_type" {
   default     = "Standard_D8_v5"
 }
 
-variable "nfs_protocol_gateway_nics_num" {
-  type        = string
-  description = "The protocol gateways' NICs number."
-  default     = 2
-}
-
 variable "nfs_protocol_gateway_disk_size" {
   type        = number
   default     = 48
@@ -507,12 +501,6 @@ variable "smb_protocol_gateway_instance_type" {
   type        = string
   description = "The protocol gateways' virtual machine type (sku) to deploy."
   default     = "Standard_D8_v5"
-}
-
-variable "smb_protocol_gateway_nics_num" {
-  type        = string
-  description = "The protocol gateways' NICs number."
-  default     = 2
 }
 
 variable "smb_protocol_gateway_disk_size" {
