@@ -10,18 +10,19 @@ data "azurerm_subnet" "subnet" {
 
 locals {
   first_nic_ids = var.assign_public_ip ? azurerm_network_interface.public_first_nic[*].id : azurerm_network_interface.private_first_nic[*].id
+  nics_num      = var.frontend_container_cores_num + 1
   preparation_script = templatefile("${path.module}/init.sh", {
     apt_repo_server = var.apt_repo_server
-    nics_num        = var.nics_numbers
+    nics_num        = local.nics_num
     subnet_range    = data.azurerm_subnet.subnet.address_prefix
   })
 
   mount_wekafs_script = templatefile("${path.module}/mount_wekafs.sh", {
-    all_subnets        = split("/", data.azurerm_subnet.subnet.address_prefix)[0]
-    all_gateways       = cidrhost(data.azurerm_subnet.subnet.address_prefix, 1)
-    nics_num           = var.nics_numbers
-    backend_lb_ip      = var.backend_lb_ip
-    mount_clients_dpdk = var.mount_clients_dpdk
+    all_subnets                  = split("/", data.azurerm_subnet.subnet.address_prefix)[0]
+    all_gateways                 = cidrhost(data.azurerm_subnet.subnet.address_prefix, 1)
+    frontend_container_cores_num = var.frontend_container_cores_num
+    backend_lb_ip                = var.backend_lb_ip
+    mount_clients_dpdk           = var.mount_clients_dpdk
   })
 
   custom_data_parts = [local.preparation_script, local.mount_wekafs_script]
@@ -80,7 +81,7 @@ resource "azurerm_network_interface_security_group_association" "private_first" 
 }
 
 resource "azurerm_network_interface" "private_nics" {
-  count                         = (var.nics_numbers - 1) * var.clients_number
+  count                         = (local.nics_num - 1) * var.clients_number
   name                          = "${var.clients_name}-backend-nic-${count.index + var.clients_number}"
   enable_accelerated_networking = var.mount_clients_dpdk
   resource_group_name           = var.rg_name
@@ -93,7 +94,7 @@ resource "azurerm_network_interface" "private_nics" {
 }
 
 resource "azurerm_network_interface_security_group_association" "private" {
-  count                     = (var.nics_numbers - 1) * var.clients_number
+  count                     = (local.nics_num - 1) * var.clients_number
   network_interface_id      = azurerm_network_interface.private_nics[count.index].id
   network_security_group_id = var.sg_id
 }
@@ -110,7 +111,7 @@ resource "azurerm_linux_virtual_machine" "this" {
   size                = var.instance_type
   network_interface_ids = concat([
     local.first_nic_ids[count.index]
-  ], slice(azurerm_network_interface.private_nics[*].id, (var.nics_numbers - 1) * count.index, (var.nics_numbers - 1) * (count.index + 1)))
+  ], slice(azurerm_network_interface.private_nics[*].id, (local.nics_num - 1) * count.index, (local.nics_num - 1) * (count.index + 1)))
 
   proximity_placement_group_id    = var.ppg_id
   disable_password_authentication = true

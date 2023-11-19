@@ -107,17 +107,12 @@ function getNetStrForDpdk() {
       break
     fi
     enp=$(ls -l /sys/class/net/$eth/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}') #for azure
-    if [ -z $enp ];then
-      enp=$(ethtool -i $eth | grep bus-info | awk '{print $2}') #pci for gcp
-    fi
     bits=$(ip -o -f inet addr show $eth | awk '{print $4}')
     IFS='/' read -ra netmask <<< "$bits"
 
     if [ -n "$gateways" ]; then
       gateway=$${gateways[0]}
       net="$net $net_option_name$enp/$subnet_inet/$${netmask[1]}/$gateway"
-    else
-      net="$net $net_option_name$eth" #aws
     fi
 	done
 }
