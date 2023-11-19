@@ -73,12 +73,6 @@ variable "subnet_name" {
   default     = ""
 }
 
-variable "subnet_autocreate_as_private" {
-  type        = bool
-  default     = false
-  description = "Create private subnet without outbound to internet route traffic. The default is public network. Relevant only when sg_id is empty."
-}
-
 variable "cluster_size" {
   type        = number
   description = "The number of virtual machines to deploy."
@@ -416,10 +410,10 @@ variable "client_placement_group_id" {
   default     = ""
 }
 
-variable "client_nics_num" {
+variable "client_frontend_cores" {
   type        = number
   description = "The client NICs number."
-  default     = 2
+  default     = 1
 }
 
 variable "placement_group_id" {
@@ -478,7 +472,7 @@ variable "nfs_protocol_gateway_disk_size" {
   description = "The protocol gateways' default disk size."
 }
 
-variable "nfs_protocol_gateway_frontend_cores_num" {
+variable "nfs_protocol_gateway_fe_cores_num" {
   type        = number
   default     = 1
   description = "The number of frontend cores on single protocol gateway machine."
@@ -515,7 +509,7 @@ variable "smb_protocol_gateway_disk_size" {
   description = "The protocol gateways' default disk size."
 }
 
-variable "smb_protocol_gateway_frontend_cores_num" {
+variable "smb_protocol_gateway_fe_cores_num" {
   type        = number
   default     = 1
   description = "The number of frontend cores on single protocol gateway machine."

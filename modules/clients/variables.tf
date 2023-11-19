@@ -3,9 +3,9 @@ variable "backend_lb_ip" {
   description = "The backend load balancer ip address."
 }
 
-variable "nics_numbers" {
+variable "frontend_container_cores_num" {
   type        = number
-  default     = 2
+  default     = 1
   description = "Number of nics to set on each client vm"
 }
 
