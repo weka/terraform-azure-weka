@@ -37,7 +37,6 @@ mkdir -p $MOUNT_POINT
 weka local stop && weka local rm -f --all
 
 gateways="${all_gateways}"
-subnets="${all_subnets}"
 FRONTEND_CONTAINER_CORES_NUM="${frontend_container_cores_num}"
 NICS_NUM=$((FRONTEND_CONTAINER_CORES_NUM+1))
 eth0=$(ifconfig | grep eth0 -C2 | grep 'inet ' | awk '{print $2}')

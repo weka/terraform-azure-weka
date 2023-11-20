@@ -86,10 +86,9 @@ function getNetStrForDpdk() {
   i=$1
   j=$2
   gateways=$3
-  subnets=$4
-  net_option_name=$5
+  net_option_name=$4
 
-  if [ "$#" -lt 5 ]; then
+  if [ "$#" -lt 4 ]; then
       echo "'net_option_name' argument is not provided. Using default value: --net"
       net_option_name="--net "
   fi
