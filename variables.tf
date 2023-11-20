@@ -73,12 +73,6 @@ variable "subnet_name" {
   default     = ""
 }
 
-variable "subnet_autocreate_as_private" {
-  type        = bool
-  default     = false
-  description = "Create private subnet without outbound to internet route traffic. The default is public network. Relevant only when sg_id is empty."
-}
-
 variable "cluster_size" {
   type        = number
   description = "The number of virtual machines to deploy."
