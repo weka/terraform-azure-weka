@@ -42,9 +42,9 @@ output "function_key_name" {
   description = "Function app key name"
 }
 
-output "ssh_user" {
+output "vm_username" {
   value       = var.vm_username
-  description = "ssh user for weka cluster"
+  description = "Provided as part of output for automated use of terraform, ssh user to weka cluster vm"
 }
 
 output "backend_ips" {
