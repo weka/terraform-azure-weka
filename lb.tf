@@ -27,7 +27,7 @@ resource "azurerm_lb_probe" "ui_lb_probe" {
   loadbalancer_id     = azurerm_lb.ui_lb.id
   name                = "${var.prefix}-${var.cluster_name}-ui-lb-probe"
   protocol            = "Https"
-  request_path        = "/api/v2/healthcheck"
+  request_path        = "/api/v2/ui/healthcheck"
   port                = 14000
   interval_in_seconds = 5
   number_of_probes    = 2
