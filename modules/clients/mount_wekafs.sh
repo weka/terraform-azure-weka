@@ -93,7 +93,8 @@ function retry {
 
 mount_command="mount -t wekafs -o net=udp $backend_ip/$FILESYSTEM_NAME $MOUNT_POINT"
 if [[ ${mount_clients_dpdk} == true ]]; then
-  getNetStrForDpdk 1 $NICS_NUM "$gateways" "-o net="
+  net_option_name="-o net="
+  getNetStrForDpdk 1 $NICS_NUM "$gateways" "$net_option_name"
   mount_command="mount -t wekafs $net -o num_cores=$FRONTEND_CONTAINER_CORES_NUM -o mgmt_ip=$eth0 $backend_ip/$FILESYSTEM_NAME $MOUNT_POINT"
 fi
 
