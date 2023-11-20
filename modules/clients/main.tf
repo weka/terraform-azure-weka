@@ -18,7 +18,6 @@ locals {
   })
 
   mount_wekafs_script = templatefile("${path.module}/mount_wekafs.sh", {
-    all_subnets                  = split("/", data.azurerm_subnet.subnet.address_prefix)[0]
     all_gateways                 = cidrhost(data.azurerm_subnet.subnet.address_prefix, 1)
     frontend_container_cores_num = var.frontend_container_cores_num
     backend_lb_ip                = var.backend_lb_ip
