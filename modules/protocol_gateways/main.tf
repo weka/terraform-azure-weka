@@ -13,7 +13,7 @@ data "azurerm_subnet" "subnet" {
 resource "azurerm_public_ip" "this" {
   count               = var.assign_public_ip ? var.gateways_number : 0
   name                = "${var.gateways_name}-public-ip-${count.index}"
-  location            = data.azurerm_resource_group.rg.location
+  location            = var.location
   resource_group_name = var.rg_name
   allocation_method   = "Dynamic"
 }
@@ -21,7 +21,7 @@ resource "azurerm_public_ip" "this" {
 resource "azurerm_network_interface" "primary_gateway_nic_public" {
   count                         = var.assign_public_ip ? var.gateways_number : 0
   name                          = "${var.gateways_name}-primary-nic-${count.index}"
-  location                      = data.azurerm_resource_group.rg.location
+  location                      = var.location
   resource_group_name           = var.rg_name
   enable_accelerated_networking = true
 
@@ -53,7 +53,7 @@ resource "azurerm_network_interface_security_group_association" "primary_gateway
 resource "azurerm_network_interface" "primary_gateway_nic_private" {
   count                         = var.assign_public_ip ? 0 : var.gateways_number
   name                          = "${var.gateways_name}-primary-nic-${count.index}"
-  location                      = data.azurerm_resource_group.rg.location
+  location                      = var.location
   resource_group_name           = var.rg_name
   enable_accelerated_networking = true
 
@@ -88,7 +88,7 @@ locals {
 resource "azurerm_network_interface" "secondary_gateway_nic" {
   count                         = local.secondary_nics_num
   name                          = "${var.gateways_name}-secondary-nic-${count.index + var.gateways_number}"
-  location                      = data.azurerm_resource_group.rg.location
+  location                      = var.location
   resource_group_name           = var.rg_name
   enable_accelerated_networking = true
 
@@ -117,14 +117,14 @@ locals {
     subnet_range     = data.azurerm_subnet.subnet.address_prefix
     disk_size        = local.disk_size
     install_weka_url = var.install_weka_url
-    key_vault_url    = data.azurerm_key_vault.this.vault_uri
+    key_vault_url    = var.key_vault_url
   })
 
   deploy_script = templatefile("${path.module}/deploy_protocol_gateways.sh", {
     frontend_container_cores_num = var.frontend_container_cores_num
     subnet_prefixes              = data.azurerm_subnet.subnet.address_prefix
     backend_lb_ip                = var.backend_lb_ip
-    key_vault_url                = data.azurerm_key_vault.this.vault_uri
+    key_vault_url                = var.key_vault_url
   })
 
   setup_nfs_protocol_script = templatefile("${path.module}/setup_nfs.sh", {
@@ -160,7 +160,7 @@ resource "azurerm_linux_virtual_machine" "this" {
   count                           = var.gateways_number
   name                            = "${var.gateways_name}-vm-${count.index}"
   computer_name                   = "${var.gateways_name}-${count.index}"
-  location                        = data.azurerm_resource_group.rg.location
+  location                        = var.location
   resource_group_name             = var.rg_name
   size                            = var.instance_type
   admin_username                  = var.vm_username
@@ -191,7 +191,7 @@ resource "azurerm_linux_virtual_machine" "this" {
   }
 
   lifecycle {
-    ignore_changes = [tags]
+    ignore_changes = [tags, custom_data]
     precondition {
       condition     = var.protocol == "NFS" ? var.gateways_number >= 1 : var.gateways_number >= 3 && var.gateways_number <= 8
       error_message = "The amount of protocol gateways should be at least 1 for NFS and at least 3 and at most 8 for SMB."
@@ -208,6 +208,10 @@ resource "azurerm_linux_virtual_machine" "this" {
       condition     = var.frontend_container_cores_num < local.nics_numbers
       error_message = "The number of frontends must be less than the number of NICs."
     }
+    precondition {
+      condition     = var.location == data.azurerm_resource_group.rg.location
+      error_message = "The location of the protocol gateways must be the same as the location of the resource group."
+    }
   }
   depends_on = [azurerm_network_interface.primary_gateway_nic_private, azurerm_network_interface.primary_gateway_nic_public, azurerm_network_interface.secondary_gateway_nic]
 }
@@ -215,7 +219,7 @@ resource "azurerm_linux_virtual_machine" "this" {
 resource "azurerm_managed_disk" "this" {
   count                = var.gateways_number
   name                 = "weka-disk-${var.gateways_name}-${count.index}"
-  location             = data.azurerm_resource_group.rg.location
+  location             = var.location
   resource_group_name  = var.rg_name
   storage_account_type = "StandardSSD_LRS"
   create_option        = "Empty"
@@ -231,14 +235,9 @@ resource "azurerm_virtual_machine_data_disk_attachment" "this" {
   depends_on         = [azurerm_linux_virtual_machine.this]
 }
 
-data "azurerm_key_vault" "this" {
-  name                = var.key_vault_name
-  resource_group_name = var.rg_name
-}
-
 resource "azurerm_key_vault_access_policy" "gateways_vmss_key_vault" {
   count        = var.gateways_number
-  key_vault_id = data.azurerm_key_vault.this.id
+  key_vault_id = var.key_vault_id
   tenant_id    = data.azurerm_client_config.current.tenant_id
   object_id    = azurerm_linux_virtual_machine.this[count.index].identity[0].principal_id
   secret_permissions = [
@@ -249,7 +248,7 @@ resource "azurerm_key_vault_access_policy" "gateways_vmss_key_vault" {
 
 resource "azurerm_role_assignment" "gateways_vmss_key_vault" {
   count                = var.gateways_number
-  scope                = data.azurerm_key_vault.this.id
+  scope                = var.key_vault_id
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_linux_virtual_machine.this[count.index].identity[0].principal_id
   depends_on           = [azurerm_linux_virtual_machine.this]

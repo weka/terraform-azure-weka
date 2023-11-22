@@ -2,6 +2,7 @@ module "nfs_protocol_gateways" {
   count                        = var.nfs_protocol_gateways_number > 0 ? 1 : 0
   source                       = "./modules/protocol_gateways"
   rg_name                      = var.rg_name
+  location                     = data.azurerm_resource_group.rg.location
   subnet_name                  = data.azurerm_subnet.subnet.name
   source_image_id              = var.source_image_id
   vnet_name                    = local.vnet_name
@@ -20,7 +21,8 @@ module "nfs_protocol_gateways" {
   ssh_public_key               = var.ssh_public_key == null ? tls_private_key.ssh_key[0].public_key_openssh : var.ssh_public_key
   ppg_id                       = local.placement_group_id
   sg_id                        = local.sg_id
-  key_vault_name               = azurerm_key_vault.key_vault.name
+  key_vault_url                = azurerm_key_vault.key_vault.vault_uri
+  key_vault_id                 = azurerm_key_vault.key_vault.id
   assign_public_ip             = var.assign_public_ip
   disk_size                    = var.nfs_protocol_gateway_disk_size
   frontend_container_cores_num = var.nfs_protocol_gateway_fe_cores_num
@@ -31,6 +33,7 @@ module "smb_protocol_gateways" {
   count                        = var.smb_protocol_gateways_number > 0 ? 1 : 0
   source                       = "./modules/protocol_gateways"
   rg_name                      = var.rg_name
+  location                     = data.azurerm_resource_group.rg.location
   subnet_name                  = data.azurerm_subnet.subnet.name
   source_image_id              = var.source_image_id
   vnet_name                    = local.vnet_name
@@ -49,7 +52,8 @@ module "smb_protocol_gateways" {
   ssh_public_key               = var.ssh_public_key == null ? tls_private_key.ssh_key[0].public_key_openssh : var.ssh_public_key
   ppg_id                       = local.placement_group_id
   sg_id                        = local.sg_id
-  key_vault_name               = azurerm_key_vault.key_vault.name
+  key_vault_url                = azurerm_key_vault.key_vault.vault_uri
+  key_vault_id                 = azurerm_key_vault.key_vault.id
   assign_public_ip             = var.assign_public_ip
   disk_size                    = var.smb_protocol_gateway_disk_size
   frontend_container_cores_num = var.smb_protocol_gateway_fe_cores_num

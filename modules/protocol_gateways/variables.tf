@@ -3,6 +3,11 @@ variable "rg_name" {
   description = "A predefined resource group in the Azure subscription."
 }
 
+variable "location" {
+  type        = string
+  description = "The Azure region to deploy all resources to."
+}
+
 variable "instance_type" {
   type        = string
   description = "The virtual machine type (sku) to deploy."
@@ -24,10 +29,10 @@ variable "secondary_ips_per_nic" {
   description = "Number of secondary IPs per single NIC per protocol gateway virtual machine."
   default     = 3
 
-  validation {
-    condition     = var.secondary_ips_per_nic >= 1
-    error_message = "The number of secondary IPs per single NIC per protocol gateway virtual machine must be at least 1."
-  }
+  # validation {
+  #   condition     = var.secondary_ips_per_nic >= 1
+  #   error_message = "The number of secondary IPs per single NIC per protocol gateway virtual machine must be at least 1."
+  # }
 }
 
 variable "vnet_rg_name" {
@@ -152,9 +157,14 @@ variable "install_weka_url" {
     error_message = "The URL should not be empty."
   }
 }
-variable "key_vault_name" {
+variable "key_vault_url" {
   type        = string
-  description = "The name of the Azure Key Vault."
+  description = "The URL of the Azure Key Vault."
+}
+
+variable "key_vault_id" {
+  type        = string
+  description = "The id of the Azure Key Vault."
 }
 
 variable "setup_protocol" {
