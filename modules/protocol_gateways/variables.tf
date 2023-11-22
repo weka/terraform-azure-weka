@@ -217,3 +217,19 @@ variable "weka_tar_storage_account_id" {
   type    = string
   default = ""
 }
+
+variable "function_app_name" {
+  type        = string
+  description = "The name of the function app."
+
+  validation {
+    condition     = length(var.function_app_name) > 0
+    error_message = "The function app name should not be empty."
+  }
+}
+
+variable "vault_function_app_key_name" {
+  type        = string
+  description = "The name of the Vault key containing the function app key."
+  default     = "function-app-default-key"
+}

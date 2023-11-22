@@ -143,6 +143,9 @@ locals {
     gateways_name                = var.gateways_name
     frontend_container_cores_num = var.frontend_container_cores_num
     share_name                   = var.smb_share_name
+    report_function_url          = format("https://%s.azurewebsites.net/api/report", var.function_app_name)
+    vault_function_app_key_name  = var.vault_function_app_key_name
+    key_vault_url                = var.key_vault_url
   })
 
   protocol_script = var.protocol == "NFS" ? local.setup_nfs_protocol_script : local.setup_smb_protocol_script
