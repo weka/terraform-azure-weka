@@ -27,7 +27,7 @@ variable "protocol" {
 variable "secondary_ips_per_nic" {
   type        = number
   description = "Number of secondary IPs per single NIC per protocol gateway virtual machine."
-  default     = 3
+  default     = 0
 
   # validation {
   #   condition     = var.secondary_ips_per_nic >= 1
