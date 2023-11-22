@@ -457,7 +457,7 @@ variable "nfs_protocol_gateways_number" {
 variable "nfs_protocol_gateway_secondary_ips_per_nic" {
   type        = number
   description = "Number of secondary IPs per single NIC per protocol gateway virtual machine."
-  default     = 3
+  default     = 0
 }
 
 variable "nfs_protocol_gateway_instance_type" {
@@ -494,7 +494,7 @@ variable "smb_protocol_gateways_number" {
 variable "smb_protocol_gateway_secondary_ips_per_nic" {
   type        = number
   description = "Number of secondary IPs per single NIC per protocol gateway virtual machine."
-  default     = 3
+  default     = 0
 }
 
 variable "smb_protocol_gateway_instance_type" {
