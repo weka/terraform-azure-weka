@@ -84,7 +84,7 @@ if [ -n "${domain_name}" ] || [ -n "${dns_ip}" ]; then
     new_dns_ip="${dns_ip}"
 
     # get updated contents of /etc/resolv.conf
-    updated_resolv_conf=$(sed -e "s|search\s*$existing_domain_name|search $new_domain_name $existing_domain_name|" -e "s|nameserver\s*$existing_dns_ip|nameserver $new_dns_ip $existing_dns_ip|" <<< "$resolv_conf")
+    updated_resolv_conf=$(sed -e "s|search\s*$existing_domain_name|search $new_domain_name $existing_domain_name|" -e "s|nameserver\s*$existing_dns_ip|nameserver $new_dns_ip\nnameserver $existing_dns_ip|" <<< "$resolv_conf")
 
     # save updated contents to /etc/resolv.conf
     echo "$updated_resolv_conf" | sudo tee /etc/resolv.conf > /dev/null
