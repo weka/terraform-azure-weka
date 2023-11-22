@@ -30,74 +30,43 @@ function wait_for_weka_fs(){
   fi
 }
 
-function create_fs(){
-  filesystem_name="$${1:-.config_fs}"
-  size="$${2:-10GB}"
-  max_retries=30 # 30 * 10 = 5 minutes
-
-  for (( i=0; i < max_retries; i++ )); do
-    echo "$(date -u): attempt $i of $max_retries"
-
-    if [ "$(weka fs | grep -c $filesystem_name)" -ge 1 ]; then
-      echo "$(date -u): weka filesystem $filesystem_name exists"
-      break
-    fi
-
-    echo "$(date -u): trying to create filesystem $filesystem_name"
-    output=$(weka fs create $filesystem_name default $size 2>&1)
-    # possiible outputs:
-    # FSId: 1 (means success)
-    # error: The given filesystem ".config_fs" already exists.
-    # error: Not enough available drive capacity for filesystem. requested "10.00 GB", but only "0 B" are free
-    if [ $? -eq 0 ]; then
-      echo "$(date -u): weka filesystem $filesystem_name is created"
-      break
-    fi
-
-    if [[ $output == *"already exists"* ]]; then
-      echo "$(date -u): weka filesystem $filesystem_name already exists"
-      break
-    fi
-
-    if [[ $output == *"Not enough available drive capacity for filesystem"* ]]; then
-      err_msg="Not enough available drive capacity for filesystem $filesystem_name for size $size"
-      echo "$(date -u): $err_msg"
-      report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"$err_msg\"}"
-      return 1
-    fi
-
-    echo "$(date -u): output: $output"
-
-  done
-  if (( i > max_retries )); then
-      err_msg="timeout: cannot create weka filesystem $filesystem_name after $max_retries attempts."
-      echo "$(date -u): $err_msg"
-      report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"$err_msg\"}"
-      return 1
-  fi
-}
-
-function ensure_config_fs(){
+function create_config_fs(){
   filesystem_name=".config_fs"
-  max_retries=60 # 60 * 10 = 10 minutes
-  for (( i=0; i < max_retries; i++ )); do
-    if [ "$(weka fs | grep -c $filesystem_name)" -ge 1 ]; then
-      echo "$(date -u): weka filesystem $filesystem_name is up"
-      break
-    fi
+  size="10GB"
 
-    create_fs $filesystem_name 10GB || return 1
-  done
-  if (( i > max_retries )); then
-      err_msg="timeout: weka filesystem $filesystem_name is not up after $max_retries attempts."
-      echo "$(date -u): $err_msg"
-      report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"$err_msg\"}"
-      return 1
+  if [ "$(weka fs | grep -c $filesystem_name)" -ge 1 ]; then
+    echo "$(date -u): weka filesystem $filesystem_name exists"
+    return 0
+  fi
+
+  echo "$(date -u): trying to create filesystem $filesystem_name"
+  output=$(weka fs create $filesystem_name default $size 2>&1)
+  # possiible outputs:
+  # FSId: 1 (means success)
+  # error: The given filesystem ".config_fs" already exists.
+  # error: Not enough available drive capacity for filesystem. requested "10.00 GB", but only "0 B" are free
+  if [ $? -eq 0 ]; then
+    echo "$(date -u): weka filesystem $filesystem_name is created"
+    return 0
+  fi
+
+  if [[ $output == *"already exists"* ]]; then
+    echo "$(date -u): weka filesystem $filesystem_name already exists"
+    break
+  elif [[ $output == *"Not enough available drive capacity for filesystem"* ]]; then
+    err_msg="Not enough available drive capacity for filesystem $filesystem_name for size $size"
+    echo "$(date -u): $err_msg"
+    report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"$err_msg\"}"
+    return 1
+  else
+    echo "$(date -u): output: $output"
+    report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"cannot create weka filesystem $filesystem_name\"}"
+    return 1
   fi
 }
 
 if [[ ${smbw_enabled} == true ]]; then
-  ensure_config_fs || exit 1
+  create_config_fs || exit 1
 fi
 
 # make sure weka cluster is already up
@@ -125,6 +94,7 @@ for ((i=0; i<20; i++)); do
   container_id=$(weka cluster container | grep frontend0 | grep ${gateways_name} | grep $current_mngmnt_ip | grep UP | awk '{print $1}')
   if [ -n "$container_id" ]; then
       echo "$(date -u): frontend0 container id: $container_id"
+      report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"frontend0 container $container_id is up\"}"
       break
   fi
   echo "$(date -u): waiting for frontend0 container to be up"
@@ -216,6 +186,7 @@ fi
 weka smb cluster create ${cluster_name} ${domain_name} $smbw_cmd_extention --container-ids $all_container_ids_str
 weka smb cluster wait
 
+report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"SMB cluster is created\"}"
 
 # add an SMB share if share_name is not empty
 # 'default' is the fs-name of weka file system created during clusterization
