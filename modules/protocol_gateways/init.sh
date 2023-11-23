@@ -189,7 +189,3 @@ if [[ "${install_weka_url}" == *.tar || "${install_weka_url}" == *".tar?"* ]]; t
 fi
 
 echo "$(date -u): weka agent installation complete"
-
-host_private_ip=$(ip -f inet addr show eth0 | sed -En -e 's/.*inet ([0-9.]+).*/\1/p')
-sed -i "2i $host_private_ip $HOSTNAME" /etc/hosts
-systemctl restart systemd-resolved.service
