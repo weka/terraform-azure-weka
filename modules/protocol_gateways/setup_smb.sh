@@ -66,6 +66,7 @@ function create_config_fs(){
 }
 
 if [[ ${smbw_enabled} == true ]]; then
+  wait_for_weka_fs || exit 1
   create_config_fs || exit 1
 fi
 
@@ -191,7 +192,6 @@ report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"SMB
 # add an SMB share if share_name is not empty
 # 'default' is the fs-name of weka file system created during clusterization
 if [ -n "${share_name}" ]; then
-    wait_for_weka_fs || exit 1
     weka smb share add ${share_name} default
 fi
 
