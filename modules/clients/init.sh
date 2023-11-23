@@ -80,7 +80,3 @@ systemctl status remove-routes.service || true # show status of remove-routes.se
 ip route # show routes after removing
 
 rm -rf $INSTALLATION_PATH
-
-host_private_ip=$(ip -f inet addr show eth0 | sed -En -e 's/.*inet ([0-9.]+).*/\1/p')
-sed -i "2i $host_private_ip $HOSTNAME" /etc/hosts
-systemctl restart systemd-resolved.service
