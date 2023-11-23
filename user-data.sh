@@ -151,5 +151,9 @@ if [ $retry -gt 0 ]; then
   curl -i "${report_url}?code=${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"debug\", \"message\": \"$msg\"}"
 fi
 
+host_private_ip=$(ip -f inet addr show eth0 | sed -En -e 's/.*inet ([0-9.]+).*/\1/p')
+sed -i "2i $host_private_ip $HOSTNAME" /etc/hosts
+systemctl restart systemd-resolved.service
+
 chmod +x /tmp/deploy.sh
 /tmp/deploy.sh 2>&1 | tee /tmp/weka_deploy.log
