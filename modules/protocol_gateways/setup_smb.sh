@@ -184,14 +184,36 @@ if [[ ${smbw_enabled} == true ]]; then
     smbw_cmd_extention="--smbw --config-fs-name .config_fs"
 fi
 
-weka smb cluster create ${cluster_name} ${domain_name} $smbw_cmd_extention --container-ids $all_container_ids_str
-weka smb cluster wait
+function create_smb_cluster {
+  cluster_create_output=$(weka smb cluster create ${cluster_name} ${domain_name} $smbw_cmd_extention --container-ids $all_container_ids_str 2>&1)
 
-report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"SMB cluster is created\"}"
+  if [ $? -eq 0 ]; then
+    msg="SMB cluster is created"
+    echo "$(date -u): $msg"
+    report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"$msg\"}"
+    return 0
+  elif [[ $cluster_create_output == *"Cluster is already configured"* ]]; then
+    msg="SMB cluster is already configured"
+    echo "$(date -u): $msg"
+    report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"$msg\"}"
+    weka smb cluster status
+    return 0
+  else
+    echo "$(date -u): $cluster_create_output"
+    report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"$cluster_create_output\"}"
+    return 1
+  fi
+}
+
+create_smb_cluster || exit 1
+
+weka smb cluster wait
 
 # add an SMB share if share_name is not empty
 # 'default' is the fs-name of weka file system created during clusterization
-if [ -n "${share_name}" ]; then
+share_exists=$(weka smb share | grep -c ${share_name})
+
+if [ -n "${share_name}" ] && [ $share_exists -eq 0 ]; then
     weka smb share add ${share_name} default
 fi
 
