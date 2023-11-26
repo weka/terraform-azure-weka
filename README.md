@@ -372,7 +372,6 @@ proxy_url = VALUE
 | [azurerm_storage_share.storage_share](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/storage_share) | data source |
 | [azurerm_subnet.subnet](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/subnet) | data source |
 | [azurerm_subscription.primary](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/subscription) | data source |
-| [azurerm_virtual_network.dns_vnet](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/virtual_network) | data source |
 | [azurerm_virtual_network.vnet](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/virtual_network) | data source |
 
 ## Inputs
@@ -433,8 +432,6 @@ proxy_url = VALUE
 | <a name="input_smb_dns_ip_address"></a> [smb\_dns\_ip\_address](#input\_smb\_dns\_ip\_address) | DNS IP address | `string` | `""` | no |
 | <a name="input_smb_dns_resolver_subnet_delegation_cidr"></a> [smb\_dns\_resolver\_subnet\_delegation\_cidr](#input\_smb\_dns\_resolver\_subnet\_delegation\_cidr) | Cidr of dns resolver of subnet, for SMB | `string` | `"10.0.4.0/28"` | no |
 | <a name="input_smb_dns_resolver_subnet_delegation_id"></a> [smb\_dns\_resolver\_subnet\_delegation\_id](#input\_smb\_dns\_resolver\_subnet\_delegation\_id) | Required to specify if subnet\_id were used to specify pre-defined for SMB dns resolver subnet, requires an additional subnet, '/subscriptions/../resourceGroups/../providers/Microsoft.Network/virtualNetworks/../subnets/..' | `string` | `""` | no |
-| <a name="input_smb_dns_resolver_vnet_name"></a> [smb\_dns\_resolver\_vnet\_name](#input\_smb\_dns\_resolver\_vnet\_name) | Name of vnet rg of dns resolver, for SMB | `string` | `""` | no |
-| <a name="input_smb_dns_resolver_vnet_rg_name"></a> [smb\_dns\_resolver\_vnet\_rg\_name](#input\_smb\_dns\_resolver\_vnet\_rg\_name) | Dns resolver vnet name | `string` | `""` | no |
 | <a name="input_smb_domain_name"></a> [smb\_domain\_name](#input\_smb\_domain\_name) | The domain to join the SMB cluster to. | `string` | `""` | no |
 | <a name="input_smb_domain_netbios_name"></a> [smb\_domain\_netbios\_name](#input\_smb\_domain\_netbios\_name) | The domain NetBIOS name of the SMB cluster. | `string` | `""` | no |
 | <a name="input_smb_protocol_gateway_disk_size"></a> [smb\_protocol\_gateway\_disk\_size](#input\_smb\_protocol\_gateway\_disk\_size) | The protocol gateways' default disk size. | `number` | `48` | no |
