@@ -43,3 +43,9 @@ data "azurerm_subnet" "subnet" {
   name                 = local.subnet_name
   depends_on           = [module.network]
 }
+
+data "azurerm_virtual_network" "vnet" {
+  name                = local.vnet_name
+  resource_group_name = local.vnet_rg_name
+  depends_on          = [module.network]
+}

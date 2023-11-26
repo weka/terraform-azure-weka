@@ -30,6 +30,79 @@ module "nfs_protocol_gateways" {
   depends_on                   = [module.network, azurerm_linux_virtual_machine_scale_set.vmss, azurerm_key_vault_secret.get_weka_io_token, azurerm_proximity_placement_group.ppg]
 }
 
+resource "azurerm_subnet" "dns_resolver_subnet" {
+  count                = var.smb_create_private_dns_resolver && var.smb_dns_resolver_subnet_delegation_id == "" ? 1 : 0
+  name                 = "${var.prefix}-${var.cluster_name}-subnet-dns-resolver"
+  resource_group_name  = local.resource_group_name
+  virtual_network_name = local.vnet_name
+  address_prefixes     = [var.smb_dns_resolver_subnet_delegation_cidr]
+
+  delegation {
+    name = "Microsoft.Network.dnsResolvers"
+    service_delegation {
+      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
+      name    = "Microsoft.Network/dnsResolvers"
+    }
+  }
+  depends_on = [module.network]
+}
+
+data "azurerm_virtual_network" "dns_vnet" {
+  count               = var.smb_dns_resolver_vnet_name != "" ? 1 : 0
+  name                = var.smb_dns_resolver_vnet_name
+  resource_group_name = var.smb_dns_resolver_vnet_rg_name
+}
+
+resource "azurerm_private_dns_resolver" "dns_resolver" {
+  count               = var.smb_create_private_dns_resolver ? 1 : 0
+  name                = "${var.prefix}-${var.cluster_name}-resolver"
+  resource_group_name = local.resource_group_name
+  location            = local.location
+  virtual_network_id  = var.smb_dns_resolver_vnet_name == "" ? data.azurerm_virtual_network.vnet.id : data.azurerm_virtual_network.dns_vnet[0].id
+  depends_on          = [module.network]
+}
+
+resource "azurerm_private_dns_resolver_outbound_endpoint" "outbound_endpoint" {
+  count                   = var.smb_create_private_dns_resolver ? 1 : 0
+  name                    = "${var.prefix}-${var.cluster_name}-endpoint"
+  private_dns_resolver_id = azurerm_private_dns_resolver.dns_resolver[0].id
+  location                = azurerm_private_dns_resolver.dns_resolver[0].location
+  subnet_id               = var.smb_dns_resolver_subnet_delegation_id == "" ? azurerm_subnet.dns_resolver_subnet[0].id : var.smb_dns_resolver_subnet_delegation_id
+  tags                    = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
+  depends_on              = [module.network, azurerm_private_dns_resolver.dns_resolver, azurerm_subnet.dns_resolver_subnet]
+}
+
+resource "azurerm_private_dns_resolver_dns_forwarding_ruleset" "dns_forwarding_ruleset" {
+  count                                      = var.smb_create_private_dns_resolver ? 1 : 0
+  name                                       = "${var.prefix}-${var.cluster_name}-ruleset"
+  resource_group_name                        = local.resource_group_name
+  location                                   = local.location
+  private_dns_resolver_outbound_endpoint_ids = [azurerm_private_dns_resolver_outbound_endpoint.outbound_endpoint[0].id]
+  tags                                       = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
+  depends_on                                 = [module.network, azurerm_private_dns_resolver_outbound_endpoint.outbound_endpoint]
+}
+
+resource "azurerm_private_dns_resolver_forwarding_rule" "resolver_forwarding_rule" {
+  count                     = var.smb_create_private_dns_resolver ? 1 : 0
+  name                      = "${var.prefix}-${var.cluster_name}-rule"
+  dns_forwarding_ruleset_id = azurerm_private_dns_resolver_dns_forwarding_ruleset.dns_forwarding_ruleset[0].id
+  domain_name               = "${var.smb_domain_name}."
+  enabled                   = true
+  target_dns_servers {
+    ip_address = var.smb_dns_ip_address
+    port       = 53
+  }
+  depends_on = [azurerm_private_dns_resolver_dns_forwarding_ruleset.dns_forwarding_ruleset]
+}
+
+resource "azurerm_private_dns_resolver_virtual_network_link" "dns_forwarding_virtual_network_link" {
+  count                     = var.smb_create_private_dns_resolver ? 1 : 0
+  name                      = "${var.prefix}-${var.cluster_name}-dns-forward-vnet-link"
+  virtual_network_id        = var.smb_dns_resolver_vnet_name == "" ? data.azurerm_virtual_network.vnet.id : data.azurerm_virtual_network.dns_vnet[0].id
+  dns_forwarding_ruleset_id = azurerm_private_dns_resolver_dns_forwarding_ruleset.dns_forwarding_ruleset[0].id
+  depends_on                = [azurerm_private_dns_resolver_dns_forwarding_ruleset.dns_forwarding_ruleset]
+}
+
 module "smb_protocol_gateways" {
   count                        = var.smb_protocol_gateways_number > 0 ? 1 : 0
   source                       = "./modules/protocol_gateways"
@@ -61,9 +134,8 @@ module "smb_protocol_gateways" {
   smb_cluster_name             = var.smb_cluster_name
   smb_domain_name              = var.smb_domain_name
   smb_domain_netbios_name      = var.smb_domain_netbios_name
-  smb_dns_ip_address           = var.smb_dns_ip_address
   smb_share_name               = var.smb_share_name
   smbw_enabled                 = var.smbw_enabled
   function_app_name            = azurerm_linux_function_app.function_app.name
-  depends_on                   = [module.network, azurerm_linux_virtual_machine_scale_set.vmss, azurerm_key_vault_secret.get_weka_io_token, azurerm_proximity_placement_group.ppg]
+  depends_on                   = [module.network, azurerm_linux_virtual_machine_scale_set.vmss, azurerm_key_vault_secret.get_weka_io_token, azurerm_proximity_placement_group.ppg, azurerm_private_dns_resolver_dns_forwarding_ruleset.dns_forwarding_ruleset]
 }

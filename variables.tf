@@ -562,6 +562,36 @@ variable "smb_share_name" {
   default     = "default"
 }
 
+variable "smb_create_private_dns_resolver" {
+  type        = bool
+  default     = false
+  description = "Create dns resolver for smb with outbound rule"
+}
+
+variable "smb_dns_resolver_subnet_delegation_cidr" {
+  type        = string
+  default     = "10.0.4.0/28"
+  description = "Cidr of dns resolver of subnet, for SMB"
+}
+
+variable "smb_dns_resolver_vnet_name" {
+  type        = string
+  default     = ""
+  description = "Name of vnet rg of dns resolver, for SMB"
+}
+
+variable "smb_dns_resolver_subnet_delegation_id" {
+  type        = string
+  default     = ""
+  description = "Required to specify if subnet_id were used to specify pre-defined for SMB dns resolver subnet, requires an additional subnet, '/subscriptions/../resourceGroups/../providers/Microsoft.Network/virtualNetworks/../subnets/..'"
+}
+
+variable "smb_dns_resolver_vnet_rg_name" {
+  type        = string
+  default     = ""
+  description = "Dns resolver vnet name"
+}
+
 variable "proxy_url" {
   type        = string
   description = "Weka home proxy url"
