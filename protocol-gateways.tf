@@ -47,18 +47,12 @@ resource "azurerm_subnet" "dns_resolver_subnet" {
   depends_on = [module.network]
 }
 
-data "azurerm_virtual_network" "dns_vnet" {
-  count               = var.smb_dns_resolver_vnet_name != "" ? 1 : 0
-  name                = var.smb_dns_resolver_vnet_name
-  resource_group_name = var.smb_dns_resolver_vnet_rg_name
-}
-
 resource "azurerm_private_dns_resolver" "dns_resolver" {
   count               = var.smb_create_private_dns_resolver ? 1 : 0
   name                = "${var.prefix}-${var.cluster_name}-resolver"
   resource_group_name = local.resource_group_name
   location            = local.location
-  virtual_network_id  = var.smb_dns_resolver_vnet_name == "" ? data.azurerm_virtual_network.vnet.id : data.azurerm_virtual_network.dns_vnet[0].id
+  virtual_network_id  = data.azurerm_virtual_network.vnet.id
   depends_on          = [module.network]
 }
 
@@ -98,7 +92,7 @@ resource "azurerm_private_dns_resolver_forwarding_rule" "resolver_forwarding_rul
 resource "azurerm_private_dns_resolver_virtual_network_link" "dns_forwarding_virtual_network_link" {
   count                     = var.smb_create_private_dns_resolver ? 1 : 0
   name                      = "${var.prefix}-${var.cluster_name}-dns-forward-vnet-link"
-  virtual_network_id        = var.smb_dns_resolver_vnet_name == "" ? data.azurerm_virtual_network.vnet.id : data.azurerm_virtual_network.dns_vnet[0].id
+  virtual_network_id        = data.azurerm_virtual_network.vnet.id
   dns_forwarding_ruleset_id = azurerm_private_dns_resolver_dns_forwarding_ruleset.dns_forwarding_ruleset[0].id
   depends_on                = [azurerm_private_dns_resolver_dns_forwarding_ruleset.dns_forwarding_ruleset]
 }
