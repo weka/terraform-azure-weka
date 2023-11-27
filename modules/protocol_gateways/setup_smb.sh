@@ -191,10 +191,8 @@ weka smb cluster wait
 
 # add an SMB share if share_name is not empty
 # 'default' is the fs-name of weka file system created during clusterization
-share_exists=$(weka smb share | grep -c ${share_name})
-
-if [ -n "${share_name}" ] && [ $share_exists -eq 0 ]; then
-    weka smb share add ${share_name} default
+if [ -n "${share_name}" ]; then
+    weka smb share add ${share_name} default || true
 fi
 
 weka smb cluster status
