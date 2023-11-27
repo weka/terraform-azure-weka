@@ -69,7 +69,7 @@ No modules.
 |------|-------------|------|---------|:--------:|
 | <a name="input_vnet_name"></a> [vnet\_name](#input\_vnet\_name) | Vnet name | `string` | n/a | yes |
 | <a name="input_vnet_rg_name"></a> [vnet\_rg\_name](#input\_vnet\_rg\_name) | Vnet resource group name | `string` | n/a | yes |
-| <a name="input_vnet_to_peering"></a> [vnet\_to\_peering](#input\_vnet\_to\_peering) | List of vnet and rg for setting peering | <pre>list(object({<br>    vnet = string<br>    rg   = string<br>  }))</pre> | n/a | yes |
+| <a name="input_vnets_to_peer_to_deployment_vnet"></a> [vnets\_to\_peer\_to\_deployment\_vnet](#input\_vnets\_to\_peer\_to\_deployment\_vnet) | List of vnet and rg for setting peering | <pre>list(object({<br>    vnet = string<br>    rg   = string<br>  }))</pre> | n/a | yes |
 
 ## Outputs
 
