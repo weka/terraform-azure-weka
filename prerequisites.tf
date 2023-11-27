@@ -29,12 +29,12 @@ locals {
 }
 
 module "peering" {
-  count           = length(var.vnet_to_peering)
-  source          = "./modules/peering_vnets"
-  vnet_rg_name    = local.vnet_rg_name
-  vnet_name       = local.vnet_name
-  vnet_to_peering = var.vnet_to_peering
-  depends_on      = [module.network]
+  count                            = length(var.vnets_to_peer_to_deployment_vnet)
+  source                           = "./modules/peering_vnets"
+  vnet_rg_name                     = local.vnet_rg_name
+  vnet_name                        = local.vnet_name
+  vnets_to_peer_to_deployment_vnet = var.vnets_to_peer_to_deployment_vnet
+  depends_on                       = [module.network]
 }
 
 data "azurerm_subnet" "subnet" {
