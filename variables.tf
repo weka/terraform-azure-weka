@@ -185,7 +185,7 @@ variable "private_dns_rg_name" {
   default     = ""
 }
 
-variable "vnet_to_peering" {
+variable "vnets_to_peer_to_deployment_vnet" {
   type = list(object({
     vnet = string
     rg   = string

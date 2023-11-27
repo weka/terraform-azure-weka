@@ -21,7 +21,7 @@ module "weka_deployment" {
   tiering_enable_obs_integration      = true
   subscription_id                     = var.subscription_id
   function_access_restriction_enabled = true
-  vnet_to_peering = [{
+  vnets_to_peer_to_deployment_vnet = [{
     vnet = "ubuntu-apt-repo-vnet"
     rg   = "ubuntu-apt-repo-rg"
   }]
