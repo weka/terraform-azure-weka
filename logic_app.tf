@@ -102,13 +102,13 @@ locals {
     function_id   = azurerm_linux_function_app.function_app.id
   })
   connections_workflow_hash     = md5(join("", [for f in fileset(local.connections_workflow, "**") : filemd5("${local.connections_workflow}/${f}")]))
-  connections_workflow_filename = "/tmp/connections_workflow_${local.connections_workflow_hash}"
+  connections_workflow_filename = "/tmp/${var.prefix}_${var.cluster_name}_connections_workflow_${local.connections_workflow_hash}"
   scale_up_workflow_path        = "${path.module}/logic_app/scale_up.json"
   scale_up_workflow_hash        = md5(join("", [for f in fileset(local.scale_up_workflow_path, "**") : filemd5("${local.scale_up_workflow_path}/${f}")]))
-  scale_up_workflow_filename    = "/tmp/scale_up_workflow_${local.scale_up_workflow_hash}"
+  scale_up_workflow_filename    = "/tmp/${var.prefix}_${var.cluster_name}_scale_up_workflow_${local.scale_up_workflow_hash}"
   scale_down_workflow_path      = "${path.module}/logic_app/scale_down.json"
   scale_down_workflow_hash      = md5(join("", [for f in fileset(local.scale_down_workflow_path, "**") : filemd5("${local.scale_down_workflow_path}/${f}")]))
-  scale_down_workflow_filename  = "/tmp/scale_down_workflow_${local.scale_down_workflow_hash}"
+  scale_down_workflow_filename  = "/tmp/${var.prefix}_${var.cluster_name}_scale_down_workflow_${local.scale_down_workflow_hash}"
 }
 
 resource "local_file" "connections_workflow_file" {
@@ -130,16 +130,16 @@ resource "azurerm_storage_share_file" "scale_down_share_file" {
   name             = "workflow.json"
   path             = azurerm_storage_share_directory.share_directory_scale_down.name
   storage_share_id = data.azurerm_storage_share.storage_share.id
-  source           = local.scale_down_workflow_filename
-  depends_on       = [azurerm_storage_share_directory.share_directory_scale_down, data.azurerm_storage_share.storage_share]
+  source           = local_file.scale_down_workflow_file.filename
+  depends_on       = [azurerm_storage_share_directory.share_directory_scale_down, data.azurerm_storage_share.storage_share, local_file.scale_down_workflow_file]
 }
 
 resource "azurerm_storage_share_file" "scale_up_share_file" {
   name             = "workflow.json"
   path             = azurerm_storage_share_directory.share_directory_scale_up.name
   storage_share_id = data.azurerm_storage_share.storage_share.id
-  source           = local.scale_up_workflow_filename
-  depends_on       = [azurerm_storage_share_directory.share_directory_scale_up, data.azurerm_storage_share.storage_share]
+  source           = local_file.scale_up_workflow_file.filename
+  depends_on       = [azurerm_storage_share_directory.share_directory_scale_up, data.azurerm_storage_share.storage_share, local_file.scale_up_workflow_file]
 }
 
 resource "azurerm_storage_share_file" "connections_share_file" {
