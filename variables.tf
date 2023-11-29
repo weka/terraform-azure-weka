@@ -544,12 +544,6 @@ variable "smb_domain_name" {
   default     = ""
 }
 
-variable "smb_domain_netbios_name" {
-  type        = string
-  description = "The domain NetBIOS name of the SMB cluster."
-  default     = ""
-}
-
 variable "smb_dns_ip_address" {
   type        = string
   description = "DNS IP address"

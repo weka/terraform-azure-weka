@@ -127,7 +127,6 @@ module "smb_protocol_gateways" {
   frontend_container_cores_num = var.smb_protocol_gateway_fe_cores_num
   smb_cluster_name             = var.smb_cluster_name
   smb_domain_name              = var.smb_domain_name
-  smb_domain_netbios_name      = var.smb_domain_netbios_name
   smb_share_name               = var.smb_share_name
   smbw_enabled                 = var.smbw_enabled
   function_app_name            = azurerm_linux_function_app.function_app.name
