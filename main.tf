@@ -73,6 +73,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
   disable_password_authentication = true
   proximity_placement_group_id    = local.placement_group_id
   source_image_id                 = var.source_image_id
+  overprovision                   = false
   tags = merge(var.tags_map, {
     "weka_cluster" : var.cluster_name, "user_id" : data.azurerm_client_config.current.object_id
   })
