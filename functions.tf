@@ -178,7 +178,7 @@ resource "azurerm_linux_function_app" "function_app" {
 
   lifecycle {
     precondition {
-      condition     = var.function_app_version == local.function_app_code_hash
+      condition     = var.function_app_dist == "release" || var.function_app_version == local.function_app_code_hash
       error_message = "Please update function app code version."
     }
     ignore_changes = [site_config, tags]
