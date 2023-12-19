@@ -160,8 +160,8 @@ Names will be:
 Also we store the keys on key vault as secret:
 To download keys from key vault use command:
 ```
-az keyvault secret download --file private.pem --encoding utf-8 --vault-name  ${prefix}-${cluster_name}-key-vault --name private-key --query "value"
-az keyvault secret download --file private.pem --encoding utf-8 --vault-name  ${prefix}-${cluster_name}-key-vault --name public-key --query "value"
+az keyvault secret download --file private.pem --encoding utf-8 --vault-name  ${prefix}-${cluster_name} --name private-key --query "value"
+az keyvault secret download --file private.pem --encoding utf-8 --vault-name  ${prefix}-${cluster_name} --name public-key --query "value"
 ```
 
 ## OBS
