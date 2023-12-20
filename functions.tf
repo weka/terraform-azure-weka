@@ -163,12 +163,13 @@ resource "azurerm_linux_function_app" "function_app" {
     PROXY_URL                        = var.proxy_url
     WEKA_HOME_URL                    = var.weka_home_url
 
-    https_only               = true
-    FUNCTIONS_WORKER_RUNTIME = "custom"
-    FUNCTION_APP_EDIT_MODE   = "readonly"
-    HASH                     = var.function_app_version
-    WEBSITE_RUN_FROM_PACKAGE = "https://${local.weka_sa}.blob.core.windows.net/${local.weka_sa_container}/${local.function_app_zip_name}"
-    WEBSITE_VNET_ROUTE_ALL   = true
+    https_only                  = true
+    FUNCTIONS_EXTENSION_VERSION = "~4"
+    FUNCTIONS_WORKER_RUNTIME    = "custom"
+    FUNCTION_APP_EDIT_MODE      = "readonly"
+    HASH                        = var.function_app_version
+    WEBSITE_RUN_FROM_PACKAGE    = "https://${local.weka_sa}.blob.core.windows.net/${local.weka_sa_container}/${local.function_app_zip_name}"
+    WEBSITE_VNET_ROUTE_ALL      = true
   }
 
   identity {
