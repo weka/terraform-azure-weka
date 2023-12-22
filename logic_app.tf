@@ -40,6 +40,7 @@ resource "azurerm_logic_app_standard" "logic_app_standard" {
   app_service_plan_id        = azurerm_service_plan.logicapp_service_plan.id
   storage_account_name       = azurerm_storage_account.logicapp.name
   storage_account_access_key = azurerm_storage_account.logicapp.primary_access_key
+  version                    = "~4" # sets FUNCTIONS_EXTENSION_VERSION (should be same as for function app)
   identity {
     type = "SystemAssigned"
   }
@@ -56,7 +57,6 @@ resource "azurerm_logic_app_standard" "logic_app_standard" {
     }
   }
   app_settings = {
-    "FUNCTIONS_EXTENSION_VERSION"  = "~4"
     "FUNCTIONS_WORKER_RUNTIME"     = "node"
     "WEBSITE_NODE_DEFAULT_VERSION" = "~18"
     "function_app_key"             = data.azurerm_function_app_host_keys.function_keys.default_function_key
