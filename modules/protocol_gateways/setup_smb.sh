@@ -164,9 +164,13 @@ if [[ ${smbw_enabled} == true ]]; then
     smbw_cmd_extention="--smbw --config-fs-name .config_fs"
 fi
 
-function create_smb_cluster {
-  cluster_create_output=$(weka smb cluster create ${cluster_name} ${domain_name} $smbw_cmd_extention --container-ids $all_container_ids_str 2>&1)
+# new smbw config, where smbw is the default
+smb_cmd_extention=""
+if [[ ${smbw_enabled} == false ]]; then
+    smb_cmd_extention="--smb"
+fi
 
+function handle_cluster_create_output() {
   if [ $? -eq 0 ]; then
     msg="SMB cluster is created"
     echo "$(date -u): $msg"
@@ -185,7 +189,19 @@ function create_smb_cluster {
   fi
 }
 
-create_smb_cluster || exit 1
+function create_old_smb_cluster() {
+  echo "$(date -u): trying to create old SMB cluster"
+  cluster_create_output=$(weka smb cluster create ${cluster_name} ${domain_name} $smbw_cmd_extention --container-ids $all_container_ids_str 2>&1)
+  handle_cluster_create_output cluster_create_output
+}
+
+function create_new_smb_cluster() {
+  echo "$(date -u): trying to create new SMB cluster"
+  cluster_create_output=$(weka smb cluster create ${cluster_name} ${domain_name} .config_fs --container-ids $all_container_ids_str $smb_cmd_extention 2>&1)
+  handle_cluster_create_output cluster_create_output
+}
+
+create_old_smb_cluster || create_new_smb_cluster || exit 1
 
 weka smb cluster wait
 
