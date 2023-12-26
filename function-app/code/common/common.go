@@ -1,7 +1,6 @@
 package common
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -17,6 +16,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/lease"
 	"github.com/google/uuid"
 	"github.com/weka/go-cloud-lib/lib/types"
 	"github.com/weka/go-cloud-lib/logging"
@@ -43,7 +44,7 @@ for d in json.load(sys.stdin)['disks']:
 	print(d['devPath'])
 `
 
-func leaseContainer(ctx context.Context, subscriptionId, resourceGroupName, storageAccountName, containerName string, leaseIdIn *string, action armstorage.LeaseContainerRequestAction) (leaseIdOut *string, err error) {
+func leaseContainerAcquire(ctx context.Context, storageAccountName, containerName string, leaseIdIn *string) (leaseIdOut *string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
@@ -52,27 +53,28 @@ func leaseContainer(ctx context.Context, subscriptionId, resourceGroupName, stor
 		return
 	}
 
-	containerClient, err := armstorage.NewBlobContainersClient(subscriptionId, credential, nil)
+	containerUrl := getContainerUrl(storageAccountName, containerName)
+	containerClient, err := container.NewClient(containerUrl, credential, nil)
+	if err != nil {
+		logger.Error().Msgf("container.NewClient: %s", err)
+		return
+	}
+
+	options := &lease.ContainerClientOptions{
+		LeaseID: leaseIdIn,
+	}
+	leaseContainerClient, err := lease.NewContainerClient(containerClient, options)
+	if err != nil {
+		logger.Error().Msgf("lease.NewContainerClient: %s", err)
+		return
+	}
 	duration := int32(60)
 	for i := 1; i < 1000; i++ {
-		lease, err2 := containerClient.Lease(ctx, resourceGroupName, storageAccountName, containerName,
-			&armstorage.BlobContainersClientLeaseOptions{
-				Parameters: &armstorage.LeaseContainerRequest{
-					Action:        &action,
-					LeaseDuration: &duration,
-					LeaseID:       leaseIdIn,
-				},
-			})
+		lease, err2 := leaseContainerClient.AcquireLease(ctx, duration, nil)
 		err = err2
 		if err != nil {
-			if leaseErr, ok := err.(*azcore.ResponseError); ok && leaseErr.ErrorCode == "ContainerOperationFailure" {
-				buf := new(bytes.Buffer)
-				buf.ReadFrom(leaseErr.RawResponse.Body)
-				if !strings.Contains(buf.String(), "LeaseAlreadyPresent") {
-					logger.Error().Err(err).Send()
-					return
-				}
-				logger.Debug().Msg("lease in use, will retry in 1 sec")
+			if leaseErr, ok := err.(*azcore.ResponseError); ok && leaseErr.ErrorCode == "LeaseAlreadyPresent" {
+				logger.Info().Msg("lease in use, will retry in 1 sec")
 				time.Sleep(time.Second)
 			} else {
 				logger.Error().Err(err).Send()
@@ -87,16 +89,54 @@ func leaseContainer(ctx context.Context, subscriptionId, resourceGroupName, stor
 	return
 }
 
-func LockContainer(ctx context.Context, subscriptionId, resourceGroupName, storageAccountName, containerName string) (*string, error) {
+func leaseContainerRelease(ctx context.Context, storageAccountName, containerName string, leaseId *string) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
-	logger.Debug().Msgf("locking %s", containerName)
-	return leaseContainer(ctx, subscriptionId, resourceGroupName, storageAccountName, containerName, nil, armstorage.LeaseContainerRequestActionAcquire)
+
+	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		logger.Error().Msgf("azidentity.NewDefaultAzureCredential: %s", err)
+		return
+	}
+
+	containerUrl := getContainerUrl(storageAccountName, containerName)
+	containerClient, err := container.NewClient(containerUrl, credential, nil)
+	if err != nil {
+		logger.Error().Msgf("container.NewClient: %s", err)
+		return
+	}
+
+	options := &lease.ContainerClientOptions{
+		LeaseID: leaseId,
+	}
+
+	leaseContainerClient, err := lease.NewContainerClient(containerClient, options)
+	if err != nil {
+		logger.Error().Msgf("lease.NewContainerClient: %s", err)
+		return
+	}
+
+	_, err = leaseContainerClient.ReleaseLease(ctx, nil)
+	if err != nil {
+		logger.Error().Msgf("leaseContainerClient.ReleaseLease: %s", err)
+		return
+	}
+	return
 }
 
-func UnlockContainer(ctx context.Context, subscriptionId, resourceGroupName, storageAccountName, containerName string, leaseId *string) (*string, error) {
+func LockContainer(ctx context.Context, storageAccountName, containerName string) (*string, error) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Debug().Msgf("locking %s", containerName)
+	return leaseContainerAcquire(ctx, storageAccountName, containerName, nil)
+}
+
+func UnlockContainer(ctx context.Context, storageAccountName, containerName string, leaseId *string) error {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Debug().Msgf("unlocking %s", containerName)
-	return leaseContainer(ctx, subscriptionId, resourceGroupName, storageAccountName, containerName, leaseId, armstorage.LeaseContainerRequestActionRelease)
+	err := leaseContainerRelease(ctx, storageAccountName, containerName, leaseId)
+	if err != nil {
+		logger.Error().Msgf("Failed leaseContainerRelease: %s", err)
+	}
+	return err
 }
 
 func ReadBlobObject(ctx context.Context, stateStorageName, containerName, blobName string) (state []byte, err error) {
@@ -183,6 +223,10 @@ func getBlobUrl(storageName string) string {
 	return fmt.Sprintf("https://%s.blob.core.windows.net/", storageName)
 }
 
+func getContainerUrl(storageName, containerName string) string {
+	return fmt.Sprintf("https://%s.blob.core.windows.net/%s", storageName, containerName)
+}
+
 type ShutdownRequired struct {
 	Message string
 }
@@ -194,10 +238,11 @@ func (e *ShutdownRequired) Error() string {
 func AddInstanceToState(ctx context.Context, subscriptionId, resourceGroupName, stateStorageName, stateContainerName, newInstance string) (state protocol.ClusterState, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	leaseId, err := LockContainer(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
+	leaseId, err := LockContainer(ctx, stateStorageName, stateContainerName)
 	if err != nil {
 		return
 	}
+	defer UnlockContainer(ctx, stateStorageName, stateContainerName, leaseId)
 
 	state, err = ReadState(ctx, stateStorageName, stateContainerName)
 	if err != nil {
@@ -219,23 +264,17 @@ func AddInstanceToState(ctx context.Context, subscriptionId, resourceGroupName, 
 		state.Instances = append(state.Instances, newInstance)
 		err = WriteState(ctx, stateStorageName, stateContainerName, state)
 	}
-	_, err2 := UnlockContainer(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName, leaseId)
-	if err2 != nil {
-		if err == nil {
-			err = err2
-		}
-		logger.Error().Msgf("unlocking %s failed", stateStorageName)
-	}
 	return
 }
 
 func UpdateClusterized(ctx context.Context, subscriptionId, resourceGroupName, stateStorageName, stateContainerName string) (state protocol.ClusterState, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	leaseId, err := LockContainer(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
+	leaseId, err := LockContainer(ctx, stateStorageName, stateContainerName)
 	if err != nil {
 		return
 	}
+	defer UnlockContainer(ctx, stateStorageName, stateContainerName, leaseId)
 
 	state, err = ReadState(ctx, stateStorageName, stateContainerName)
 	if err != nil {
@@ -245,13 +284,8 @@ func UpdateClusterized(ctx context.Context, subscriptionId, resourceGroupName, s
 	state.Instances = []string{}
 	state.Clusterized = true
 	err = WriteState(ctx, stateStorageName, stateContainerName, state)
-	_, err2 := UnlockContainer(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName, leaseId)
-	if err2 != nil {
-		if err == nil {
-			err = err2
-		}
-		logger.Error().Msgf("unlocking %s failed", stateStorageName)
-	}
+
+	logger.Info().Msg("State updated to 'clusterized'")
 	return
 }
 
@@ -965,23 +999,13 @@ func TerminateScaleSetInstances(ctx context.Context, subscriptionId, resourceGro
 }
 
 func UpdateStateReporting(ctx context.Context, subscriptionId, resourceGroupName, stateContainerName, stateStorageName string, report protocol.Report) (err error) {
-	logger := logging.LoggerFromCtx(ctx)
-
-	leaseId, err := LockContainer(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
+	leaseId, err := LockContainer(ctx, stateStorageName, stateContainerName)
 	if err != nil {
 		return
 	}
+	defer UnlockContainer(ctx, stateStorageName, stateContainerName, leaseId)
 
-	err = UpdateStateReportingWithoutLocking(ctx, stateContainerName, stateStorageName, report)
-
-	_, err2 := UnlockContainer(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName, leaseId)
-	if err2 != nil {
-		if err == nil {
-			err = err2
-		}
-		logger.Error().Msgf("unlocking %s failed", stateStorageName)
-	}
-	return
+	return UpdateStateReportingWithoutLocking(ctx, stateContainerName, stateStorageName, report)
 }
 
 func UpdateStateReportingWithoutLocking(ctx context.Context, stateContainerName, stateStorageName string, report protocol.Report) (err error) {
