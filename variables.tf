@@ -321,13 +321,13 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "7cd7a633b3249a2032f284a1c9129c71"
+  default     = "ad86b5621c1f36ad9af80763d88b29a6"
 }
 
 variable "function_app_dist" {
   type        = string
   description = "Function app code dist"
-  default     = "release"
+  default     = "dev"
 
   validation {
     condition     = contains(["dev", "release"], var.function_app_dist)
