@@ -11,7 +11,7 @@ import (
 	"time"
 	"weka-deployment/common"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5"
 	"github.com/weka/go-cloud-lib/logging"
 	"github.com/weka/go-cloud-lib/protocol"
 )
