@@ -422,6 +422,12 @@ variable "placement_group_id" {
   description = "Proximity placement group to use for the vmss. If not passed, will be created automatically."
 }
 
+variable "vmss_single_placement_group" {
+  type        = bool
+  default     = true
+  description = "Sets single_placement_group option for vmss. If true, a scale set is composed of a single placement group, and has a range of 0-100 VMs."
+}
+
 variable "deployment_storage_account_name" {
   type        = string
   default     = ""
