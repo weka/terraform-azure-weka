@@ -72,6 +72,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
   custom_data                     = base64encode(local.custom_data_script)
   disable_password_authentication = true
   proximity_placement_group_id    = local.placement_group_id
+  single_placement_group          = var.vmss_single_placement_group
   source_image_id                 = var.source_image_id
   overprovision                   = false
   tags = merge(var.tags_map, {
