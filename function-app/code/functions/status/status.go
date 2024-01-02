@@ -4,16 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/weka/go-cloud-lib/connectors"
-	"github.com/weka/go-cloud-lib/lib/jrpc"
-	"github.com/weka/go-cloud-lib/lib/weka"
-	"github.com/weka/go-cloud-lib/logging"
-	"github.com/weka/go-cloud-lib/protocol"
 	"math/rand"
 	"net/http"
 	"os"
 	"time"
 	"weka-deployment/common"
+
+	"github.com/weka/go-cloud-lib/connectors"
+	"github.com/weka/go-cloud-lib/lib/jrpc"
+	"github.com/weka/go-cloud-lib/lib/weka"
+	"github.com/weka/go-cloud-lib/logging"
+	"github.com/weka/go-cloud-lib/protocol"
 )
 
 func GetReports(ctx context.Context, stateStorageName, stateContainerName string) (reports protocol.Reports, err error) {
@@ -67,8 +68,8 @@ func GetClusterStatus(ctx context.Context, subscriptionId, resourceGroupName, vm
 	for _, ip := range vmIps {
 		ips = append(ips, ip)
 	}
-	rand.Seed(time.Now().UnixNano())
-	rand.Shuffle(len(ips), func(i, j int) { ips[i], ips[j] = ips[j], ips[i] })
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r.Shuffle(len(ips), func(i, j int) { ips[i], ips[j] = ips[j], ips[i] })
 	logger.Info().Msgf("ips: %s", ips)
 	jpool := &jrpc.Pool{
 		Ips:     ips,

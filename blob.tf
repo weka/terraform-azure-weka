@@ -44,3 +44,104 @@ data "azurerm_storage_account" "obs_sa" {
   name                = var.tiering_obs_name
   resource_group_name = var.rg_name
 }
+
+resource "azurerm_storage_blob" "vmss_state" {
+  name                   = "vmss-state"
+  storage_account_name   = local.deployment_storage_account_name
+  storage_container_name = local.deployment_container_name
+  type                   = "Block"
+
+  source_content = jsonencode({
+    vmss_created   = false
+    vmss_id        = ""
+    upgrade_needed = false
+  })
+}
+
+resource "azurerm_storage_blob" "vmss_config" {
+  name                   = "vmss-config"
+  storage_account_name   = local.deployment_storage_account_name
+  storage_container_name = local.deployment_container_name
+  type                   = "Block"
+
+  source_content = jsonencode({
+    name                            = "${var.prefix}-${var.cluster_name}-vmss"
+    location                        = data.azurerm_resource_group.rg.location
+    zones                           = [var.zone]
+    resource_group_name             = var.rg_name
+    sku                             = var.instance_type
+    upgrade_mode                    = "Manual"
+    health_probe_id                 = azurerm_lb_probe.backend_lb_probe.id
+    admin_username                  = var.vm_username
+    instances                       = var.cluster_size
+    computer_name_prefix            = "${var.prefix}-${var.cluster_name}-backend"
+    custom_data                     = base64encode(local.custom_data_script)
+    disable_password_authentication = true
+    proximity_placement_group_id    = var.vmss_single_placement_group ? local.placement_group_id : null
+    single_placement_group          = var.vmss_single_placement_group
+    source_image_id                 = var.source_image_id
+    overprovision                   = false
+    orchestration_mode              = "Uniform"
+    tags = merge(var.tags_map, {
+      "weka_cluster" : var.cluster_name, "user_id" : data.azurerm_client_config.current.object_id
+    })
+
+    os_disk = {
+      caching              = "ReadWrite"
+      storage_account_type = "Premium_LRS"
+    }
+
+    data_disk = {
+      lun                  = 0
+      caching              = "None"
+      create_option        = "Empty"
+      disk_size_gb         = local.disk_size
+      storage_account_type = "Premium_LRS"
+    }
+
+    admin_ssh_key = {
+      username   = var.vm_username
+      public_key = local.public_ssh_key
+    }
+
+    identity = {
+      type         = "UserAssigned"
+      identity_ids = [azurerm_user_assigned_identity.vmss.id]
+    }
+
+    primary_nic = {
+      name                          = "${var.prefix}-${var.cluster_name}-backend-nic-0"
+      network_security_group_id     = local.sg_id
+      primary                       = true
+      enable_accelerated_networking = var.install_cluster_dpdk
+
+      ip_configurations = [{
+        primary                                = true
+        subnet_id                              = data.azurerm_subnet.subnet.id
+        load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
+        public_ip_address = {
+          assign            = var.assign_public_ip
+          name              = "${var.prefix}-${var.cluster_name}-public-ip"
+          domain_name_label = "${var.prefix}-${var.cluster_name}-backend"
+        }
+      }]
+    }
+
+    secondary_nics = {
+      number                        = local.nics_numbers - 1
+      name_prefix                   = "${var.prefix}-${var.cluster_name}-backend-nic"
+      network_security_group_id     = local.sg_id
+      primary                       = false
+      enable_accelerated_networking = var.install_cluster_dpdk
+      ip_configurations = [{
+        primary                                = false
+        subnet_id                              = data.azurerm_subnet.subnet.id
+        load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
+      }]
+    }
+  })
+  depends_on = [
+    azurerm_storage_container.deployment, azurerm_lb_backend_address_pool.lb_backend_pool, azurerm_lb_probe.backend_lb_probe,
+    azurerm_proximity_placement_group.ppg, azurerm_lb_rule.backend_lb_rule, azurerm_lb_rule.ui_lb_rule
+  ]
+}

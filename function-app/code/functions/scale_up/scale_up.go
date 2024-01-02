@@ -1,14 +1,16 @@
 package scale_up
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/weka/go-cloud-lib/logging"
-	"github.com/weka/go-cloud-lib/protocol"
 	"net/http"
 	"os"
 	"strings"
 	"weka-deployment/common"
+
+	"github.com/weka/go-cloud-lib/logging"
+	"github.com/weka/go-cloud-lib/protocol"
 )
 
 func itemInList(item string, list []string) bool {
@@ -26,6 +28,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
+	vmssStateStorageName := os.Getenv("VMSS_STATE_STORAGE_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
 	prefix := os.Getenv("PREFIX")
@@ -34,6 +37,19 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName)
 	logger := logging.LoggerFromCtx(ctx)
+
+	vmssState, err := common.ReadVmssState(ctx, vmssStateStorageName, stateContainerName)
+	if err != nil {
+		resData["body"] = err.Error()
+	} else if !vmssState.VmssCreated {
+		err := HandleVmssCreate(ctx, subscriptionId, resourceGroupName, vmScaleSetName, vmssStateStorageName, stateContainerName, &vmssState)
+		if err != nil {
+			resData["body"] = err.Error()
+		} else {
+			resData["body"] = "created vmss successfully"
+		}
+	}
+
 	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
 	if err != nil {
 		resData["body"] = err.Error()
@@ -123,4 +139,33 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(responseJson)
+}
+
+func HandleVmssCreate(ctx context.Context, subscriptionId, resourceGroupName, vmssName, vmssStateStorageName, containerName string, vmssState *common.VMSSState) error {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msgf("creating vmss %s", vmssName)
+
+	functionAppName := os.Getenv("FUNCTION_APP_NAME")
+
+	vmssConfig, err := common.ReadVmssConfig(ctx, vmssStateStorageName, containerName)
+	if err != nil {
+		return err
+	}
+
+	vmssId, err := common.CreateVmss(ctx, subscriptionId, resourceGroupName, vmssName, vmssConfig)
+	if err != nil {
+		return err
+	}
+
+	err = common.AssignVmssContributorRoleToFunctionApp(ctx, subscriptionId, resourceGroupName, *vmssId, functionAppName)
+	if err != nil {
+		err = fmt.Errorf("cannot assign vmss 'contributor' role to function app: %w", err)
+		return err
+	}
+
+	logger.Info().Msgf("created vmss %s, updating vmss state", vmssName)
+	vmssState.VmssCreated = true
+	vmssState.VmssId = *vmssId
+	err = common.WriteVmssState(ctx, vmssStateStorageName, containerName, *vmssState)
+	return err
 }
