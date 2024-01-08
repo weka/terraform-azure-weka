@@ -11,7 +11,7 @@ module "weka_deployment" {
   rg_name                             = "weka-rg"
   assign_public_ip                    = false
   apt_repo_server                     = "http://11.0.0.4/ubuntu/mirror/archive.ubuntu.com/ubuntu/"
-  install_weka_url                    = "https://wekatars.blob.core.windows.net/tars/weka-4.2.7.tar?<SAS_TOKEN>"
+  install_weka_url                    = "https://wekatars.blob.core.windows.net/tars/weka-4.2.7.64.tar?<SAS_TOKEN>"
   vnet_rg_name                        = "weka-rg"
   vnet_name                           = "weka-vnet"
   subnet_name                         = "weka-subnet"
