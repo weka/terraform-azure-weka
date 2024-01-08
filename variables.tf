@@ -123,7 +123,7 @@ variable "logic_app_subnet_delegation_cidr" {
 variable "weka_version" {
   type        = string
   description = "The Weka version to deploy."
-  default     = "4.2.7"
+  default     = "4.2.7.64"
 }
 
 variable "get_weka_io_token" {
