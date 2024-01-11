@@ -36,7 +36,9 @@ func GetReports(ctx context.Context, stateStorageName, stateContainerName string
 	return
 }
 
-func GetClusterStatus(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, keyVaultUri string) (clusterStatus protocol.ClusterStatus, err error) {
+func GetClusterStatus(
+	ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, keyVaultUri string, refreshVmScaleSetName *string,
+) (clusterStatus protocol.ClusterStatus, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("fetching cluster status...")
 
@@ -64,10 +66,20 @@ func GetClusterStatus(ctx context.Context, subscriptionId, resourceGroupName, vm
 	if err != nil {
 		return
 	}
-	ips := make([]string, len(vmIps))
+
+	refreshVmIps := make(map[string]string, 0)
+	if refreshVmScaleSetName != nil {
+		refreshVmIps, err = common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, *refreshVmScaleSetName)
+		if err != nil {
+			return
+		}
+	}
+
+	ips := make([]string, 0, len(vmIps)+len(refreshVmIps))
 	for _, ip := range vmIps {
 		ips = append(ips, ip)
 	}
+
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	r.Shuffle(len(ips), func(i, j int) { ips[i], ips[j] = ips[j], ips[i] })
 	logger.Info().Msgf("ips: %s", ips)
@@ -96,13 +108,11 @@ func GetClusterStatus(ctx context.Context, subscriptionId, resourceGroupName, vm
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	outputs := make(map[string]interface{})
-	resData := make(map[string]interface{})
-
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
+	vmssStateStorageName := os.Getenv("VMSS_STATE_STORAGE_NAME")
 	prefix := os.Getenv("PREFIX")
 	clusterName := os.Getenv("CLUSTER_NAME")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
@@ -119,7 +129,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&invokeRequest); err != nil {
 		err = fmt.Errorf("cannot decode the request: %v", err)
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -128,7 +138,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		err = fmt.Errorf("cannot unmarshal the request data: %v", err)
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -136,32 +146,50 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		if json.Unmarshal([]byte(reqData["Body"].(string)), &requestBody) != nil {
 			err = fmt.Errorf("cannot unmarshal the request body: %v", err)
 			logger.Error().Err(err).Send()
-			w.WriteHeader(http.StatusBadRequest)
+			common.WriteErrorResponse(w, err)
 			return
 		}
 	}
 
-	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName)
+	vmssState, err := common.ReadVmssState(ctx, vmssStateStorageName, stateContainerName)
+	if err != nil {
+		err = fmt.Errorf("cannot read vmss state to read get vmss version: %v", err)
+		logger.Error().Err(err).Send()
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
+	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName, vmssState.VmssVersion)
+	var refreshVmssName *string
+	if vmssState.RefreshStatus != common.RefreshNone {
+		n := common.GetRefreshVmssName(vmScaleSetName, vmssState.VmssVersion)
+		refreshVmssName = &n
+	}
+
 	var result interface{}
 	if requestBody.Type == "" || requestBody.Type == "status" {
-		result, err = GetClusterStatus(ctx, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, keyVaultUri)
+		result, err = GetClusterStatus(ctx, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, keyVaultUri, refreshVmssName)
 	} else if requestBody.Type == "progress" {
 		result, err = GetReports(ctx, stateStorageName, stateContainerName)
+	} else if requestBody.Type == "vmss" {
+		refreshVmssName := common.GetRefreshVmssName(vmScaleSetName, vmssState.VmssVersion)
+		if vmssState.RefreshStatus == common.RefreshNone {
+			refreshVmssName = ""
+		}
+		result = common.VMSSStateVerbose{
+			VmssCreated:     vmssState.VmssCreated,
+			VmssName:        vmScaleSetName,
+			RefreshStatus:   vmssState.RefreshStatus.String(),
+			RefreshVmssName: refreshVmssName,
+			CurrentConfig:   vmssState.CurrentConfig,
+		}
 	} else {
 		result = "Invalid status type"
 	}
 
 	if err != nil {
-		resData["body"] = err.Error()
-	} else {
-
-		resData["body"] = result
+		common.WriteErrorResponse(w, err)
+		return
 	}
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.WriteSuccessResponse(w, result)
 }

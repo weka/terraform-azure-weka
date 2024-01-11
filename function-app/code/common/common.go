@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -45,6 +46,34 @@ for d in json.load(sys.stdin)['disks']:
 	if d['isRotational'] or 'nvme' not in d['devPath']: continue
 	print(d['devPath'])
 `
+
+func WriteResponse(w http.ResponseWriter, resData map[string]any, statusCode *int) {
+	outputs := make(map[string]any)
+
+	outputs["res"] = resData
+	invokeResponse := InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
+
+	responseJson, _ := json.Marshal(invokeResponse)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(responseJson)
+}
+
+func WriteErrorResponse(w http.ResponseWriter, err error) {
+	resData := make(map[string]any)
+	resData["body"] = err.Error()
+
+	badReqStatus := http.StatusBadRequest
+	WriteResponse(w, resData, &badReqStatus)
+}
+
+func WriteSuccessResponse(w http.ResponseWriter, data any) {
+	resData := make(map[string]any)
+	resData["body"] = data
+
+	successStatus := http.StatusOK
+	WriteResponse(w, resData, &successStatus)
+}
 
 func leaseContainerAcquire(ctx context.Context, storageAccountName, containerName string, leaseIdIn *string) (leaseIdOut *string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
@@ -747,6 +776,18 @@ func GetScaleSetInfo(ctx context.Context, subscriptionId, resourceGroupName, vmS
 	return &scaleSetInfo, err
 }
 
+func GetScaleSetSize(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (size int, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	scaleSet, err := getScaleSet(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+	size = int(*scaleSet.SKU.Capacity)
+	return
+}
+
 // Gets a list of all VMs in a scale set
 // see https://learn.microsoft.com/en-us/rest/api/compute/virtual-machine-scale-set-vms/list
 func GetScaleSetInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, expand *string) (vms []*armcompute.VirtualMachineScaleSetVM, err error) {
@@ -919,8 +960,12 @@ func GetWekaClusterPassword(ctx context.Context, keyVaultUri string) (password s
 	return GetKeyVaultValue(ctx, keyVaultUri, "weka-password")
 }
 
-func GetVmScaleSetName(prefix, clusterName string) string {
-	return fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
+func GetVmScaleSetName(prefix, clusterName string, version uint16) string {
+	versionStr := ""
+	if version > 0 {
+		versionStr = fmt.Sprintf("-v%d", version)
+	}
+	return fmt.Sprintf("%s-%s-vmss%s", prefix, clusterName, versionStr)
 }
 
 func GetScaleSetInstanceIds(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (instanceIds []string, err error) {
@@ -1190,7 +1235,29 @@ func AssignVmssContributorRoleToFunctionApp(ctx context.Context, subscriptionId,
 	return nil
 }
 
-func CreateVmss(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, config VMSSConfig) (id *string, err error) {
+func DeleteVmss(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (err error) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msgf("Deleting vmss %s", vmScaleSetName)
+
+	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+	client, err := armcompute.NewVirtualMachineScaleSetsClient(subscriptionId, credential, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	_, err = client.BeginDelete(ctx, resourceGroupName, vmScaleSetName, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+	}
+	return
+}
+
+func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, config VMSSConfig, vmssSize int) (id *string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
@@ -1205,7 +1272,7 @@ func CreateVmss(ctx context.Context, subscriptionId, resourceGroupName, vmScaleS
 		return
 	}
 
-	size := int64(config.Instances)
+	size := int64(vmssSize)
 	forceDeletion := false
 	sshKeyPath := fmt.Sprintf("/home/%s/.ssh/authorized_keys", config.AdminUsername)
 
@@ -1362,7 +1429,7 @@ func CreateVmss(ctx context.Context, subscriptionId, resourceGroupName, vmScaleS
 	}
 	resp, err := poller.PollUntilDone(ctx, &runtime.PollUntilDoneOptions{Frequency: time.Second})
 	if err != nil {
-		err = fmt.Errorf("cannot create vmss: %v", err)
+		err = fmt.Errorf("cannot create/update vmss: %v", err)
 		return
 	}
 	id = resp.VirtualMachineScaleSet.ID

@@ -53,9 +53,14 @@ resource "azurerm_storage_blob" "vmss_state" {
 
   source_content = jsonencode({
     vmss_created   = false
-    vmss_id        = ""
-    upgrade_needed = false
+    vmss_version   = 0
+    refresh_status = 0
+    current_config = {}
   })
+
+  lifecycle {
+    ignore_changes = all
+  }
 }
 
 resource "azurerm_storage_blob" "vmss_config" {
@@ -73,7 +78,6 @@ resource "azurerm_storage_blob" "vmss_config" {
     upgrade_mode                    = "Manual"
     health_probe_id                 = azurerm_lb_probe.backend_lb_probe.id
     admin_username                  = var.vm_username
-    instances                       = var.cluster_size
     computer_name_prefix            = "${var.prefix}-${var.cluster_name}-backend"
     custom_data                     = base64encode(local.custom_data_script)
     disable_password_authentication = true

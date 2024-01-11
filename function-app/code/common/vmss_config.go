@@ -1,6 +1,11 @@
 package common
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/google/go-cmp/cmp"
+)
 
 type Identity struct {
 	IdentityIDs []string `json:"identity_ids"`
@@ -62,7 +67,6 @@ type VMSSConfig struct {
 	Zones             []string           `json:"zones"`
 	ResourceGroupName string             `json:"resource_group_name"`
 	SKU               string             `json:"sku"`
-	Instances         int                `json:"instances"`
 	SourceImageID     string             `json:"source_image_id"`
 	Tags              map[string]*string `json:"tags"`
 
@@ -87,10 +91,43 @@ type VMSSConfig struct {
 	SecondaryNICs SecondaryNICs `json:"secondary_nics"`
 }
 
+func VmssConfigsDiff(old, new *VMSSConfig) string {
+	return cmp.Diff(new, old) // arguments order: (want, got)
+}
+
+type RefreshStatus uint8
+
+const (
+	RefreshNone       RefreshStatus = iota
+	RefreshInProgress RefreshStatus = iota
+	RefreshNeeded     RefreshStatus = iota
+)
+
+func (s *RefreshStatus) String() string {
+	return []string{"none", "in_progress", "needed"}[*s]
+}
+
 type VMSSState struct {
-	VmssCreated   bool   `json:"vmss_created"`
-	VmssId        string `json:"vmss_id"`
-	UpgradeNeeded bool   `json:"upgrade_needed"`
+	VmssCreated   bool          `json:"vmss_created"`
+	VmssVersion   uint16        `json:"vmss_version"`
+	RefreshStatus RefreshStatus `json:"refresh_status"`
+	CurrentConfig *VMSSConfig   `json:"current_config,omitempty"`
+}
+
+func GetRefreshVmssName(outdatedVmssName string, currentVmssVersion uint16) string {
+	versionStr := fmt.Sprintf("-v%d", currentVmssVersion)
+	newVersionStr := fmt.Sprintf("-v%d", currentVmssVersion+1)
+
+	vmssNameBase := strings.TrimSuffix(outdatedVmssName, versionStr)
+	return fmt.Sprintf("%s%s", vmssNameBase, newVersionStr)
+}
+
+type VMSSStateVerbose struct {
+	VmssCreated     bool        `json:"vmss_created"`
+	VmssName        string      `json:"vmss_name"`
+	RefreshStatus   string      `json:"refresh_status"`
+	RefreshVmssName string      `json:"refresh_vmss_name"`
+	CurrentConfig   *VMSSConfig `json:"current_config,omitempty"`
 }
 
 func ToEnumStrValue[T interface{ ~string }](val string, possibleEnumValues []T) (*T, error) {

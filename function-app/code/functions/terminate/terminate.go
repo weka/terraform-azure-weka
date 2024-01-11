@@ -228,21 +228,19 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	prefix := os.Getenv("PREFIX")
 	clusterName := os.Getenv("CLUSTER_NAME")
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
+	vmssStateStorageName := os.Getenv("VMSS_STATE_STORAGE_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
 
-	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
-
-	outputs := make(map[string]interface{})
-	resData := make(map[string]interface{})
 	var invokeRequest common.InvokeRequest
 
 	d := json.NewDecoder(r.Body)
 	err := d.Decode(&invokeRequest)
 	if err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -250,27 +248,32 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
 	if err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
 	var scaleResponse protocol.ScaleResponse
 
-	if json.Unmarshal([]byte(reqData["Body"].(string)), &scaleResponse) != nil {
+	if err := json.Unmarshal([]byte(reqData["Body"].(string)), &scaleResponse); err != nil {
 		logger.Error().Msgf("Failed to parse scaleResponse:%s", reqData["Body"].(string))
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
+	vmssState, err := common.ReadVmssState(ctx, vmssStateStorageName, stateContainerName)
+	if err != nil {
+		err = fmt.Errorf("cannot read vmss state to read get vmss version: %v", err)
+		logger.Error().Err(err).Send()
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName, vmssState.VmssVersion)
+
 	terminateResponse, err := Terminate(ctx, scaleResponse, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName)
 	if err != nil {
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = terminateResponse
+		logger.Error().Err(err).Send()
+		common.WriteErrorResponse(w, err)
+		return
 	}
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.WriteSuccessResponse(w, terminateResponse)
 }

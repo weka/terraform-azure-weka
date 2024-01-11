@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/weka/go-cloud-lib/logging"
-	"github.com/weka/go-cloud-lib/protocol"
 	"net/http"
 	"os"
 	"time"
 	"weka-deployment/common"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/weka/go-cloud-lib/logging"
+	"github.com/weka/go-cloud-lib/protocol"
 )
 
 const BlobPermissionsErrorCode = "AuthorizationPermissionMismatch"
@@ -46,9 +47,6 @@ func UpdateStateReportingWithRetry(ctx context.Context, subscriptionId, resource
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	outputs := make(map[string]interface{})
-	resData := make(map[string]interface{})
-
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
@@ -64,7 +62,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&invokeRequest); err != nil {
 		err = fmt.Errorf("cannot decode the request: %v", err)
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -73,14 +71,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		err = fmt.Errorf("cannot unmarshal the request data: %v", err)
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
 	if json.Unmarshal([]byte(reqData["Body"].(string)), &report) != nil {
 		err = fmt.Errorf("cannot unmarshal the request body: %v", err)
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -102,17 +100,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = fmt.Sprintf("The report was added successfully")
+		common.WriteErrorResponse(w, err)
+		return
 	}
-
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.WriteSuccessResponse(w, "The report was added successfully")
 }

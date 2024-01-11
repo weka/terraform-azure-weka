@@ -58,6 +58,7 @@ type ClusterizationParams struct {
 	Location          string
 	Prefix            string
 	KeyVaultUri       string
+	VmssVersion       uint16
 
 	StateContainerName string
 	StateStorageName   string
@@ -96,7 +97,7 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("This is the last instance in the cluster, creating obs and clusterization script")
 
-	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName)
+	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName, p.VmssVersion)
 
 	if p.Cluster.SetObs {
 		if p.Obs.AccessKey == "" {
@@ -177,7 +178,7 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 
 	instanceName := strings.Split(p.VmName, ":")[0]
 	instanceId := common.GetScaleSetVmIndex(instanceName)
-	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName)
+	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName, p.VmssVersion)
 	vmName := p.VmName
 
 	ip, err := common.GetPublicIp(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, p.Prefix, p.Cluster.ClusterName, instanceId)
@@ -226,6 +227,7 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 func Handler(w http.ResponseWriter, r *http.Request) {
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
+	vmssStateStorageName := os.Getenv("VMSS_STATE_STORAGE_NAME")
 	hostsNum, _ := strconv.Atoi(os.Getenv("HOSTS_NUM"))
 	clusterName := os.Getenv("CLUSTER_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
@@ -255,7 +257,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		addFrontend = true
 	}
 
-	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
 	var invokeRequest common.InvokeRequest
 
@@ -283,12 +284,21 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	vmssState, err := common.ReadVmssState(ctx, vmssStateStorageName, stateContainerName)
+	if err != nil {
+		err = fmt.Errorf("cannot read vmss state to read get vmss version: %v", err)
+		logger.Error().Err(err).Send()
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
 	params := ClusterizationParams{
 		SubscriptionId:     subscriptionId,
 		ResourceGroupName:  resourceGroupName,
 		Location:           location,
 		Prefix:             prefix,
 		KeyVaultUri:        keyVaultUri,
+		VmssVersion:        vmssState.VmssVersion,
 		StateContainerName: stateContainerName,
 		StateStorageName:   stateStorageName,
 		VmName:             data.Vm,
@@ -317,19 +327,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		FunctionAppName: functionAppName,
 	}
 
+	status := http.StatusOK
 	if data.Vm == "" {
 		msg := "Cluster name wasn't supplied"
 		logger.Error().Msgf(msg)
 		resData["body"] = msg
+		status = http.StatusBadRequest
 	} else {
 		clusterizeScript := Clusterize(ctx, params)
 		resData["body"] = clusterizeScript
 	}
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.WriteResponse(w, resData, &status)
 }

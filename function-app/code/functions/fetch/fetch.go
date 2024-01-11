@@ -2,11 +2,12 @@ package fetch
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"weka-deployment/common"
+
+	"github.com/weka/go-cloud-lib/logging"
 )
 
 type ScaleSetInfoResponse struct {
@@ -20,10 +21,8 @@ type ScaleSetInfoResponse struct {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	outputs := make(map[string]interface{})
-	resData := make(map[string]interface{})
-
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
+	vmssStateStorageName := os.Getenv("VMSS_STATE_STORAGE_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
@@ -31,30 +30,37 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	clusterName := os.Getenv("CLUSTER_NAME")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 
-	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
-
 	ctx := r.Context()
+	logger := logging.LoggerFromCtx(ctx)
 
-	response, err := getScaleSetInfoResponse(
-		ctx, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName, keyVaultUri,
-	)
+	vmssState, err := common.ReadVmssState(ctx, vmssStateStorageName, stateContainerName)
 	if err != nil {
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = response
+		err = fmt.Errorf("cannot read vmss state to read get vmss version: %v", err)
+		logger.Error().Err(err).Send()
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	vmssName := common.GetVmScaleSetName(prefix, clusterName, vmssState.VmssVersion)
+
+	var refreshVmssName *string
+	if vmssState.RefreshStatus != common.RefreshNone {
+		n := common.GetRefreshVmssName(vmssName, vmssState.VmssVersion)
+		refreshVmssName = &n
 	}
 
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	response, err := getScaleSetInfoResponse(
+		ctx, subscriptionId, resourceGroupName, vmssName, stateContainerName, stateStorageName, keyVaultUri, refreshVmssName,
+	)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	common.WriteSuccessResponse(w, response)
 }
 
 func getScaleSetInfoResponse(
-	ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName, keyVaultUri string,
+	ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName, keyVaultUri string, refreshVmScaleSetName *string,
 ) (scaleSetInfoResponse ScaleSetInfoResponse, err error) {
 	instances, err := common.GetScaleSetInstancesInfo(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
@@ -64,6 +70,14 @@ func getScaleSetInfoResponse(
 	scaleSetInfo, err := common.GetScaleSetInfo(ctx, subscriptionId, resourceGroupName, vmScaleSetName, keyVaultUri)
 	if err != nil {
 		return
+	}
+
+	if refreshVmScaleSetName != nil {
+		refreshInstances, err := common.GetScaleSetInstancesInfo(ctx, subscriptionId, resourceGroupName, *refreshVmScaleSetName)
+		if err != nil {
+			return scaleSetInfoResponse, err
+		}
+		instances = append(instances, refreshInstances...)
 	}
 
 	desiredCapacity, err := getCapacity(ctx, stateStorageName, stateContainerName)

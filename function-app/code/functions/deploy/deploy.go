@@ -40,6 +40,7 @@ func GetDeployScript(
 	subscriptionId,
 	resourceGroupName,
 	stateStorageName,
+	vmssStateStorageName,
 	stateContainerName,
 	prefix,
 	clusterName,
@@ -110,7 +111,14 @@ func GetDeployScript(
 			return "", err
 		}
 
-		vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
+		vmssState, err := common.ReadVmssState(ctx, vmssStateStorageName, stateContainerName)
+		if err != nil {
+			err = fmt.Errorf("cannot read vmss state to read get vmss version: %v", err)
+			logger.Error().Err(err).Send()
+			return "", err
+		}
+		vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName, vmssState.VmssVersion)
+
 		vmsPrivateIps, err := common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 		if err != nil {
 			logger.Error().Err(err).Send()
@@ -171,19 +179,6 @@ type RequestBody struct {
 	Vm string `json:"vm"`
 }
 
-func writeResponse(w http.ResponseWriter, outputs, resData map[string]interface{}, err error) {
-	if err != nil {
-		resData["body"] = err.Error()
-	}
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
-}
-
 func getGateway(subnet string) string {
 	ip, ipNet, _ := net.ParseCIDR(subnet)
 	ip = ip.Mask(ipNet.Mask)
@@ -208,6 +203,7 @@ func getGateways(subnet string, nicsNum int) (gateways []string) {
 func Handler(w http.ResponseWriter, r *http.Request) {
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
+	vmssStateStorageName := os.Getenv("VMSS_STATE_STORAGE_NAME")
 	clusterName := os.Getenv("CLUSTER_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
@@ -226,8 +222,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	installUrl := os.Getenv("INSTALL_URL")
 	proxyUrl := os.Getenv("PROXY_URL")
 
-	outputs := make(map[string]interface{})
-	resData := make(map[string]interface{})
 	var invokeRequest common.InvokeRequest
 
 	ctx := r.Context()
@@ -238,8 +232,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		err = fmt.Errorf("cannot decode the request: %v", err)
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
-		writeResponse(w, outputs, resData, err)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -248,8 +241,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		err = fmt.Errorf("cannot unmarshal the request data: %v", err)
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
-		writeResponse(w, outputs, resData, err)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -258,8 +250,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if json.Unmarshal([]byte(reqData["Body"].(string)), &data) != nil {
 		err = fmt.Errorf("cannot unmarshal the request body: %v", err)
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
-		writeResponse(w, outputs, resData, err)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -268,6 +259,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		subscriptionId,
 		resourceGroupName,
 		stateStorageName,
+		vmssStateStorageName,
 		stateContainerName,
 		prefix,
 		clusterName,
@@ -286,9 +278,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-	} else {
-		resData["body"] = bashScript
+		common.WriteErrorResponse(w, err)
+		return
 	}
-	writeResponse(w, outputs, resData, err)
+	common.WriteSuccessResponse(w, bashScript)
 }

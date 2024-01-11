@@ -125,7 +125,7 @@ function_key=$(az functionapp keys list --name ${local.function_app_name} --reso
 curl --fail https://${local.function_app_name}.azurewebsites.net/api/resize?code=$function_key -H "Content-Type:application/json" -d '{"value":ENTER_NEW_VALUE_HERE}'
 
 ########################################## pre-terraform destroy, cluster terminate function ################
-az vmss delete --name ${local.vmss_name} --resource-group ${var.rg_name} --force-deletion true --subscription ${var.subscription_id}
+az vmss delete --name <paste-your-vmss-name> --resource-group ${var.rg_name} --force-deletion true --subscription ${var.subscription_id}
 
 EOT
   description = "Useful commands and script to interact with weka cluster"
