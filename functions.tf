@@ -163,6 +163,7 @@ resource "azurerm_linux_function_app" "function_app" {
     FUNCTION_APP_NAME                = local.function_app_name
     PROXY_URL                        = var.proxy_url
     WEKA_HOME_URL                    = var.weka_home_url
+    VMSS_INSTANCES_ADDING_STEP       = var.vmss_instances_adding_step
 
     https_only                  = true
     FUNCTIONS_EXTENSION_VERSION = "~4"

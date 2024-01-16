@@ -321,7 +321,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "60ec8c21cc5fd2b21d698fa9bb9e69ac"
+  default     = "7c4493328abdc118b81a8cd08617bc4a"
 }
 
 variable "function_app_dist" {
@@ -596,4 +596,15 @@ variable "function_access_restriction_enabled" {
   type        = bool
   default     = false
   description = "Allow public access, Access restrictions apply to inbound access to internal vent"
+}
+
+variable "vmss_instances_adding_step" {
+  type        = number
+  default     = 3
+  description = "Number of instances to add to vmss in one iteration"
+
+  validation {
+    condition     = var.vmss_instances_adding_step >= 1
+    error_message = "Instances adding step should be greater than 0"
+  }
 }

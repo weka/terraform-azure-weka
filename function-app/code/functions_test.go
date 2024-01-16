@@ -13,7 +13,7 @@ func Test_fetchPrivateIps(t *testing.T) {
 	vmScaleSetName := "jassaf-poc-vmss"
 	ctx := context.TODO()
 
-	vmsPrivateIps, err := common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	vmsPrivateIps, err := common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, vmScaleSetName, nil)
 	if err != nil {
 		t.Logf("failed fetching private ips: %s", err)
 		return

@@ -60,6 +60,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName, vmssState.VmssVersion)
+	// use the refresh vmss name if the cluster is in refresh mode
+	if vmssState.RefreshStatus == common.RefreshInProgress {
+		vmScaleSetName = common.GetRefreshVmssName(vmScaleSetName, vmssState.VmssVersion)
+	}
 
 	err = common.SetDeletionProtection(ctx, subscriptionId, resourceGroupName, vmScaleSetName, common.GetScaleSetVmIndex(data.Name), true)
 	if err != nil {

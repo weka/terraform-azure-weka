@@ -63,6 +63,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName, vmssState.VmssVersion)
+	// use the refresh vmss name if the cluster is in refresh mode
+	if vmssState.RefreshStatus == common.RefreshInProgress {
+		vmScaleSetName = common.GetRefreshVmssName(vmScaleSetName, vmssState.VmssVersion)
+	}
 
 	instanceName := strings.Split(data.Vm, ":")[0]
 	hostName := strings.Split(data.Vm, ":")[1]

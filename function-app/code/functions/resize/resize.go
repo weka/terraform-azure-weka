@@ -77,6 +77,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	vmssName := common.GetVmScaleSetName(prefix, clusterName, vmssState.VmssVersion)
+	// use the refresh vmss name if the cluster is in refresh mode
+	if vmssState.RefreshStatus != common.RefreshNone {
+		vmssName = common.GetRefreshVmssName(vmssName, vmssState.VmssVersion)
+	}
+
 	err = updateDesiredClusterSize(ctx, *size.Value, subscriptionId, resourceGroupName, vmssName, stateContainerName, stateStorageName)
 	if err != nil {
 		logger.Error().Err(err).Send()

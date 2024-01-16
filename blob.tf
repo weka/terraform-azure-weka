@@ -52,10 +52,9 @@ resource "azurerm_storage_blob" "vmss_state" {
   type                   = "Block"
 
   source_content = jsonencode({
-    vmss_created   = false
     vmss_version   = 0
-    refresh_status = 0
-    current_config = {}
+    refresh_status = "none"
+    current_config = null
   })
 
   lifecycle {

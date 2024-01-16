@@ -95,20 +95,15 @@ func VmssConfigsDiff(old, new *VMSSConfig) string {
 	return cmp.Diff(new, old) // arguments order: (want, got)
 }
 
-type RefreshStatus uint8
+type RefreshStatus string
 
 const (
-	RefreshNone       RefreshStatus = iota
-	RefreshInProgress RefreshStatus = iota
-	RefreshNeeded     RefreshStatus = iota
+	RefreshNone       RefreshStatus = "none"
+	RefreshInProgress RefreshStatus = "in_progress"
+	RefreshNeeded     RefreshStatus = "needed"
 )
 
-func (s *RefreshStatus) String() string {
-	return []string{"none", "in_progress", "needed"}[*s]
-}
-
 type VMSSState struct {
-	VmssCreated   bool          `json:"vmss_created"`
 	VmssVersion   uint16        `json:"vmss_version"`
 	RefreshStatus RefreshStatus `json:"refresh_status"`
 	CurrentConfig *VMSSConfig   `json:"current_config,omitempty"`

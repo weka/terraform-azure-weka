@@ -119,7 +119,13 @@ func GetDeployScript(
 		}
 		vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName, vmssState.VmssVersion)
 
-		vmsPrivateIps, err := common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+		var refreshVmssName *string
+		if vmssState.RefreshStatus == common.RefreshInProgress {
+			n := common.GetRefreshVmssName(vmScaleSetName, vmssState.VmssVersion)
+			refreshVmssName = &n
+		}
+
+		vmsPrivateIps, err := common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, vmScaleSetName, refreshVmssName)
 		if err != nil {
 			logger.Error().Err(err).Send()
 			return "", err
@@ -136,7 +142,7 @@ func GetDeployScript(
 			}
 		}
 		if len(ips) == 0 {
-			err = fmt.Errorf("no instances found for instance group %s, can't join", vmScaleSetName)
+			err = fmt.Errorf("no instances found for scale sets, can't join")
 			logger.Error().Err(err).Send()
 			return "", err
 		}

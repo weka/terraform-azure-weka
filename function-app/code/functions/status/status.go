@@ -62,20 +62,12 @@ func GetClusterStatus(
 		return connectors.NewJrpcClient(ctx, ip, weka.ManagementJrpcPort, "admin", wekaPassword)
 	}
 
-	vmIps, err := common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	vmIps, err := common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, vmScaleSetName, refreshVmScaleSetName)
 	if err != nil {
 		return
 	}
 
-	refreshVmIps := make(map[string]string, 0)
-	if refreshVmScaleSetName != nil {
-		refreshVmIps, err = common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, *refreshVmScaleSetName)
-		if err != nil {
-			return
-		}
-	}
-
-	ips := make([]string, 0, len(vmIps)+len(refreshVmIps))
+	ips := make([]string, 0, len(vmIps))
 	for _, ip := range vmIps {
 		ips = append(ips, ip)
 	}
@@ -161,7 +153,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName, vmssState.VmssVersion)
 	var refreshVmssName *string
-	if vmssState.RefreshStatus != common.RefreshNone {
+	if vmssState.RefreshStatus == common.RefreshInProgress {
 		n := common.GetRefreshVmssName(vmScaleSetName, vmssState.VmssVersion)
 		refreshVmssName = &n
 	}
@@ -177,9 +169,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			refreshVmssName = ""
 		}
 		result = common.VMSSStateVerbose{
-			VmssCreated:     vmssState.VmssCreated,
+			VmssCreated:     vmssState.CurrentConfig != nil,
 			VmssName:        vmScaleSetName,
-			RefreshStatus:   vmssState.RefreshStatus.String(),
+			RefreshStatus:   string(vmssState.RefreshStatus),
 			RefreshVmssName: refreshVmssName,
 			CurrentConfig:   vmssState.CurrentConfig,
 		}

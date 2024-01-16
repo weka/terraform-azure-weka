@@ -543,7 +543,7 @@ func GetPublicIp(ctx context.Context, subscriptionId, resourceGroupName, vmScale
 	return
 }
 
-func GetVmsPrivateIps(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (vmsPrivateIps map[string]string, err error) {
+func GetVmsPrivateIps(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, refreshVmScaleSetName *string) (vmsPrivateIps map[string]string, err error) {
 	//returns compute_name to private ip map
 
 	logger := logging.LoggerFromCtx(ctx)
@@ -552,6 +552,14 @@ func GetVmsPrivateIps(ctx context.Context, subscriptionId, resourceGroupName, vm
 	networkInterfaces, err := GetScaleSetVmsNetworkPrimaryNICs(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
 		return
+	}
+
+	if refreshVmScaleSetName != nil {
+		refreshNetworkInterfaces, err := GetScaleSetVmsNetworkPrimaryNICs(ctx, subscriptionId, resourceGroupName, *refreshVmScaleSetName)
+		if err != nil {
+			return nil, err
+		}
+		networkInterfaces = append(networkInterfaces, refreshNetworkInterfaces...)
 	}
 
 	vmsPrivateIps = make(map[string]string)
@@ -747,6 +755,17 @@ func getScaleSet(ctx context.Context, subscriptionId, resourceGroupName, vmScale
 		return nil, err
 	}
 	return &scaleSet.VirtualMachineScaleSet, nil
+}
+
+func GetScaleSetOrNilOnNotFound(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (*armcompute.VirtualMachineScaleSet, error) {
+	vmss, err := getScaleSet(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	if err != nil {
+		if getErr, ok := err.(*azcore.ResponseError); ok && getErr.ErrorCode == "ResourceNotFound" {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return vmss, nil
 }
 
 // Gets single scale set info

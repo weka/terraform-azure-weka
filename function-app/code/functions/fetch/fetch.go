@@ -43,7 +43,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	vmssName := common.GetVmScaleSetName(prefix, clusterName, vmssState.VmssVersion)
 
 	var refreshVmssName *string
-	if vmssState.RefreshStatus != common.RefreshNone {
+	if vmssState.RefreshStatus == common.RefreshInProgress {
 		n := common.GetRefreshVmssName(vmssName, vmssState.VmssVersion)
 		refreshVmssName = &n
 	}
