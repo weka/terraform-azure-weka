@@ -22,34 +22,23 @@ type ScaleSetInfoResponse struct {
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
-	vmssStateStorageName := os.Getenv("VMSS_STATE_STORAGE_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
-	prefix := os.Getenv("PREFIX")
 	clusterName := os.Getenv("CLUSTER_NAME")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
 
-	vmssState, err := common.ReadVmssState(ctx, vmssStateStorageName, stateContainerName)
+	vmssNames, err := common.GetScaleSetsNames(ctx, subscriptionId, resourceGroupName, clusterName)
 	if err != nil {
-		err = fmt.Errorf("cannot read vmss state to read get vmss version: %v", err)
-		logger.Error().Err(err).Send()
 		common.WriteErrorResponse(w, err)
 		return
 	}
-	vmssName := common.GetVmScaleSetName(prefix, clusterName, vmssState.VmssVersion)
-
-	var refreshVmssName *string
-	if vmssState.RefreshStatus == common.RefreshInProgress {
-		n := common.GetRefreshVmssName(vmssName, vmssState.VmssVersion)
-		refreshVmssName = &n
-	}
 
 	response, err := getScaleSetInfoResponse(
-		ctx, subscriptionId, resourceGroupName, vmssName, stateContainerName, stateStorageName, keyVaultUri, refreshVmssName,
+		ctx, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, keyVaultUri, vmssNames,
 	)
 	if err != nil {
 		logger.Error().Err(err).Send()
@@ -60,24 +49,22 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getScaleSetInfoResponse(
-	ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName, keyVaultUri string, refreshVmScaleSetName *string,
+	ctx context.Context, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, keyVaultUri string, vmScaleSetNames []string,
 ) (scaleSetInfoResponse ScaleSetInfoResponse, err error) {
-	instances, err := common.GetScaleSetInstancesInfo(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
-	if err != nil {
-		return
-	}
+	var instances []common.ScaleSetInstanceInfo
 
-	scaleSetInfo, err := common.GetScaleSetInfo(ctx, subscriptionId, resourceGroupName, vmScaleSetName, keyVaultUri)
-	if err != nil {
-		return
-	}
-
-	if refreshVmScaleSetName != nil {
-		refreshInstances, err := common.GetScaleSetInstancesInfo(ctx, subscriptionId, resourceGroupName, *refreshVmScaleSetName)
+	for _, vmScaleSetName := range vmScaleSetNames {
+		insts, err := common.GetScaleSetInstancesInfo(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 		if err != nil {
 			return scaleSetInfoResponse, err
 		}
-		instances = append(instances, refreshInstances...)
+		instances = append(instances, insts...)
+	}
+
+	wekaAdminPassword, err := common.GetWekaClusterPassword(ctx, keyVaultUri)
+	if err != nil {
+		err = fmt.Errorf("cannot get weka admin password: %v", err)
+		return
 	}
 
 	desiredCapacity, err := getCapacity(ctx, stateStorageName, stateContainerName)
@@ -86,8 +73,8 @@ func getScaleSetInfoResponse(
 	}
 
 	scaleSetInfoResponse = ScaleSetInfoResponse{
-		Username:        scaleSetInfo.AdminUsername,
-		Password:        scaleSetInfo.AdminPassword,
+		Username:        common.WekaAdminUsername,
+		Password:        wekaAdminPassword,
 		DesiredCapacity: desiredCapacity,
 		Instances:       instances,
 		BackendIps:      getBackendIps(instances),

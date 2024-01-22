@@ -97,7 +97,7 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 	logger.Info().Msg("This is the last instance in the cluster, creating obs and clusterization script")
 
 	version := 0 // on cluserization step we are sure that the vmss version is 0 as no refresh was done yet
-	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName, uint16(version))
+	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName, version)
 
 	if p.Cluster.SetObs {
 		if p.Obs.AccessKey == "" {
@@ -135,7 +135,7 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 		return
 	}
 
-	vmsPrivateIps, err := common.GetVmsPrivateIps(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, nil)
+	vmsPrivateIps, err := common.GetVmsPrivateIps(ctx, p.SubscriptionId, p.ResourceGroupName, []string{vmScaleSetName})
 	if err != nil {
 		err = fmt.Errorf("failed to get vms private ips: %w", err)
 		logger.Error().Err(err).Send()
@@ -159,7 +159,7 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 	clusterParams.ObsScript = GetObsScript(p.Obs)
 	clusterParams.DebugOverrideCmds = GetWekaDebugOverrideCmds()
 	clusterParams.WekaPassword = wekaPassword
-	clusterParams.WekaUsername = "admin"
+	clusterParams.WekaUsername = common.WekaAdminUsername
 	clusterParams.InstallDpdk = p.InstallDpdk
 	clusterParams.FindDrivesScript = common.FindDrivesScript
 
@@ -179,7 +179,7 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 	instanceName := strings.Split(p.VmName, ":")[0]
 	instanceId := common.GetScaleSetVmIndex(instanceName)
 	version := 0 // on cluserization step we are sure that the vmss version is 0 as no refresh was done yet
-	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName, uint16(version))
+	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName, version)
 	vmName := p.VmName
 
 	ip, err := common.GetPublicIp(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, p.Prefix, p.Cluster.ClusterName, instanceId)

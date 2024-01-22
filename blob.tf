@@ -45,23 +45,6 @@ data "azurerm_storage_account" "obs_sa" {
   resource_group_name = var.rg_name
 }
 
-resource "azurerm_storage_blob" "vmss_state" {
-  name                   = "vmss-state"
-  storage_account_name   = local.deployment_storage_account_name
-  storage_container_name = local.deployment_container_name
-  type                   = "Block"
-
-  source_content = jsonencode({
-    vmss_version   = 0
-    refresh_status = "none"
-    current_config = null
-  })
-
-  lifecycle {
-    ignore_changes = all
-  }
-}
-
 resource "azurerm_storage_blob" "vmss_config" {
   name                   = "vmss-config"
   storage_account_name   = local.deployment_storage_account_name
@@ -77,6 +60,7 @@ resource "azurerm_storage_blob" "vmss_config" {
     upgrade_mode                    = "Manual"
     health_probe_id                 = azurerm_lb_probe.backend_lb_probe.id
     admin_username                  = var.vm_username
+    ssh_public_key                  = local.public_ssh_key
     computer_name_prefix            = "${var.prefix}-${var.cluster_name}-backend"
     custom_data                     = base64encode(local.custom_data_script)
     disable_password_authentication = true
@@ -86,7 +70,9 @@ resource "azurerm_storage_blob" "vmss_config" {
     overprovision                   = false
     orchestration_mode              = "Uniform"
     tags = merge(var.tags_map, {
-      "weka_cluster" : var.cluster_name, "user_id" : data.azurerm_client_config.current.object_id
+      "weka_cluster" : var.cluster_name,
+      "user_id" : data.azurerm_client_config.current.object_id,
+      "custom_data_md5" : md5(local.custom_data_script),
     })
 
     os_disk = {
@@ -102,11 +88,6 @@ resource "azurerm_storage_blob" "vmss_config" {
       storage_account_type = "Premium_LRS"
     }
 
-    admin_ssh_key = {
-      username   = var.vm_username
-      public_key = local.public_ssh_key
-    }
-
     identity = {
       type         = "UserAssigned"
       identity_ids = [azurerm_user_assigned_identity.vmss.id]
@@ -115,7 +96,6 @@ resource "azurerm_storage_blob" "vmss_config" {
     primary_nic = {
       name                          = "${var.prefix}-${var.cluster_name}-backend-nic-0"
       network_security_group_id     = local.sg_id
-      primary                       = true
       enable_accelerated_networking = var.install_cluster_dpdk
 
       ip_configurations = [{
@@ -134,10 +114,9 @@ resource "azurerm_storage_blob" "vmss_config" {
       number                        = local.nics_numbers - 1
       name_prefix                   = "${var.prefix}-${var.cluster_name}-backend-nic"
       network_security_group_id     = local.sg_id
-      primary                       = false
       enable_accelerated_networking = var.install_cluster_dpdk
       ip_configurations = [{
-        primary                                = false
+        primary                                = true
         subnet_id                              = data.azurerm_subnet.subnet.id
         load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
       }]

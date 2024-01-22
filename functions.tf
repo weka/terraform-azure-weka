@@ -131,7 +131,6 @@ resource "azurerm_linux_function_app" "function_app" {
   app_settings = {
     "APPINSIGHTS_INSTRUMENTATIONKEY" = azurerm_application_insights.application_insights.instrumentation_key
     "STATE_STORAGE_NAME"             = local.deployment_storage_account_name
-    "VMSS_STATE_STORAGE_NAME"        = local.deployment_storage_account_name
     "STATE_CONTAINER_NAME"           = local.deployment_container_name
     "HOSTS_NUM"                      = var.cluster_size
     "CLUSTER_NAME"                   = var.cluster_name
@@ -163,7 +162,6 @@ resource "azurerm_linux_function_app" "function_app" {
     FUNCTION_APP_NAME                = local.function_app_name
     PROXY_URL                        = var.proxy_url
     WEKA_HOME_URL                    = var.weka_home_url
-    VMSS_INSTANCES_ADDING_STEP       = var.vmss_instances_adding_step
 
     https_only                  = true
     FUNCTIONS_EXTENSION_VERSION = "~4"

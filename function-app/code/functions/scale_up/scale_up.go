@@ -10,6 +10,7 @@ import (
 	"weka-deployment/common"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5"
 
 	"github.com/weka/go-cloud-lib/logging"
 	"github.com/weka/go-cloud-lib/protocol"
@@ -24,28 +25,17 @@ func itemInList(item string, list []string) bool {
 	return false
 }
 
-const RefreshVmssInstancesAddingStep = 10
+const instancesAddingStep = 6
 
 var (
-	instancesAddingStep = 3
-
-	functionAppName      = os.Getenv("FUNCTION_APP_NAME")
-	vmssStateStorageName = os.Getenv("VMSS_STATE_STORAGE_NAME")
-	stateStorageName     = os.Getenv("STATE_STORAGE_NAME")
-	stateContainerName   = os.Getenv("STATE_CONTAINER_NAME")
-	prefix               = os.Getenv("PREFIX")
-	clusterName          = os.Getenv("CLUSTER_NAME")
-	subscriptionId       = os.Getenv("SUBSCRIPTION_ID")
-	resourceGroupName    = os.Getenv("RESOURCE_GROUP_NAME")
+	functionAppName    = os.Getenv("FUNCTION_APP_NAME")
+	stateStorageName   = os.Getenv("STATE_STORAGE_NAME")
+	stateContainerName = os.Getenv("STATE_CONTAINER_NAME")
+	prefix             = os.Getenv("PREFIX")
+	clusterName        = os.Getenv("CLUSTER_NAME")
+	subscriptionId     = os.Getenv("SUBSCRIPTION_ID")
+	resourceGroupName  = os.Getenv("RESOURCE_GROUP_NAME")
 )
-
-func init() {
-	vmssInstancesAddingStep := os.Getenv("VMSS_INSTANCES_ADDING_STEP")
-	step, _ := strconv.Atoi(vmssInstancesAddingStep)
-	if step > 0 {
-		instancesAddingStep = step
-	}
-}
 
 type ScaleUpParams struct {
 	VmssName        string
@@ -64,66 +54,69 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vmssState, err := common.ReadVmssState(ctx, vmssStateStorageName, stateContainerName)
+	scaleSets, err := common.GetScaleSetsOrderdedByVersion(ctx, subscriptionId, resourceGroupName, clusterName)
 	if err != nil {
-		logger.Error().Err(err).Msg("cannot read vmss state")
+		logger.Error().Err(err).Msg("cannot get scale sets")
 		common.WriteErrorResponse(w, err)
 		return
 	}
+	logger.Info().Msgf("scale sets number: %d", len(scaleSets))
 
-	version := vmssState.VmssVersion
-	vmssName := common.GetVmScaleSetName(prefix, clusterName, version)
-	refreshVmssName := common.GetRefreshVmssName(vmssName, version)
-
-	// after vmss creation we need to wait until vmss is clusterized
-	if vmssState.CurrentConfig != nil && !state.Clusterized {
-		handleProgressingClusterization(ctx, &state, subscriptionId, resourceGroupName, vmssName, stateContainerName, stateStorageName)
-		logger.Info().Msgf("cluster is not clusterized yet, skipping...")
-		common.WriteSuccessResponse(w, "Not clusterized yet, skipping...")
+	// 1. Refresh in progress flow: handle vmss refresh if needed
+	if len(scaleSets) > 1 {
+		initialVmss, refreshVmss := scaleSets[0], scaleSets[1]
+		err := progressVmssRefresh(ctx, initialVmss, refreshVmss, state.DesiredSize)
+		if err != nil {
+			common.WriteErrorResponse(w, err)
+			return
+		}
+		common.WriteSuccessResponse(w, "progress vmss refresh succeeded")
 		return
 	}
 
-	scaleUpParams := ScaleUpParams{
-		VmssName:        vmssName,
-		RefreshVmssName: refreshVmssName,
-		DesiredSize:     state.DesiredSize,
-	}
-
 	// get expected vmss config
-	vmssConfig, err := common.ReadVmssConfig(ctx, vmssStateStorageName, stateContainerName)
+	vmssConfig, err := common.ReadVmssConfig(ctx, stateStorageName, stateContainerName)
 	if err != nil {
 		logger.Error().Err(err).Msgf("cannot read vmss config")
 		common.WriteErrorResponse(w, err)
 		return
 	}
 
-	// 1. Initial VMSS creation flow: initiale vmss creation if needed
-	if vmssState.CurrentConfig == nil {
-		err := createInitialVmss(ctx, vmssName, &vmssConfig, &vmssState, &state)
+	// 2. Initial VMSS creation flow: initiale vmss creation if needed
+	if len(scaleSets) == 0 && !state.Clusterized {
+		vmssVersion := 0
+		err := createVmss(ctx, &vmssConfig, state.DesiredSize, vmssVersion)
 		if err != nil {
+			logger.Error().Err(err).Msgf("cannot create initial vmss")
 			common.WriteErrorResponse(w, err)
 		} else {
-			common.WriteSuccessResponse(w, fmt.Sprintf("created vmss %s successfully", vmssName))
+			common.WriteSuccessResponse(w, "created initial vmss successfully")
 		}
+		return
+	} else if len(scaleSets) == 0 && state.Clusterized {
+		msg := "need to remove state file and re-apply terraform"
+		logger.Info().Msg(msg)
+		common.WriteSuccessResponse(w, msg)
 		return
 	}
 
-	// 2. Refresh flow: handle vmss refresh if needed
-	if vmssState.RefreshStatus != common.RefreshNone {
-		err := HandleVmssRefresh(ctx, &scaleUpParams, &vmssConfig, &vmssState)
-		if err != nil {
-			common.WriteErrorResponse(w, err)
-			return
-		}
-		common.WriteSuccessResponse(w, "vmss refresh initiated successfully")
+	initialVmss := scaleSets[0]
+
+	// after vmss creation we need to wait until vmss is clusterized
+	if !state.Clusterized {
+		handleProgressingClusterization(ctx, &state, subscriptionId, resourceGroupName, *initialVmss.Name, stateContainerName, stateStorageName)
+		logger.Info().Msgf("cluster is not clusterized yet, skipping...")
+		common.WriteSuccessResponse(w, "Not clusterized yet, skipping...")
 		return
 	}
+
+	currentConfig := common.GetVmssConfig(ctx, resourceGroupName, initialVmss)
 
 	// 3. Update flow: compare current vmss config with expected vmss config and update if needed
-	if diff := common.VmssConfigsDiff(vmssState.CurrentConfig, &vmssConfig); diff != "" {
+	if diff := common.VmssConfigsDiff(*currentConfig, vmssConfig); diff != "" {
 		logger.Info().Msgf("vmss config changed, diff: %s", diff)
 
-		err := HandleVmssUpdate(ctx, &scaleUpParams, &vmssConfig, &vmssState)
+		err := HandleVmssUpdate(ctx, initialVmss, currentConfig, &vmssConfig, state.DesiredSize)
 		if err != nil {
 			common.WriteErrorResponse(w, err)
 			return
@@ -132,8 +125,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// scale up vmss if needed
-	err = common.ScaleUp(ctx, subscriptionId, resourceGroupName, vmssName, int64(state.DesiredSize))
+	// 4. Scale up vmss if needed
+	err = common.ScaleUp(ctx, subscriptionId, resourceGroupName, *initialVmss.Name, int64(state.DesiredSize))
 	if err != nil {
 		common.WriteErrorResponse(w, err)
 		return
@@ -141,122 +134,72 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	common.WriteSuccessResponse(w, fmt.Sprintf("updated size to %d successfully", state.DesiredSize))
 }
 
-func HandleVmssRefresh(ctx context.Context, params *ScaleUpParams, vmssConfig *common.VMSSConfig, vmssState *common.VMSSState) error {
-	if vmssState.RefreshStatus == common.RefreshNeeded {
-		return initiateVmssRefresh(ctx, params, vmssConfig, vmssState)
-	} else if vmssState.RefreshStatus == common.RefreshInProgress {
-		return progressVmssRefresh(ctx, params, vmssConfig, vmssState)
-	} else {
-		return fmt.Errorf("invalid refresh status: %s", vmssState.RefreshStatus)
-	}
-}
-
-func HandleVmssUpdate(ctx context.Context, params *ScaleUpParams, vmssConfig *common.VMSSConfig, vmssState *common.VMSSState) error {
+func HandleVmssUpdate(ctx context.Context, initialVmss *armcompute.VirtualMachineScaleSet, currentConfig, newConfig *common.VMSSConfig, desiredSize int) error {
 	logger := logging.LoggerFromCtx(ctx)
-	logger.Info().Msgf("updating vmss %s", params.VmssName)
+	logger.Info().Msgf("updating vmss %s", *initialVmss.Name)
 
-	if vmssState.CurrentConfig.SKU != vmssConfig.SKU {
-		msg := fmt.Sprintf("cannot change vmss SKU from %s to %s, need refresh", vmssState.CurrentConfig.SKU, vmssConfig.SKU)
+	currentVersionStr := initialVmss.Tags["version"]
+	currentVersion, _ := strconv.Atoi(*currentVersionStr)
+	newVersion := currentVersion + 1
+
+	refreshNeeded := false
+	if currentConfig.SKU != newConfig.SKU {
+		msg := fmt.Sprintf("cannot change vmss SKU from %s to %s, need refresh", currentConfig.SKU, newConfig.SKU)
 		logger.Info().Msg(msg)
-		setNeedRefreshVmssState(ctx, params, vmssState)
-		return fmt.Errorf(msg)
-	}
-
-	_, err := common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, params.VmssName, *vmssConfig, params.DesiredSize)
-	if err != nil {
-		if updErr, ok := err.(*azcore.ResponseError); ok && updErr.ErrorCode == "PropertyChangeNotAllowed" {
-			setNeedRefreshVmssState(ctx, params, vmssState)
-		}
-		logger.Error().Err(err).Msgf("cannot update vmss %s", params.VmssName)
-		return err
-	}
-
-	logger.Info().Msgf("updated vmss %s", params.VmssName)
-	return nil
-}
-
-func createInitialVmss(ctx context.Context, vmssName string, vmssConfig *common.VMSSConfig, vmssState *common.VMSSState, state *protocol.ClusterState) error {
-	logger := logging.LoggerFromCtx(ctx)
-
-	vmss, err := common.GetScaleSetOrNilOnNotFound(ctx, subscriptionId, resourceGroupName, vmssName)
-	if err != nil {
-		logger.Error().Err(err).Msgf("cannot get vmss %s", vmssName)
-		return err
-	}
-
-	if vmss == nil {
-		err := createVmss(ctx, vmssName, vmssConfig, state.DesiredSize)
+		refreshNeeded = true
+	} else {
+		_, err := common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, *initialVmss.Name, *newConfig, desiredSize, currentVersion)
 		if err != nil {
-			logger.Error().Err(err).Msgf("cannot create vmss %s", vmssName)
+			if updErr, ok := err.(*azcore.ResponseError); ok && updErr.ErrorCode == "PropertyChangeNotAllowed" {
+				refreshNeeded = true
+			}
+			logger.Error().Err(err).Msgf("cannot update vmss %s", *initialVmss.Name)
 			return err
 		}
 	}
 
-	logger.Info().Msgf("updating vmss state setting current config")
-	vmssState.CurrentConfig = vmssConfig
-
-	err = common.WriteVmssState(ctx, vmssStateStorageName, stateContainerName, *vmssState)
-	if err != nil {
-		logger.Error().Err(err).Msgf("cannot update vmss state")
-		return err
+	if refreshNeeded {
+		err := initiateVmssRefresh(ctx, newConfig, newVersion)
+		if err != nil {
+			logger.Error().Err(err).Msgf("cannot initiate vmss refresh")
+			return err
+		}
+		logger.Info().Msgf("initiated vmss refresh")
+		return nil
 	}
+
+	logger.Info().Msgf("updated vmss %s", *initialVmss.Name)
 	return nil
 }
 
-func setNeedRefreshVmssState(ctx context.Context, params *ScaleUpParams, vmssState *common.VMSSState) error {
-	logger := logging.LoggerFromCtx(ctx)
-
-	logger.Info().Msgf("need to refresh vmss %s", params.VmssName)
-	vmssState.RefreshStatus = common.RefreshNeeded
-
-	err := common.WriteVmssState(ctx, vmssStateStorageName, stateContainerName, *vmssState)
-	if err != nil {
-		err = fmt.Errorf("cannot update vmss state: %w", err)
-		logger.Error().Err(err).Msgf("cannot update vmss %s", params.VmssName)
-	}
-	return err
-}
-
-func initiateVmssRefresh(ctx context.Context, params *ScaleUpParams, vmssConfig *common.VMSSConfig, vmssState *common.VMSSState) error {
+func initiateVmssRefresh(ctx context.Context, vmssConfig *common.VMSSConfig, newVersion int) error {
 	// Make sure that vmss current size is equal to "desired" number of weka instances
 	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msgf("initiate vmss refresh")
 
-	refreshVmss, err := common.GetScaleSetOrNilOnNotFound(ctx, subscriptionId, resourceGroupName, params.RefreshVmssName)
+	newVmssName := common.GetVmScaleSetName(prefix, clusterName, newVersion)
+	newVmssSize := 0
+
+	// if public ip address is assigned to vmss, domainNameLabel should differ (avoid VMScaleSetDnsRecordsInUse error)
+	for i := range vmssConfig.PrimaryNIC.IPConfigurations {
+		newDnsLabelName := fmt.Sprintf("%s-v%d", vmssConfig.PrimaryNIC.IPConfigurations[i].PublicIPAddress.DomainNameLabel, newVersion)
+		vmssConfig.PrimaryNIC.IPConfigurations[i].PublicIPAddress.DomainNameLabel = newDnsLabelName
+	}
+
+	// update hostname prefix
+	vmssConfig.ComputerNamePrefix = fmt.Sprintf("%s-v%d", vmssConfig.ComputerNamePrefix, newVersion)
+
+	logger.Info().Msgf("creating new vmss %s of size %d", newVmssName, newVmssSize)
+
+	err := createVmss(ctx, vmssConfig, newVmssSize, newVersion)
 	if err != nil {
+		logger.Error().Err(err).Msgf("cannot create 'refresh' vmss %s", newVmssName)
 		return err
 	}
-
-	if refreshVmss == nil {
-		logger.Info().Msgf("starting vmss refresh for %s", params.VmssName)
-
-		newVmssName := params.RefreshVmssName
-		newVmssSize := 0
-		// if public ip address is assigned to vmss, domainNameLabel should differ (avoid VMScaleSetDnsRecordsInUse error)
-		for i := range vmssConfig.PrimaryNIC.IPConfigurations {
-			newDnsLabelName := fmt.Sprintf("%s-v%d", vmssConfig.PrimaryNIC.IPConfigurations[i].PublicIPAddress.DomainNameLabel, vmssState.VmssVersion+1)
-			vmssConfig.PrimaryNIC.IPConfigurations[i].PublicIPAddress.DomainNameLabel = newDnsLabelName
-		}
-
-		// update hostname prefix
-		vmssConfig.ComputerNamePrefix = fmt.Sprintf("%s-v%d", vmssConfig.ComputerNamePrefix, vmssState.VmssVersion+1)
-
-		logger.Info().Msgf("creating new vmss %s of size %d", newVmssName, newVmssSize)
-
-		err := createVmss(ctx, newVmssName, vmssConfig, newVmssSize)
-		if err != nil {
-			logger.Error().Err(err).Msgf("cannot create 'refresh' vmss %s", params.VmssName)
-			return err
-		}
-	}
-
-	logger.Info().Msgf("updating vmss state to 'refresh in progress'")
-	vmssState.RefreshStatus = common.RefreshInProgress
-	vmssState.CurrentConfig = vmssConfig
-	err = common.WriteVmssState(ctx, vmssStateStorageName, stateContainerName, *vmssState)
-	return err
+	return nil
 }
 
-func progressVmssRefresh(ctx context.Context, params *ScaleUpParams, vmssConfig *common.VMSSConfig, vmssState *common.VMSSState) error {
+func progressVmssRefresh(ctx context.Context, outdatedVmss, refreshVmss *armcompute.VirtualMachineScaleSet, desiredSize int) error {
 	// Terminology:
 	// "Outdated" vmss -- vmss that was used before refresh
 	// "Refresh" vmss -- vmss that was created during refresh
@@ -278,28 +221,17 @@ func progressVmssRefresh(ctx context.Context, params *ScaleUpParams, vmssConfig 
 	//   - set new vmss version
 	//   - update vmss state
 	logger := logging.LoggerFromCtx(ctx)
-	logger.Info().Msgf("progressing vmss refresh for %s", params.VmssName)
+	logger.Info().Msgf("progressing vmss refresh for %s", *outdatedVmss.Name)
 
-	refreshVmssSize, err := common.GetScaleSetSize(ctx, subscriptionId, resourceGroupName, params.RefreshVmssName)
-	if err != nil {
-		err = fmt.Errorf("cannot get refresh vmss size: %w", err)
-		logger.Error().Err(err).Send()
-		return err
-	}
-
-	outdatedVmssSize, err := common.GetScaleSetSize(ctx, subscriptionId, resourceGroupName, params.VmssName)
-	if err != nil {
-		err = fmt.Errorf("cannot get outdated vmss size: %w", err)
-		logger.Error().Err(err).Send()
-		return err
-	}
+	refreshVmssSize := int(*refreshVmss.SKU.Capacity)
+	outdatedVmssSize := int(*outdatedVmss.SKU.Capacity)
 
 	logger.Info().Msgf("refresh vmss size is %d, outdated vmss size is %d", refreshVmssSize, outdatedVmssSize)
 
-	if outdatedVmssSize == params.DesiredSize-refreshVmssSize && outdatedVmssSize != 0 {
-		newSize := calculateNewVmssSize(refreshVmssSize, params.DesiredSize)
-		logger.Info().Msgf("scaling up refresh vmss %s from %d to %d", params.RefreshVmssName, refreshVmssSize, newSize)
-		err := common.ScaleUp(ctx, subscriptionId, resourceGroupName, params.RefreshVmssName, int64(newSize))
+	if outdatedVmssSize == desiredSize-refreshVmssSize && outdatedVmssSize != 0 {
+		newSize := calculateNewVmssSize(refreshVmssSize, desiredSize)
+		logger.Info().Msgf("scaling up refresh vmss %s from %d to %d", *refreshVmss.Name, refreshVmssSize, newSize)
+		err := common.ScaleUp(ctx, subscriptionId, resourceGroupName, *refreshVmss.Name, int64(newSize))
 		if err != nil {
 			err = fmt.Errorf("cannot scale up refresh vmss: %w", err)
 			logger.Error().Err(err).Send()
@@ -310,26 +242,13 @@ func progressVmssRefresh(ctx context.Context, params *ScaleUpParams, vmssConfig 
 	}
 
 	if outdatedVmssSize == 0 {
-		logger.Info().Msgf("deleting outdated vmss %s", params.VmssName)
-		err := common.DeleteVmss(ctx, subscriptionId, resourceGroupName, params.VmssName)
+		logger.Info().Msgf("deleting outdated vmss %s", *outdatedVmss.Name)
+		err := common.DeleteVmss(ctx, subscriptionId, resourceGroupName, *outdatedVmss.Name)
 		if err != nil {
 			err = fmt.Errorf("cannot delete outdated vmss: %w", err)
 			logger.Error().Err(err).Send()
 			return err
 		}
-
-		logger.Info().Msgf("updating vmss state")
-		vmssState.RefreshStatus = common.RefreshNone
-		vmssState.VmssVersion = vmssState.VmssVersion + 1
-		vmssState.CurrentConfig = vmssConfig
-		err = common.WriteVmssState(ctx, vmssStateStorageName, stateContainerName, *vmssState)
-		if err != nil {
-			err = fmt.Errorf("cannot update vmss state: %w", err)
-			logger.Error().Err(err).Send()
-			return err
-		}
-		logger.Info().Msgf("refresh vmss finished successfully, new vmss version is %d", vmssState.VmssVersion)
-		return nil
 	}
 	return nil
 }
@@ -344,11 +263,13 @@ func calculateNewVmssSize(current, expected int) int {
 	return current + instancesAddingStep
 }
 
-func createVmss(ctx context.Context, vmssName string, vmssConfig *common.VMSSConfig, vmssSize int) error {
+func createVmss(ctx context.Context, vmssConfig *common.VMSSConfig, vmssSize, vmssVersion int) error {
 	logger := logging.LoggerFromCtx(ctx)
+
+	vmssName := common.GetVmScaleSetName(prefix, clusterName, vmssVersion)
 	logger.Info().Msgf("creating vmss %s", vmssName)
 
-	vmssId, err := common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, vmssName, *vmssConfig, vmssSize)
+	vmssId, err := common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, vmssName, *vmssConfig, vmssSize, vmssVersion)
 	if err != nil {
 		return err
 	}

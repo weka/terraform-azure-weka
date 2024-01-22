@@ -13,11 +13,9 @@ import (
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
-	vmssStateStorageName := os.Getenv("VMSS_STATE_STORAGE_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
-	prefix := os.Getenv("PREFIX")
 	clusterName := os.Getenv("CLUSTER_NAME")
 
 	ctx := r.Context()
@@ -68,21 +66,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vmssState, err := common.ReadVmssState(ctx, vmssStateStorageName, stateContainerName)
+	vmScaleSetName, err := common.GetScaleSetNameWithLatestVersion(ctx, subscriptionId, resourceGroupName, clusterName)
 	if err != nil {
-		err = fmt.Errorf("cannot read vmss state to read get vmss version: %v", err)
+		err = fmt.Errorf("cannot get scale set with latest version: %v", err)
 		logger.Error().Err(err).Send()
 		common.WriteErrorResponse(w, err)
 		return
 	}
 
-	vmssName := common.GetVmScaleSetName(prefix, clusterName, vmssState.VmssVersion)
-	// use the refresh vmss name if the cluster is in refresh mode
-	if vmssState.RefreshStatus != common.RefreshNone {
-		vmssName = common.GetRefreshVmssName(vmssName, vmssState.VmssVersion)
-	}
-
-	err = updateDesiredClusterSize(ctx, *size.Value, subscriptionId, resourceGroupName, vmssName, stateContainerName, stateStorageName)
+	err = updateDesiredClusterSize(ctx, *size.Value, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName)
 	if err != nil {
 		logger.Error().Err(err).Send()
 		common.WriteErrorResponse(w, err)

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,6 +29,8 @@ import (
 	"github.com/weka/go-cloud-lib/protocol"
 	reportLib "github.com/weka/go-cloud-lib/report"
 )
+
+const WekaAdminUsername = "admin"
 
 type InvokeRequest struct {
 	Data     map[string]json.RawMessage
@@ -543,23 +547,20 @@ func GetPublicIp(ctx context.Context, subscriptionId, resourceGroupName, vmScale
 	return
 }
 
-func GetVmsPrivateIps(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, refreshVmScaleSetName *string) (vmsPrivateIps map[string]string, err error) {
+func GetVmsPrivateIps(ctx context.Context, subscriptionId, resourceGroupName string, vmScaleSetNames []string) (vmsPrivateIps map[string]string, err error) {
 	//returns compute_name to private ip map
 
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("fetching scale set vms private ips")
 
-	networkInterfaces, err := GetScaleSetVmsNetworkPrimaryNICs(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
-	if err != nil {
-		return
-	}
+	var networkInterfaces []*armnetwork.Interface
 
-	if refreshVmScaleSetName != nil {
-		refreshNetworkInterfaces, err := GetScaleSetVmsNetworkPrimaryNICs(ctx, subscriptionId, resourceGroupName, *refreshVmScaleSetName)
+	for _, vmScaleSetName := range vmScaleSetNames {
+		nics, err := GetScaleSetVmsNetworkPrimaryNICs(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 		if err != nil {
 			return nil, err
 		}
-		networkInterfaces = append(networkInterfaces, refreshNetworkInterfaces...)
+		networkInterfaces = append(networkInterfaces, nics...)
 	}
 
 	vmsPrivateIps = make(map[string]string)
@@ -757,17 +758,6 @@ func getScaleSet(ctx context.Context, subscriptionId, resourceGroupName, vmScale
 	return &scaleSet.VirtualMachineScaleSet, nil
 }
 
-func GetScaleSetOrNilOnNotFound(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (*armcompute.VirtualMachineScaleSet, error) {
-	vmss, err := getScaleSet(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
-	if err != nil {
-		if getErr, ok := err.(*azcore.ResponseError); ok && getErr.ErrorCode == "ResourceNotFound" {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return vmss, nil
-}
-
 // Gets single scale set info
 func GetScaleSetInfo(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, keyVaultUri string) (*ScaleSetInfo, error) {
 	logger := logging.LoggerFromCtx(ctx)
@@ -787,7 +777,7 @@ func GetScaleSetInfo(ctx context.Context, subscriptionId, resourceGroupName, vmS
 	scaleSetInfo := ScaleSetInfo{
 		Id:            *scaleSet.ID,
 		Name:          *scaleSet.Name,
-		AdminUsername: "admin",
+		AdminUsername: WekaAdminUsername,
 		AdminPassword: wekaPassword,
 		Capacity:      int(*scaleSet.SKU.Capacity),
 		VMSize:        *scaleSet.SKU.Name,
@@ -979,7 +969,7 @@ func GetWekaClusterPassword(ctx context.Context, keyVaultUri string) (password s
 	return GetKeyVaultValue(ctx, keyVaultUri, "weka-password")
 }
 
-func GetVmScaleSetName(prefix, clusterName string, version uint16) string {
+func GetVmScaleSetName(prefix, clusterName string, version int) string {
 	versionStr := ""
 	if version > 0 {
 		versionStr = fmt.Sprintf("-v%d", version)
@@ -1167,35 +1157,6 @@ func ReadVmssConfig(ctx context.Context, storageName, containerName string) (vms
 	return
 }
 
-func ReadVmssState(ctx context.Context, storageName, containerName string) (vmssState VMSSState, err error) {
-	logger := logging.LoggerFromCtx(ctx)
-
-	asByteArray, err := ReadBlobObject(ctx, storageName, containerName, "vmss-state")
-	if err != nil {
-		return
-	}
-	err = json.Unmarshal(asByteArray, &vmssState)
-	if err != nil {
-		logger.Error().Err(err).Send()
-		return
-	}
-
-	return
-}
-
-func WriteVmssState(ctx context.Context, stateStorageName, containerName string, vmssState VMSSState) (err error) {
-	logger := logging.LoggerFromCtx(ctx)
-
-	asByteArray, err := json.Marshal(vmssState)
-	if err != nil {
-		logger.Error().Err(err).Send()
-		return
-	}
-
-	err = WriteBlobObject(ctx, stateStorageName, containerName, "vmss-state", asByteArray)
-	return
-}
-
 func AssignVmssContributorRoleToFunctionApp(ctx context.Context, subscriptionId, resourceGroupName, vmssId, functionAppName string) error {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("Assigning vmss contributor role to function app")
@@ -1276,7 +1237,268 @@ func DeleteVmss(ctx context.Context, subscriptionId, resourceGroupName, vmScaleS
 	return
 }
 
-func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, config VMSSConfig, vmssSize int) (id *string, err error) {
+func GetScaleSetsNames(ctx context.Context, subscriptionId, resourceGroupName, clusterName string) (scaleSetsNames []string, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msgf("Getting scale sets names for cluster %s", clusterName)
+
+	scaleSets, err := GetScaleSetsList(ctx, subscriptionId, resourceGroupName, clusterName)
+	for _, scaleSet := range scaleSets {
+		scaleSetsNames = append(scaleSetsNames, *scaleSet.Name)
+	}
+	return
+}
+
+func GetScaleSetNameWithLatestVersion(ctx context.Context, subscriptionId, resourceGroupName, clusterName string) (scaleSetName string, err error) {
+	vmss, err := GetScaleSetWithLatestVersion(ctx, subscriptionId, resourceGroupName, clusterName)
+	if err != nil {
+		return
+	}
+	scaleSetName = *vmss.Name
+	return
+}
+
+func GetScaleSetWithLatestVersion(ctx context.Context, subscriptionId, resourceGroupName, clusterName string) (vmss *armcompute.VirtualMachineScaleSet, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msgf("Getting scale set with latest version for cluster %s", clusterName)
+
+	scaleSets, err := GetScaleSetsOrderdedByVersion(ctx, subscriptionId, resourceGroupName, clusterName)
+	if err != nil {
+		return
+	}
+	return scaleSets[len(scaleSets)-1], nil
+}
+
+func GetScaleSetsOrderdedByVersion(ctx context.Context, subscriptionId, resourceGroupName, clusterName string) (sortedScaleSets []*armcompute.VirtualMachineScaleSet, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msgf("Getting scale sets ordered by version for cluster %s", clusterName)
+
+	scaleSets, err := GetScaleSetsList(ctx, subscriptionId, resourceGroupName, clusterName)
+	if err != nil {
+		return
+	}
+	// tags should contain "version"
+	scaleSetsByVersion := make(map[int]*armcompute.VirtualMachineScaleSet, len(scaleSets))
+	for _, scaleSet := range scaleSets {
+		if scaleSet.Tags == nil {
+			continue
+		}
+		if version, ok := scaleSet.Tags["version"]; ok {
+			versionInt, err := strconv.Atoi(*version)
+			if err != nil {
+				logger.Error().Err(err).Send()
+				return nil, err
+			}
+			scaleSetsByVersion[versionInt] = scaleSet
+		}
+	}
+	// sort by version
+	var versions []int
+	for version := range scaleSetsByVersion {
+		versions = append(versions, version)
+	}
+
+	sortedScaleSets = make([]*armcompute.VirtualMachineScaleSet, len(scaleSetsByVersion))
+	sort.Ints(versions)
+	for i, version := range versions {
+		sortedScaleSets[i] = scaleSetsByVersion[version]
+	}
+	return
+}
+
+func GetScaleSetsList(ctx context.Context, subscriptionId, resourceGroupName, clusterName string) (scaleSets []*armcompute.VirtualMachineScaleSet, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msgf("Getting scale sets for cluster %s", clusterName)
+
+	tags := map[string]string{"weka_cluster": clusterName}
+	scaleSets, err = listScaleSetsByTags(ctx, subscriptionId, resourceGroupName, tags)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+	if len(scaleSets) == 0 {
+		return
+	}
+	// make sure there are no more than 2 scale sets with same cluster name
+	// (original vmss and "refresh" vmss)
+	if len(scaleSets) > 2 {
+		err = fmt.Errorf("found more than 2 scale sets with cluster name %s", clusterName)
+		logger.Error().Err(err).Send()
+	}
+	return
+}
+
+func listScaleSetsByTags(ctx context.Context, subscriptionId, resourceGroupName string, tags map[string]string) ([]*armcompute.VirtualMachineScaleSet, error) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msgf("Listing scale sets by tags: %v", tags)
+
+	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return nil, err
+	}
+	client, err := armcompute.NewVirtualMachineScaleSetsClient(subscriptionId, credential, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return nil, err
+	}
+
+	var scaleSets []*armcompute.VirtualMachineScaleSet
+	pager := client.NewListPager(resourceGroupName, nil)
+
+	for pager.More() {
+		nextResult, err := pager.NextPage(ctx)
+		if err != nil {
+			logger.Error().Err(err).Send()
+			return nil, err
+		}
+		scaleSets = append(scaleSets, nextResult.Value...)
+	}
+
+	logger.Info().Msgf("Found %d scale sets in rg %s", len(scaleSets), resourceGroupName)
+
+	var filteredScaleSets []*armcompute.VirtualMachineScaleSet
+	for _, scaleSet := range scaleSets {
+		if scaleSet.Tags == nil {
+			continue
+		}
+		skip := false
+		for k, v := range tags {
+			if val, ok := scaleSet.Tags[k]; !ok || val == nil || *val != v {
+				skip = true
+				break
+			}
+		}
+		if skip {
+			continue
+		}
+		filteredScaleSets = append(filteredScaleSets, scaleSet)
+	}
+	logger.Info().Msgf("Found %d scale sets with tags: %v", len(filteredScaleSets), tags)
+	return filteredScaleSets, nil
+}
+
+func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armcompute.VirtualMachineScaleSet) *VMSSConfig {
+	var identityIds []string
+	if scaleSet.Identity != nil && scaleSet.Identity.UserAssignedIdentities != nil {
+		for identityId := range scaleSet.Identity.UserAssignedIdentities {
+			identityIds = append(identityIds, identityId)
+		}
+	}
+
+	var sshPublicKey string
+	if scaleSet.Properties.VirtualMachineProfile.OSProfile.LinuxConfiguration.SSH.PublicKeys != nil {
+		sshPublicKey = *scaleSet.Properties.VirtualMachineProfile.OSProfile.LinuxConfiguration.SSH.PublicKeys[0].KeyData
+	}
+
+	var primaryNic *PrimaryNIC
+	var secondaryNics *SecondaryNICs
+
+	for _, nic := range scaleSet.Properties.VirtualMachineProfile.NetworkProfile.NetworkInterfaceConfigurations {
+		ipConfigs := make([]IPConfiguration, len(nic.Properties.IPConfigurations))
+
+		for i, ipConfig := range nic.Properties.IPConfigurations {
+			loadBalancerBackendAddressPoolIDs := make([]string, len(ipConfig.Properties.LoadBalancerBackendAddressPools))
+			for j, loadBalancerBackendAddressPool := range ipConfig.Properties.LoadBalancerBackendAddressPools {
+				loadBalancerBackendAddressPoolIDs[j] = *loadBalancerBackendAddressPool.ID
+			}
+			ipConfigs[i] = IPConfiguration{
+				LoadBalancerBackendAddressPoolIDs: loadBalancerBackendAddressPoolIDs,
+				SubnetID:                          *ipConfig.Properties.Subnet.ID,
+				Primary:                           *ipConfig.Properties.Primary,
+			}
+			if ipConfig.Properties.PublicIPAddressConfiguration != nil {
+				ipConfigs[i].PublicIPAddress = &PublicIPAddress{
+					Assign:          true,
+					DomainNameLabel: *ipConfig.Properties.PublicIPAddressConfiguration.Properties.DNSSettings.DomainNameLabel,
+					Name:            *ipConfig.Properties.PublicIPAddressConfiguration.Name,
+				}
+			}
+		}
+
+		if nic.Properties.Primary != nil && *nic.Properties.Primary {
+			primaryNic = &PrimaryNIC{
+				EnableAcceleratedNetworking: *nic.Properties.EnableAcceleratedNetworking,
+				Name:                        *nic.Name,
+				NetworkSecurityGroupID:      *nic.Properties.NetworkSecurityGroup.ID,
+				IPConfigurations:            ipConfigs,
+			}
+		} else if secondaryNics == nil {
+			nicNameParts := strings.Split(*nic.Name, "-")
+			// remove the last part of the nic name which is the index
+			namePrefix := strings.Join(nicNameParts[:len(nicNameParts)-1], "-")
+
+			secondaryNics = &SecondaryNICs{
+				EnableAcceleratedNetworking: *nic.Properties.EnableAcceleratedNetworking,
+				NamePrefix:                  namePrefix,
+				IPConfigurations:            ipConfigs,
+				NetworkSecurityGroupID:      *nic.Properties.NetworkSecurityGroup.ID,
+				Number:                      len(scaleSet.Properties.VirtualMachineProfile.NetworkProfile.NetworkInterfaceConfigurations) - 1,
+			}
+		}
+		if primaryNic != nil && secondaryNics != nil {
+			break
+		}
+	}
+
+	var customData string
+	if scaleSet.Properties.VirtualMachineProfile.OSProfile.CustomData != nil {
+		customData = *scaleSet.Properties.VirtualMachineProfile.OSProfile.CustomData
+	}
+
+	var ppg *string
+	if scaleSet.Properties.ProximityPlacementGroup != nil {
+		ppg = scaleSet.Properties.ProximityPlacementGroup.ID
+		upperCaseRg := strings.ToUpper(resourceGroupName)
+		val := strings.Replace(*ppg, upperCaseRg, resourceGroupName, 1)
+		ppg = &val
+	}
+
+	vmssConfig := &VMSSConfig{
+		Name:              *scaleSet.Name,
+		Location:          *scaleSet.Location,
+		Zones:             PtrArrToStrArray(scaleSet.Zones),
+		ResourceGroupName: resourceGroupName,
+		SKU:               *scaleSet.SKU.Name,
+		SourceImageID:     *scaleSet.Properties.VirtualMachineProfile.StorageProfile.ImageReference.CommunityGalleryImageID,
+		Tags:              PtrMapToStrMap(scaleSet.Tags),
+
+		UpgradeMode:          string(*scaleSet.Properties.UpgradePolicy.Mode),
+		OrchestrationMode:    string(*scaleSet.Properties.OrchestrationMode),
+		HealthProbeID:        *scaleSet.Properties.VirtualMachineProfile.NetworkProfile.HealthProbe.ID,
+		Overprovision:        *scaleSet.Properties.Overprovision,
+		SinglePlacementGroup: *scaleSet.Properties.SinglePlacementGroup,
+
+		Identity: Identity{
+			IdentityIDs: identityIds,
+			Type:        string(*scaleSet.Identity.Type),
+		},
+		AdminUsername:      *scaleSet.Properties.VirtualMachineProfile.OSProfile.AdminUsername,
+		SshPublicKey:       sshPublicKey,
+		ComputerNamePrefix: *scaleSet.Properties.VirtualMachineProfile.OSProfile.ComputerNamePrefix,
+		CustomData:         customData,
+
+		DisablePasswordAuthentication: *scaleSet.Properties.VirtualMachineProfile.OSProfile.LinuxConfiguration.DisablePasswordAuthentication,
+		ProximityPlacementGroupID:     ppg,
+
+		OSDisk: OSDisk{
+			Caching:            string(*scaleSet.Properties.VirtualMachineProfile.StorageProfile.OSDisk.Caching),
+			StorageAccountType: string(*scaleSet.Properties.VirtualMachineProfile.StorageProfile.OSDisk.ManagedDisk.StorageAccountType),
+			SizeGB:             scaleSet.Properties.VirtualMachineProfile.StorageProfile.OSDisk.DiskSizeGB,
+		},
+		DataDisk: DataDisk{
+			Caching:            string(*scaleSet.Properties.VirtualMachineProfile.StorageProfile.DataDisks[0].Caching),
+			CreateOption:       string(*scaleSet.Properties.VirtualMachineProfile.StorageProfile.DataDisks[0].CreateOption),
+			DiskSizeGB:         *scaleSet.Properties.VirtualMachineProfile.StorageProfile.DataDisks[0].DiskSizeGB,
+			Lun:                *scaleSet.Properties.VirtualMachineProfile.StorageProfile.DataDisks[0].Lun,
+			StorageAccountType: string(*scaleSet.Properties.VirtualMachineProfile.StorageProfile.DataDisks[0].ManagedDisk.StorageAccountType),
+		},
+		PrimaryNIC:    *primaryNic,
+		SecondaryNICs: *secondaryNics,
+	}
+	return vmssConfig
+}
+
+func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, config VMSSConfig, vmssSize, version int) (id *string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
@@ -1291,14 +1513,13 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 		return
 	}
 
+	config.Tags["version"] = fmt.Sprintf("%d", version)
 	size := int64(vmssSize)
 	forceDeletion := false
 	sshKeyPath := fmt.Sprintf("/home/%s/.ssh/authorized_keys", config.AdminUsername)
 
-	var zones []*string
-	for _, zone := range config.Zones {
-		zones = append(zones, &zone)
-	}
+	tags := StrMapToPtrMap(config.Tags)
+	zones := StrArrToPtrArray(config.Zones)
 
 	identities := make(map[string]*armcompute.UserAssignedIdentitiesValue)
 	for _, identityID := range config.Identity.IdentityIDs {
@@ -1375,7 +1596,7 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 			Name:     &config.SKU,
 			Capacity: &size,
 		},
-		Tags:  config.Tags,
+		Tags:  tags,
 		Zones: zones,
 		Properties: &armcompute.VirtualMachineScaleSetProperties{
 			Overprovision: &config.Overprovision,
@@ -1388,7 +1609,7 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 				ForceDeletion: &forceDeletion,
 			},
 			ProximityPlacementGroup: &armcompute.SubResource{
-				ID: &config.ProximityPlacementGroupID,
+				ID: config.ProximityPlacementGroupID,
 			},
 			VirtualMachineProfile: &armcompute.VirtualMachineScaleSetVMProfile{
 				OSProfile: &armcompute.VirtualMachineScaleSetOSProfile{
@@ -1399,7 +1620,7 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 						SSH: &armcompute.SSHConfiguration{
 							PublicKeys: []*armcompute.SSHPublicKey{
 								{
-									KeyData: &config.AdminSSHKey.PublicKey,
+									KeyData: &config.SshPublicKey,
 									Path:    &sshKeyPath,
 								},
 							},
@@ -1452,7 +1673,7 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 		return
 	}
 	id = resp.VirtualMachineScaleSet.ID
-	logger.Info().Msgf("vmss %s created successfully", *id)
+	logger.Info().Msgf("vmss %s created/updated successfully", *id)
 	return
 }
 

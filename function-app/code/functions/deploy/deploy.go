@@ -40,7 +40,6 @@ func GetDeployScript(
 	subscriptionId,
 	resourceGroupName,
 	stateStorageName,
-	vmssStateStorageName,
 	stateContainerName,
 	prefix,
 	clusterName,
@@ -111,21 +110,13 @@ func GetDeployScript(
 			return "", err
 		}
 
-		vmssState, err := common.ReadVmssState(ctx, vmssStateStorageName, stateContainerName)
+		vmScaleSetNames, err := common.GetScaleSetsNames(ctx, subscriptionId, resourceGroupName, clusterName)
 		if err != nil {
-			err = fmt.Errorf("cannot read vmss state to read get vmss version: %v", err)
 			logger.Error().Err(err).Send()
 			return "", err
 		}
-		vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName, vmssState.VmssVersion)
 
-		var refreshVmssName *string
-		if vmssState.RefreshStatus == common.RefreshInProgress {
-			n := common.GetRefreshVmssName(vmScaleSetName, vmssState.VmssVersion)
-			refreshVmssName = &n
-		}
-
-		vmsPrivateIps, err := common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, vmScaleSetName, refreshVmssName)
+		vmsPrivateIps, err := common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, vmScaleSetNames)
 		if err != nil {
 			logger.Error().Err(err).Send()
 			return "", err
@@ -153,7 +144,7 @@ func GetDeployScript(
 		}
 
 		joinParams := join.JoinParams{
-			WekaUsername:   "admin",
+			WekaUsername:   common.WekaAdminUsername,
 			WekaPassword:   wekaPassword,
 			IPs:            ips,
 			InstallDpdk:    installDpdk,
@@ -209,7 +200,6 @@ func getGateways(subnet string, nicsNum int) (gateways []string) {
 func Handler(w http.ResponseWriter, r *http.Request) {
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
-	vmssStateStorageName := os.Getenv("VMSS_STATE_STORAGE_NAME")
 	clusterName := os.Getenv("CLUSTER_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
@@ -265,7 +255,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		subscriptionId,
 		resourceGroupName,
 		stateStorageName,
-		vmssStateStorageName,
 		stateContainerName,
 		prefix,
 		clusterName,

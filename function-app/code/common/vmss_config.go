@@ -12,11 +12,6 @@ type Identity struct {
 	Type        string   `json:"type"`
 }
 
-type AdminSSHKey struct {
-	PublicKey string `json:"public_key"`
-	Username  string `json:"username"`
-}
-
 type DataDisk struct {
 	Caching            string `json:"caching"`
 	CreateOption       string `json:"create_option"`
@@ -49,7 +44,6 @@ type PrimaryNIC struct {
 	IPConfigurations            []IPConfiguration `json:"ip_configurations"`
 	Name                        string            `json:"name"`
 	NetworkSecurityGroupID      string            `json:"network_security_group_id"`
-	Primary                     bool              `json:"primary"`
 }
 
 type SecondaryNICs struct {
@@ -58,17 +52,16 @@ type SecondaryNICs struct {
 	NamePrefix                  string            `json:"name_prefix"`
 	NetworkSecurityGroupID      string            `json:"network_security_group_id"`
 	Number                      int               `json:"number"`
-	Primary                     bool              `json:"primary"`
 }
 
 type VMSSConfig struct {
-	Name              string             `json:"name"`
-	Location          string             `json:"location"`
-	Zones             []string           `json:"zones"`
-	ResourceGroupName string             `json:"resource_group_name"`
-	SKU               string             `json:"sku"`
-	SourceImageID     string             `json:"source_image_id"`
-	Tags              map[string]*string `json:"tags"`
+	Name              string            `json:"name"`
+	Location          string            `json:"location"`
+	Zones             []string          `json:"zones"`
+	ResourceGroupName string            `json:"resource_group_name"`
+	SKU               string            `json:"sku"`
+	SourceImageID     string            `json:"source_image_id"`
+	Tags              map[string]string `json:"tags"`
 
 	UpgradeMode          string `json:"upgrade_mode"`
 	OrchestrationMode    string `json:"orchestration_mode"`
@@ -76,14 +69,14 @@ type VMSSConfig struct {
 	Overprovision        bool   `json:"overprovision"`
 	SinglePlacementGroup bool   `json:"single_placement_group"`
 
-	Identity           Identity    `json:"identity"`
-	AdminUsername      string      `json:"admin_username"`
-	AdminSSHKey        AdminSSHKey `json:"admin_ssh_key"`
-	ComputerNamePrefix string      `json:"computer_name_prefix"`
-	CustomData         string      `json:"custom_data"`
+	Identity           Identity `json:"identity"`
+	AdminUsername      string   `json:"admin_username"`
+	SshPublicKey       string   `json:"ssh_public_key"`
+	ComputerNamePrefix string   `json:"computer_name_prefix"`
+	CustomData         string   `json:"custom_data"`
 
-	DisablePasswordAuthentication bool   `json:"disable_password_authentication"`
-	ProximityPlacementGroupID     string `json:"proximity_placement_group_id"`
+	DisablePasswordAuthentication bool    `json:"disable_password_authentication"`
+	ProximityPlacementGroupID     *string `json:"proximity_placement_group_id,omitempty"`
 
 	OSDisk        OSDisk        `json:"os_disk"`
 	DataDisk      DataDisk      `json:"data_disk"`
@@ -91,22 +84,32 @@ type VMSSConfig struct {
 	SecondaryNICs SecondaryNICs `json:"secondary_nics"`
 }
 
-func VmssConfigsDiff(old, new *VMSSConfig) string {
+// Compares two vmss configs - works with copies of VMSSConfig structs
+// NOTES:
+// - does not compare "version" tags, and names which include version
+// - for Custom Data we use tag `custom_data_md5` to compare, as it is not possible to get custom data from VMSS
+func VmssConfigsDiff(old, new VMSSConfig) string {
+	old.CustomData, new.CustomData = "", ""
+	old.Tags["version"], new.Tags["version"] = "", ""
+	old.ComputerNamePrefix, new.ComputerNamePrefix = "", ""
+	old.Name, new.Name = "", ""
+
+	for i := range old.PrimaryNIC.IPConfigurations {
+		if old.PrimaryNIC.IPConfigurations[i].PublicIPAddress != nil {
+			old.PrimaryNIC.IPConfigurations[i].PublicIPAddress.DomainNameLabel = ""
+		}
+	}
+	for i := range new.PrimaryNIC.IPConfigurations {
+		if new.PrimaryNIC.IPConfigurations[i].PublicIPAddress != nil {
+			new.PrimaryNIC.IPConfigurations[i].PublicIPAddress.DomainNameLabel = ""
+		}
+	}
+
+	if new.OSDisk.SizeGB == nil {
+		old.OSDisk.SizeGB = nil
+	}
+
 	return cmp.Diff(new, old) // arguments order: (want, got)
-}
-
-type RefreshStatus string
-
-const (
-	RefreshNone       RefreshStatus = "none"
-	RefreshInProgress RefreshStatus = "in_progress"
-	RefreshNeeded     RefreshStatus = "needed"
-)
-
-type VMSSState struct {
-	VmssVersion   uint16        `json:"vmss_version"`
-	RefreshStatus RefreshStatus `json:"refresh_status"`
-	CurrentConfig *VMSSConfig   `json:"current_config,omitempty"`
 }
 
 func GetRefreshVmssName(outdatedVmssName string, currentVmssVersion uint16) string {
@@ -118,10 +121,8 @@ func GetRefreshVmssName(outdatedVmssName string, currentVmssVersion uint16) stri
 }
 
 type VMSSStateVerbose struct {
-	VmssCreated     bool        `json:"vmss_created"`
 	VmssName        string      `json:"vmss_name"`
-	RefreshStatus   string      `json:"refresh_status"`
-	RefreshVmssName string      `json:"refresh_vmss_name"`
+	RefreshVmssName *string     `json:"refresh_vmss_name"`
 	CurrentConfig   *VMSSConfig `json:"current_config,omitempty"`
 }
 
@@ -143,4 +144,38 @@ func TruePtr() *bool {
 func FalsePtr() *bool {
 	b := false
 	return &b
+}
+
+func PtrArrToStrArray(arr []*string) []string {
+	result := make([]string, len(arr))
+	for i, s := range arr {
+		result[i] = *s
+	}
+	return result
+}
+
+func PtrMapToStrMap(m map[string]*string) map[string]string {
+	result := make(map[string]string, len(m))
+	for k, v := range m {
+		result[k] = *v
+	}
+	return result
+}
+
+func StrArrToPtrArray(arr []string) []*string {
+	result := make([]*string, len(arr))
+	for i, s := range arr {
+		copyS := s
+		result[i] = &copyS
+	}
+	return result
+}
+
+func StrMapToPtrMap(m map[string]string) map[string]*string {
+	result := make(map[string]*string, len(m))
+	for k, v := range m {
+		copyV := v
+		result[k] = &copyV
+	}
+	return result
 }

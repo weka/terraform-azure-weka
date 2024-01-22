@@ -37,7 +37,7 @@ func GetReports(ctx context.Context, stateStorageName, stateContainerName string
 }
 
 func GetClusterStatus(
-	ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, keyVaultUri string, refreshVmScaleSetName *string,
+	ctx context.Context, subscriptionId, resourceGroupName, stateStorageName, stateContainerName, keyVaultUri, clusterName string,
 ) (clusterStatus protocol.ClusterStatus, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("fetching cluster status...")
@@ -59,10 +59,15 @@ func GetClusterStatus(
 	}
 
 	jrpcBuilder := func(ip string) *jrpc.BaseClient {
-		return connectors.NewJrpcClient(ctx, ip, weka.ManagementJrpcPort, "admin", wekaPassword)
+		return connectors.NewJrpcClient(ctx, ip, weka.ManagementJrpcPort, common.WekaAdminUsername, wekaPassword)
 	}
 
-	vmIps, err := common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, vmScaleSetName, refreshVmScaleSetName)
+	vmScaleSetNames, err := common.GetScaleSetsNames(ctx, subscriptionId, resourceGroupName, clusterName)
+	if err != nil {
+		return
+	}
+
+	vmIps, err := common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, vmScaleSetNames)
 	if err != nil {
 		return
 	}
@@ -99,13 +104,31 @@ func GetClusterStatus(
 	return
 }
 
+func GetRefreshStatus(ctx context.Context, subscriptionId, resourceGroupName, clusterName string) (*common.VMSSStateVerbose, error) {
+	scaleSets, err := common.GetScaleSetsOrderdedByVersion(ctx, subscriptionId, resourceGroupName, clusterName)
+	if err != nil {
+		return nil, err
+	}
+
+	currentConfig := common.GetVmssConfig(ctx, resourceGroupName, scaleSets[0])
+	var refreshVmssName *string
+	if len(scaleSets) > 1 {
+		refreshVmssName = scaleSets[1].Name
+	}
+
+	result := &common.VMSSStateVerbose{
+		VmssName:        *scaleSets[0].Name,
+		RefreshVmssName: refreshVmssName,
+		CurrentConfig:   currentConfig,
+	}
+	return result, nil
+}
+
 func Handler(w http.ResponseWriter, r *http.Request) {
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
-	vmssStateStorageName := os.Getenv("VMSS_STATE_STORAGE_NAME")
-	prefix := os.Getenv("PREFIX")
 	clusterName := os.Getenv("CLUSTER_NAME")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 
@@ -143,38 +166,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	vmssState, err := common.ReadVmssState(ctx, vmssStateStorageName, stateContainerName)
-	if err != nil {
-		err = fmt.Errorf("cannot read vmss state to read get vmss version: %v", err)
-		logger.Error().Err(err).Send()
-		common.WriteErrorResponse(w, err)
-		return
-	}
-
-	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName, vmssState.VmssVersion)
-	var refreshVmssName *string
-	if vmssState.RefreshStatus == common.RefreshInProgress {
-		n := common.GetRefreshVmssName(vmScaleSetName, vmssState.VmssVersion)
-		refreshVmssName = &n
-	}
-
 	var result interface{}
 	if requestBody.Type == "" || requestBody.Type == "status" {
-		result, err = GetClusterStatus(ctx, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, keyVaultUri, refreshVmssName)
+		result, err = GetClusterStatus(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName, keyVaultUri, clusterName)
 	} else if requestBody.Type == "progress" {
 		result, err = GetReports(ctx, stateStorageName, stateContainerName)
 	} else if requestBody.Type == "vmss" {
-		refreshVmssName := common.GetRefreshVmssName(vmScaleSetName, vmssState.VmssVersion)
-		if vmssState.RefreshStatus == common.RefreshNone {
-			refreshVmssName = ""
-		}
-		result = common.VMSSStateVerbose{
-			VmssCreated:     vmssState.CurrentConfig != nil,
-			VmssName:        vmScaleSetName,
-			RefreshStatus:   string(vmssState.RefreshStatus),
-			RefreshVmssName: refreshVmssName,
-			CurrentConfig:   vmssState.CurrentConfig,
-		}
+		result, err = GetRefreshStatus(ctx, subscriptionId, resourceGroupName, clusterName)
 	} else {
 		result = "Invalid status type"
 	}
