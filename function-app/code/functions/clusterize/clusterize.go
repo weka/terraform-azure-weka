@@ -92,12 +92,9 @@ func GetShutdownScript() string {
 	return dedent.Dedent(s)
 }
 
-func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p ClusterizationParams, funcDef functions_def.FunctionDef) (clusterizeScript string, err error) {
+func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p ClusterizationParams, funcDef functions_def.FunctionDef, vmScaleSetName string) (clusterizeScript string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("This is the last instance in the cluster, creating obs and clusterization script")
-
-	version := 0 // on cluserization step we are sure that the vmss version is 0 as no refresh was done yet
-	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName, version)
 
 	if p.Cluster.SetObs {
 		if p.Obs.AccessKey == "" {
@@ -178,8 +175,15 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 
 	instanceName := strings.Split(p.VmName, ":")[0]
 	instanceId := common.GetScaleSetVmIndex(instanceName)
-	version := 0 // on cluserization step we are sure that the vmss version is 0 as no refresh was done yet
-	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName, version)
+
+	vmssState, err := common.ReadVmssState(ctx, p.StateStorageName, p.StateContainerName)
+	if err != nil {
+		err = fmt.Errorf("failed to read vmss state: %w", err)
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName, vmssState.GetLatestVersion())
 	vmName := p.VmName
 
 	ip, err := common.GetPublicIp(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, p.Prefix, p.Cluster.ClusterName, instanceId)
@@ -213,7 +217,7 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 	reportFunction := funcDef.GetFunctionCmdDefinition(functions_def.Report)
 
 	if len(state.Instances) == p.Cluster.HostsNum {
-		clusterizeScript, err = HandleLastClusterVm(ctx, state, p, funcDef)
+		clusterizeScript, err = HandleLastClusterVm(ctx, state, p, funcDef, vmScaleSetName)
 		if err != nil {
 			clusterizeScript = cloudCommon.GetErrorScript(err, reportFunction)
 		}

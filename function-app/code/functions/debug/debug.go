@@ -113,7 +113,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 					TieringSsdPercent: tieringSsdPercent,
 				},
 			}
-			result, err = clusterizeFunc.HandleLastClusterVm(ctx, state, params, &azure_functions_def.AzureFuncDef{})
+			result, err = clusterizeFunc.HandleLastClusterVm(ctx, state, params, &azure_functions_def.AzureFuncDef{}, vmScaleSetName)
 			if err != nil {
 				result = clusterizeFunc.GetErrorScript(err)
 			}

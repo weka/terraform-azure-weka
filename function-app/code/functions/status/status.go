@@ -62,7 +62,7 @@ func GetClusterStatus(
 		return connectors.NewJrpcClient(ctx, ip, weka.ManagementJrpcPort, common.WekaAdminUsername, wekaPassword)
 	}
 
-	vmScaleSetNames, err := common.GetScaleSetsNames(ctx, subscriptionId, resourceGroupName, clusterName)
+	vmScaleSetNames, err := common.GetScaleSetsNames(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
 	if err != nil {
 		return
 	}
@@ -104,22 +104,22 @@ func GetClusterStatus(
 	return
 }
 
-func GetRefreshStatus(ctx context.Context, subscriptionId, resourceGroupName, clusterName string) (*common.VMSSStateVerbose, error) {
-	scaleSets, err := common.GetScaleSetsOrderdedByVersion(ctx, subscriptionId, resourceGroupName, clusterName)
+func GetRefreshStatus(ctx context.Context, subscriptionId, resourceGroupName, stateStorageName, stateContainerName string) (*common.VMSSStateVerbose, error) {
+	scaleSetNames, err := common.GetScaleSetsNames(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
 	if err != nil {
 		return nil, err
 	}
 
-	currentConfig := common.GetVmssConfig(ctx, resourceGroupName, scaleSets[0])
-	var refreshVmssName *string
-	if len(scaleSets) > 1 {
-		refreshVmssName = scaleSets[1].Name
+	vmssConfig, err := common.ReadVmssConfig(ctx, stateStorageName, stateContainerName)
+	if err != nil {
+		return nil, err
 	}
+	vmssConfig.CustomData = "<hidden>"
+	vmssConfig.SshPublicKey = "<hidden>"
 
 	result := &common.VMSSStateVerbose{
-		VmssName:        *scaleSets[0].Name,
-		RefreshVmssName: refreshVmssName,
-		CurrentConfig:   currentConfig,
+		ActiveVmssNames: scaleSetNames,
+		TargetConfig:    vmssConfig,
 	}
 	return result, nil
 }
@@ -172,7 +172,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	} else if requestBody.Type == "progress" {
 		result, err = GetReports(ctx, stateStorageName, stateContainerName)
 	} else if requestBody.Type == "vmss" {
-		result, err = GetRefreshStatus(ctx, subscriptionId, resourceGroupName, clusterName)
+		result, err = GetRefreshStatus(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
 	} else {
 		result = "Invalid status type"
 	}

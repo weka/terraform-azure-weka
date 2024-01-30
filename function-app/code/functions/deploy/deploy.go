@@ -110,7 +110,7 @@ func GetDeployScript(
 			return "", err
 		}
 
-		vmScaleSetNames, err := common.GetScaleSetsNames(ctx, subscriptionId, resourceGroupName, clusterName)
+		vmScaleSetNames, err := common.GetScaleSetsNames(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
 		if err != nil {
 			logger.Error().Err(err).Send()
 			return "", err

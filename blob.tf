@@ -45,6 +45,23 @@ data "azurerm_storage_account" "obs_sa" {
   resource_group_name = var.rg_name
 }
 
+resource "azurerm_storage_blob" "vmss_state" {
+  name                   = "vmss-state"
+  storage_account_name   = local.deployment_storage_account_name
+  storage_container_name = local.deployment_container_name
+  type                   = "Block"
+
+  source_content = jsonencode({
+    prefix          = var.prefix
+    cluster_name    = var.cluster_name
+    active_versions = [] # a queue of versions that are currently active
+  })
+
+  lifecycle {
+    ignore_changes = all
+  }
+}
+
 resource "azurerm_storage_blob" "vmss_config" {
   name                   = "vmss-config"
   storage_account_name   = local.deployment_storage_account_name
@@ -72,7 +89,6 @@ resource "azurerm_storage_blob" "vmss_config" {
     tags = merge(var.tags_map, {
       "weka_cluster" : var.cluster_name,
       "user_id" : data.azurerm_client_config.current.object_id,
-      "custom_data_md5" : md5(local.custom_data_script),
     })
 
     os_disk = {

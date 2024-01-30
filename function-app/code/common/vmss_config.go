@@ -1,6 +1,8 @@
 package common
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -84,24 +86,34 @@ type VMSSConfig struct {
 	SecondaryNICs SecondaryNICs `json:"secondary_nics"`
 }
 
+func GetConfigHash(c VMSSConfig) (string, error) {
+	// calculate hash of the config (used to identify vmss config changes)
+	// take first 10 chars of the hash
+	jsonData, err := json.Marshal(c)
+	if err != nil {
+		return "", fmt.Errorf("cannot marshal vmss config: %v", err)
+	}
+
+	hash := sha256.Sum256(jsonData)
+	hashStr := fmt.Sprintf("%x", hash)
+	return hashStr[:10], nil
+}
+
 // Compares two vmss configs - works with copies of VMSSConfig structs
 // NOTES:
-// - does not compare "version" tags, and names which include version
-// - for Custom Data we use tag `custom_data_md5` to compare, as it is not possible to get custom data from VMSS
+// - does not compare "version" and "config_applied_at" tags, and names which include version
 func VmssConfigsDiff(old, new VMSSConfig) string {
 	old.CustomData, new.CustomData = "", ""
 	old.Tags["version"], new.Tags["version"] = "", ""
+	old.Tags["config_applied_at"], new.Tags["config_applied_at"] = "", ""
 	old.ComputerNamePrefix, new.ComputerNamePrefix = "", ""
 	old.Name, new.Name = "", ""
 
-	for i := range old.PrimaryNIC.IPConfigurations {
-		if old.PrimaryNIC.IPConfigurations[i].PublicIPAddress != nil {
-			old.PrimaryNIC.IPConfigurations[i].PublicIPAddress.DomainNameLabel = ""
-		}
-	}
-	for i := range new.PrimaryNIC.IPConfigurations {
-		if new.PrimaryNIC.IPConfigurations[i].PublicIPAddress != nil {
-			new.PrimaryNIC.IPConfigurations[i].PublicIPAddress.DomainNameLabel = ""
+	if len(old.PrimaryNIC.IPConfigurations) == len(new.PrimaryNIC.IPConfigurations) {
+		for i := range old.PrimaryNIC.IPConfigurations {
+			if old.PrimaryNIC.IPConfigurations[i].PublicIPAddress != nil {
+				old.PrimaryNIC.IPConfigurations[i].PublicIPAddress.DomainNameLabel = new.PrimaryNIC.IPConfigurations[i].PublicIPAddress.DomainNameLabel
+			}
 		}
 	}
 
@@ -120,10 +132,59 @@ func GetRefreshVmssName(outdatedVmssName string, currentVmssVersion uint16) stri
 	return fmt.Sprintf("%s%s", vmssNameBase, newVersionStr)
 }
 
+type VMSSState struct {
+	Prefix      string   `json:"prefix"`
+	ClusterName string   `json:"cluster_name"`
+	Versions    []string `json:"active_versions"`
+}
+
+func (q *VMSSState) AddVersion(item string) {
+	// make sure version is added in the end of the queue
+	// and there are no duplicates
+	for i, v := range q.Versions {
+		if v == item && i != len(q.Versions)-1 {
+			q.Versions = append(q.Versions[:i], q.Versions[i+1:]...)
+			break
+		} else if v == item && i == len(q.Versions)-1 {
+			q.Versions = q.Versions[:i]
+		}
+	}
+	q.Versions = append(q.Versions, item)
+}
+
+func (q *VMSSState) GetLatestVersion() string {
+	return q.Versions[len(q.Versions)-1]
+}
+
+func (q *VMSSState) IsEmpty() bool {
+	return len(q.Versions) == 0
+}
+
+func (q *VMSSState) ReplaceVersion(old, new string) {
+	for i, v := range q.Versions {
+		if v == old {
+			q.Versions[i] = new
+			return
+		}
+	}
+}
+
+func (q *VMSSState) RemoveVersion(item string) error {
+	for i, v := range q.Versions {
+		// do not allow removing the last element of array
+		if v == item && i != len(q.Versions)-1 {
+			q.Versions = append(q.Versions[:i], q.Versions[i+1:]...)
+			return nil
+		} else if v == item && i == len(q.Versions)-1 {
+			return fmt.Errorf("cannot remove the latest version from the queue")
+		}
+	}
+	return fmt.Errorf("version %s not found in the queue", item)
+}
+
 type VMSSStateVerbose struct {
-	VmssName        string      `json:"vmss_name"`
-	RefreshVmssName *string     `json:"refresh_vmss_name"`
-	CurrentConfig   *VMSSConfig `json:"current_config,omitempty"`
+	ActiveVmssNames []string   `json:"active_vmss_names"`
+	TargetConfig    VMSSConfig `json:"target_config"`
 }
 
 func ToEnumStrValue[T interface{ ~string }](val string, possibleEnumValues []T) (*T, error) {

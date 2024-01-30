@@ -21,7 +21,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
-	clusterName := os.Getenv("CLUSTER_NAME")
 
 	var invokeRequest common.InvokeRequest
 
@@ -52,7 +51,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vmScaleSetName, err := common.GetScaleSetNameWithLatestVersion(ctx, subscriptionId, resourceGroupName, clusterName)
+	vmScaleSetName, err := common.GetScaleSetNameWithLatestConfiguration(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
 	if err != nil {
 		err = fmt.Errorf("cannot get scale set with latest version: %v", err)
 		logger.Error().Err(err).Send()

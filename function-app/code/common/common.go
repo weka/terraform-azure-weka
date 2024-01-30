@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -322,6 +320,34 @@ func UpdateClusterized(ctx context.Context, subscriptionId, resourceGroupName, s
 	err = WriteState(ctx, stateStorageName, stateContainerName, state)
 
 	logger.Info().Msg("State updated to 'clusterized'")
+	return
+}
+
+func ReadVmssState(ctx context.Context, storageName, containerName string) (vmssState VMSSState, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	asByteArray, err := ReadBlobObject(ctx, storageName, containerName, "vmss-state")
+	if err != nil {
+		return
+	}
+	err = json.Unmarshal(asByteArray, &vmssState)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+	return
+}
+
+func WriteVmssState(ctx context.Context, stateStorageName, containerName string, vmssState VMSSState) (err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	asByteArray, err := json.Marshal(vmssState)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	err = WriteBlobObject(ctx, stateStorageName, containerName, "vmss-state", asByteArray)
 	return
 }
 
@@ -969,12 +995,8 @@ func GetWekaClusterPassword(ctx context.Context, keyVaultUri string) (password s
 	return GetKeyVaultValue(ctx, keyVaultUri, "weka-password")
 }
 
-func GetVmScaleSetName(prefix, clusterName string, version int) string {
-	versionStr := ""
-	if version > 0 {
-		versionStr = fmt.Sprintf("-v%d", version)
-	}
-	return fmt.Sprintf("%s-%s-vmss%s", prefix, clusterName, versionStr)
+func GetVmScaleSetName(prefix, clusterName string, version string) string {
+	return fmt.Sprintf("%s-%s-vmss-%s", prefix, clusterName, version)
 }
 
 func GetScaleSetInstanceIds(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (instanceIds []string, err error) {
@@ -1237,144 +1259,56 @@ func DeleteVmss(ctx context.Context, subscriptionId, resourceGroupName, vmScaleS
 	return
 }
 
-func GetScaleSetsNames(ctx context.Context, subscriptionId, resourceGroupName, clusterName string) (scaleSetsNames []string, err error) {
-	logger := logging.LoggerFromCtx(ctx)
-	logger.Info().Msgf("Getting scale sets names for cluster %s", clusterName)
+func GetScaleSetsNames(ctx context.Context, subscriptionId, resourceGroupName, storageAccountName, storageContainerName string) (scaleSetsNames []string, err error) {
+	vmssState, err := ReadVmssState(ctx, storageAccountName, storageContainerName)
+	if err != nil {
+		err = fmt.Errorf("failed to read vmss state: %v", err)
+		return
+	}
 
-	scaleSets, err := GetScaleSetsList(ctx, subscriptionId, resourceGroupName, clusterName)
-	for _, scaleSet := range scaleSets {
-		scaleSetsNames = append(scaleSetsNames, *scaleSet.Name)
+	scaleSetsNames = GetScaleSetsNamesFromVmssState(ctx, subscriptionId, resourceGroupName, &vmssState)
+	return
+}
+
+func GetScaleSetsNamesFromVmssState(ctx context.Context, subscriptionId, resourceGroupName string, vmssState *VMSSState) (scaleSetsNames []string) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msgf("Getting scale sets names for active verisons: %v", vmssState.Versions)
+
+	for _, version := range vmssState.Versions {
+		vmssName := GetVmScaleSetName(vmssState.Prefix, vmssState.ClusterName, version)
+		scaleSetsNames = append(scaleSetsNames, vmssName)
 	}
 	return
 }
 
-func GetScaleSetNameWithLatestVersion(ctx context.Context, subscriptionId, resourceGroupName, clusterName string) (scaleSetName string, err error) {
-	vmss, err := GetScaleSetWithLatestVersion(ctx, subscriptionId, resourceGroupName, clusterName)
+func GetScaleSetNameWithLatestConfiguration(ctx context.Context, subscriptionId, resourceGroupName, storageAccountName, storageContainerName string) (scaleSetName string, err error) {
+	vmssState, err := ReadVmssState(ctx, storageAccountName, storageContainerName)
 	if err != nil {
+		err = fmt.Errorf("failed to read vmss state: %v", err)
 		return
 	}
-	scaleSetName = *vmss.Name
-	return
+	latestVersion := vmssState.GetLatestVersion()
+	scaleSetName = GetVmScaleSetName(vmssState.Prefix, vmssState.ClusterName, latestVersion)
+	return scaleSetName, nil
 }
 
-func GetScaleSetWithLatestVersion(ctx context.Context, subscriptionId, resourceGroupName, clusterName string) (vmss *armcompute.VirtualMachineScaleSet, err error) {
+func GetScaleSetsList(ctx context.Context, subscriptionId, resourceGroupName string, scaleSetNames []string) (scaleSets []*armcompute.VirtualMachineScaleSet, err error) {
 	logger := logging.LoggerFromCtx(ctx)
-	logger.Info().Msgf("Getting scale set with latest version for cluster %s", clusterName)
 
-	scaleSets, err := GetScaleSetsOrderdedByVersion(ctx, subscriptionId, resourceGroupName, clusterName)
-	if err != nil {
-		return
-	}
-	return scaleSets[len(scaleSets)-1], nil
-}
-
-func GetScaleSetsOrderdedByVersion(ctx context.Context, subscriptionId, resourceGroupName, clusterName string) (sortedScaleSets []*armcompute.VirtualMachineScaleSet, err error) {
-	logger := logging.LoggerFromCtx(ctx)
-	logger.Info().Msgf("Getting scale sets ordered by version for cluster %s", clusterName)
-
-	scaleSets, err := GetScaleSetsList(ctx, subscriptionId, resourceGroupName, clusterName)
-	if err != nil {
-		return
-	}
-	// tags should contain "version"
-	scaleSetsByVersion := make(map[int]*armcompute.VirtualMachineScaleSet, len(scaleSets))
-	for _, scaleSet := range scaleSets {
-		if scaleSet.Tags == nil {
-			continue
-		}
-		if version, ok := scaleSet.Tags["version"]; ok {
-			versionInt, err := strconv.Atoi(*version)
-			if err != nil {
-				logger.Error().Err(err).Send()
-				return nil, err
-			}
-			scaleSetsByVersion[versionInt] = scaleSet
-		}
-	}
-	// sort by version
-	var versions []int
-	for version := range scaleSetsByVersion {
-		versions = append(versions, version)
-	}
-
-	sortedScaleSets = make([]*armcompute.VirtualMachineScaleSet, len(scaleSetsByVersion))
-	sort.Ints(versions)
-	for i, version := range versions {
-		sortedScaleSets[i] = scaleSetsByVersion[version]
-	}
-	return
-}
-
-func GetScaleSetsList(ctx context.Context, subscriptionId, resourceGroupName, clusterName string) (scaleSets []*armcompute.VirtualMachineScaleSet, err error) {
-	logger := logging.LoggerFromCtx(ctx)
-	logger.Info().Msgf("Getting scale sets for cluster %s", clusterName)
-
-	tags := map[string]string{"weka_cluster": clusterName}
-	scaleSets, err = listScaleSetsByTags(ctx, subscriptionId, resourceGroupName, tags)
-	if err != nil {
-		logger.Error().Err(err).Send()
-		return
-	}
-	if len(scaleSets) == 0 {
-		return
-	}
-	// make sure there are no more than 2 scale sets with same cluster name
-	// (original vmss and "refresh" vmss)
-	if len(scaleSets) > 2 {
-		err = fmt.Errorf("found more than 2 scale sets with cluster name %s", clusterName)
-		logger.Error().Err(err).Send()
-	}
-	return
-}
-
-func listScaleSetsByTags(ctx context.Context, subscriptionId, resourceGroupName string, tags map[string]string) ([]*armcompute.VirtualMachineScaleSet, error) {
-	logger := logging.LoggerFromCtx(ctx)
-	logger.Info().Msgf("Listing scale sets by tags: %v", tags)
-
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
-	if err != nil {
-		logger.Error().Err(err).Send()
-		return nil, err
-	}
-	client, err := armcompute.NewVirtualMachineScaleSetsClient(subscriptionId, credential, nil)
-	if err != nil {
-		logger.Error().Err(err).Send()
-		return nil, err
-	}
-
-	var scaleSets []*armcompute.VirtualMachineScaleSet
-	pager := client.NewListPager(resourceGroupName, nil)
-
-	for pager.More() {
-		nextResult, err := pager.NextPage(ctx)
+	for _, scaleSetName := range scaleSetNames {
+		scaleSet, err := getScaleSet(ctx, subscriptionId, resourceGroupName, scaleSetName)
 		if err != nil {
-			logger.Error().Err(err).Send()
+			// if scale set not found, ignore
+			if getErr, ok := err.(*azcore.ResponseError); ok && getErr.ErrorCode == "ResourceNotFound" {
+				continue
+			}
 			return nil, err
 		}
-		scaleSets = append(scaleSets, nextResult.Value...)
+		scaleSets = append(scaleSets, scaleSet)
 	}
 
-	logger.Info().Msgf("Found %d scale sets in rg %s", len(scaleSets), resourceGroupName)
-
-	var filteredScaleSets []*armcompute.VirtualMachineScaleSet
-	for _, scaleSet := range scaleSets {
-		if scaleSet.Tags == nil {
-			continue
-		}
-		skip := false
-		for k, v := range tags {
-			if val, ok := scaleSet.Tags[k]; !ok || val == nil || *val != v {
-				skip = true
-				break
-			}
-		}
-		if skip {
-			continue
-		}
-		filteredScaleSets = append(filteredScaleSets, scaleSet)
-	}
-	logger.Info().Msgf("Found %d scale sets with tags: %v", len(filteredScaleSets), tags)
-	return filteredScaleSets, nil
+	logger.Info().Msgf("Found %d scale sets from list %v", len(scaleSets), scaleSetNames)
+	return
 }
 
 func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armcompute.VirtualMachineScaleSet) *VMSSConfig {
@@ -1498,7 +1432,7 @@ func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armc
 	return vmssConfig
 }
 
-func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, config VMSSConfig, vmssSize, version int) (id *string, err error) {
+func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, configHash string, config VMSSConfig, vmssSize int) (id *string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
@@ -1513,7 +1447,8 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 		return
 	}
 
-	config.Tags["version"] = fmt.Sprintf("%d", version)
+	config.Tags["version"] = configHash
+	config.Tags["config_applied_at"] = time.Now().Format(time.RFC3339)
 	size := int64(vmssSize)
 	forceDeletion := false
 	sshKeyPath := fmt.Sprintf("/home/%s/.ssh/authorized_keys", config.AdminUsername)

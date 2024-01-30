@@ -225,7 +225,6 @@ func Terminate(ctx context.Context, scaleResponse protocol.ScaleResponse, subscr
 func Handler(w http.ResponseWriter, r *http.Request) {
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
-	clusterName := os.Getenv("CLUSTER_NAME")
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 
@@ -258,7 +257,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vmssNames, err := common.GetScaleSetsNames(ctx, subscriptionId, resourceGroupName, clusterName)
+	vmssNames, err := common.GetScaleSetsNames(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
 	if err != nil {
 		common.WriteErrorResponse(w, err)
 		return

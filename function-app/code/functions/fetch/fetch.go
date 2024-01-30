@@ -25,13 +25,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
-	clusterName := os.Getenv("CLUSTER_NAME")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
 
-	vmssNames, err := common.GetScaleSetsNames(ctx, subscriptionId, resourceGroupName, clusterName)
+	vmssNames, err := common.GetScaleSetsNames(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
 	if err != nil {
 		common.WriteErrorResponse(w, err)
 		return
