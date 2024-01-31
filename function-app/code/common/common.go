@@ -2,7 +2,9 @@ package common
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -963,7 +965,7 @@ func RetrySetDeletionProtectionAndReport(
 			counter++
 			// deletion protection invoked by terminate function
 			if maxAttempts == 0 {
-				msg := fmt.Sprintf("Deletion protection set authorization isn't ready, will retry on next scale down workflow")
+				msg := "Deletion protection set authorization isn't ready, will retry on next scale down workflow"
 				ReportMsg(ctx, hostName, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, "debug", msg)
 				return
 			}
@@ -995,8 +997,11 @@ func GetWekaClusterPassword(ctx context.Context, keyVaultUri string) (password s
 	return GetKeyVaultValue(ctx, keyVaultUri, "weka-password")
 }
 
-func GetVmScaleSetName(prefix, clusterName string, version string) string {
-	return fmt.Sprintf("%s-%s-vmss-%s", prefix, clusterName, version)
+func GetVmScaleSetName(prefix, clusterName string, version int) string {
+	if version == 0 {
+		return fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
+	}
+	return fmt.Sprintf("%s-%s-vmss-v%d", prefix, clusterName, version)
 }
 
 func GetScaleSetInstanceIds(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (instanceIds []string, err error) {
@@ -1170,12 +1175,19 @@ func ReadVmssConfig(ctx context.Context, storageName, containerName string) (vms
 	if err != nil {
 		return
 	}
+
+	// calculate hash of the config (used to identify vmss config changes)
+	// take first 10 chars of the hash
+	hash := sha256.Sum256(asByteArray)
+	hashStr := fmt.Sprintf("%x", hash)
+
 	err = json.Unmarshal(asByteArray, &vmssConfig)
 	if err != nil {
 		logger.Error().Err(err).Send()
 		return
 	}
 
+	vmssConfig.ConfigHash = hashStr[:10]
 	return
 }
 
@@ -1292,23 +1304,29 @@ func GetScaleSetNameWithLatestConfiguration(ctx context.Context, subscriptionId,
 	return scaleSetName, nil
 }
 
-func GetScaleSetsList(ctx context.Context, subscriptionId, resourceGroupName string, scaleSetNames []string) (scaleSets []*armcompute.VirtualMachineScaleSet, err error) {
+func GetScaleSetsByVersion(ctx context.Context, subscriptionId, resourceGroupName string, vmssState *VMSSState) (map[int]*armcompute.VirtualMachineScaleSet, error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	for _, scaleSetName := range scaleSetNames {
+	scaleSetNames := make([]string, 0)
+	scaleSetsByVersion := make(map[int]*armcompute.VirtualMachineScaleSet, len(vmssState.Versions))
+
+	for _, version := range vmssState.Versions {
+		scaleSetName := GetVmScaleSetName(vmssState.Prefix, vmssState.ClusterName, version)
 		scaleSet, err := getScaleSet(ctx, subscriptionId, resourceGroupName, scaleSetName)
 		if err != nil {
 			// if scale set not found, ignore
-			if getErr, ok := err.(*azcore.ResponseError); ok && getErr.ErrorCode == "ResourceNotFound" {
+			var responseErr *azcore.ResponseError
+			if errors.As(err, &responseErr) && responseErr.ErrorCode == "ResourceNotFound" {
 				continue
 			}
 			return nil, err
 		}
-		scaleSets = append(scaleSets, scaleSet)
+		scaleSetsByVersion[version] = scaleSet
+		scaleSetNames = append(scaleSetNames, scaleSetName)
 	}
 
-	logger.Info().Msgf("Found %d scale sets from list %v", len(scaleSets), scaleSetNames)
-	return
+	logger.Info().Msgf("Found %d scale sets from list %v", len(scaleSetsByVersion), scaleSetNames)
+	return scaleSetsByVersion, nil
 }
 
 func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armcompute.VirtualMachineScaleSet) *VMSSConfig {
@@ -1447,7 +1465,7 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 		return
 	}
 
-	config.Tags["version"] = configHash
+	config.Tags["config_hash"] = configHash
 	config.Tags["config_applied_at"] = time.Now().Format(time.RFC3339)
 	size := int64(vmssSize)
 	forceDeletion := false

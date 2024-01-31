@@ -176,14 +176,8 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 	instanceName := strings.Split(p.VmName, ":")[0]
 	instanceId := common.GetScaleSetVmIndex(instanceName)
 
-	vmssState, err := common.ReadVmssState(ctx, p.StateStorageName, p.StateContainerName)
-	if err != nil {
-		err = fmt.Errorf("failed to read vmss state: %w", err)
-		logger.Error().Err(err).Send()
-		return
-	}
-
-	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName, vmssState.GetLatestVersion())
+	version := 0 // on cluserization step we are sure that the vmss version is 0 as no refresh was done yet
+	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName, version)
 	vmName := p.VmName
 
 	ip, err := common.GetPublicIp(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, p.Prefix, p.Cluster.ClusterName, instanceId)
