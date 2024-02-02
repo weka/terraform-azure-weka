@@ -21,7 +21,7 @@ locals {
     all_gateways                 = cidrhost(data.azurerm_subnet.subnet.address_prefix, 1)
     frontend_container_cores_num = var.frontend_container_cores_num
     backend_lb_ip                = var.backend_lb_ip
-    mount_clients_dpdk           = var.mount_clients_dpdk
+    clients_use_dpdk             = var.clients_use_dpdk
   })
 
   custom_data_parts = [local.preparation_script, local.mount_wekafs_script]
@@ -41,7 +41,7 @@ resource "azurerm_public_ip" "public_ip" {
 resource "azurerm_network_interface" "public_first_nic" {
   count                         = var.assign_public_ip ? var.clients_number : 0
   name                          = "${var.clients_name}-backend-nic-${count.index}"
-  enable_accelerated_networking = var.mount_clients_dpdk
+  enable_accelerated_networking = var.clients_use_dpdk
   resource_group_name           = var.rg_name
   location                      = data.azurerm_resource_group.rg.location
   ip_configuration {
@@ -62,7 +62,7 @@ resource "azurerm_network_interface_security_group_association" "public_first" {
 resource "azurerm_network_interface" "private_first_nic" {
   count                         = var.assign_public_ip ? 0 : var.clients_number
   name                          = "${var.clients_name}-backend-nic-${count.index}"
-  enable_accelerated_networking = var.mount_clients_dpdk
+  enable_accelerated_networking = var.clients_use_dpdk
   resource_group_name           = var.rg_name
   location                      = data.azurerm_resource_group.rg.location
   ip_configuration {
@@ -82,7 +82,7 @@ resource "azurerm_network_interface_security_group_association" "private_first" 
 resource "azurerm_network_interface" "private_nics" {
   count                         = (local.nics_num - 1) * var.clients_number
   name                          = "${var.clients_name}-backend-nic-${count.index + var.clients_number}"
-  enable_accelerated_networking = var.mount_clients_dpdk
+  enable_accelerated_networking = var.clients_use_dpdk
   resource_group_name           = var.rg_name
   location                      = data.azurerm_resource_group.rg.location
   ip_configuration {
