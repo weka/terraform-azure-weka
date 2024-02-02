@@ -4,7 +4,7 @@ module "clients" {
   rg_name                      = var.rg_name
   clients_name                 = "${var.prefix}-${var.cluster_name}-client"
   clients_number               = var.clients_number
-  mount_clients_dpdk           = var.clients_use_dpdk
+  clients_use_dpdk             = var.clients_use_dpdk
   subnet_name                  = local.subnet_name
   apt_repo_server              = var.apt_repo_server
   vnet_name                    = local.vnet_name
