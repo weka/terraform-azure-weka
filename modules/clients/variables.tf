@@ -62,10 +62,10 @@ variable "apt_repo_server" {
   description = "The URL of the apt private repository."
 }
 
-variable "mount_clients_dpdk" {
+variable "clients_use_dpdk" {
   type        = bool
   default     = true
-  description = "Install weka cluster with DPDK"
+  description = "Mount weka clients in DPDK mode."
 }
 
 variable "ppg_id" {
