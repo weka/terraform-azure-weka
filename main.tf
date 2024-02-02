@@ -19,8 +19,6 @@ locals {
     report_url               = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/report"
     function_app_default_key = data.azurerm_function_app_host_keys.function_keys.default_function_key
     disk_size                = local.disk_size
-    vmss_name                = "${var.prefix}-${var.cluster_name}-vmss"
-    rg_name                  = var.rg_name
   })
   placement_group_id = var.placement_group_id != "" ? var.placement_group_id : azurerm_proximity_placement_group.ppg[0].id
 }

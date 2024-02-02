@@ -102,7 +102,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, err)
 		return
 	}
-	currentConfig := common.GetVmssConfig(ctx, resourceGroupName, latestVmss)
 
 	// after vmss creation we need to wait until vmss is clusterized
 	if !state.Clusterized {
@@ -111,6 +110,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		common.WriteSuccessResponse(w, "Not clusterized yet, skipping...")
 		return
 	}
+
+	currentConfig := common.GetVmssConfig(ctx, resourceGroupName, latestVmss)
 
 	// 2. Update flow: compare current vmss config with expected vmss config and update if needed
 	if !targetConfigIsLatestConfig(latestVmss, vmssConfig.ConfigHash) {
