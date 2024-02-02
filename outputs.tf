@@ -77,6 +77,31 @@ output "key_vault_name" {
   description = "Keyault name"
 }
 
+output "subnet_name" {
+  value       = local.subnet_name
+  description = "Subnet name"
+}
+
+output "vnet_name" {
+  value       = local.vnet_name
+  description = "Virtual network name"
+}
+
+output "vnet_rg_name" {
+  value       = local.vnet_rg_name
+  description = "Virtual network resource group name"
+}
+
+output "sg_id" {
+  value       = local.sg_id
+  description = "Security group id"
+}
+
+output "ppg_id" {
+  value       = local.placement_group_id
+  description = "Placement proximity group id"
+}
+
 output "cluster_helper_commands" {
   value       = <<EOT
 ########################################## Get function key #####################################################################
