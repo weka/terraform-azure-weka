@@ -475,8 +475,13 @@ proxy_url = VALUE
 | <a name="output_functions_url"></a> [functions\_url](#output\_functions\_url) | Functions url and body for api request |
 | <a name="output_key_vault_name"></a> [key\_vault\_name](#output\_key\_vault\_name) | Keyault name |
 | <a name="output_nfs_protocol_gateway_ips"></a> [nfs\_protocol\_gateway\_ips](#output\_nfs\_protocol\_gateway\_ips) | If 'private\_network' is set to false, it will output nfs protocol gateway public ips, otherwise private ips. |
+| <a name="output_ppg_id"></a> [ppg\_id](#output\_ppg\_id) | Placement proximity group id |
 | <a name="output_private_ssh_key"></a> [private\_ssh\_key](#output\_private\_ssh\_key) | If 'ssh\_public\_key' is set to null and no file provided, it will output the private ssh key location. |
+| <a name="output_sg_id"></a> [sg\_id](#output\_sg\_id) | Security group id |
 | <a name="output_smb_protocol_gateway_ips"></a> [smb\_protocol\_gateway\_ips](#output\_smb\_protocol\_gateway\_ips) | If 'private\_network' is set to false, it will output smb protocol gateway public ips, otherwise private ips. |
+| <a name="output_subnet_name"></a> [subnet\_name](#output\_subnet\_name) | Subnet name |
 | <a name="output_vm_username"></a> [vm\_username](#output\_vm\_username) | Provided as part of output for automated use of terraform, ssh user to weka cluster vm |
 | <a name="output_vmss_name"></a> [vmss\_name](#output\_vmss\_name) | n/a |
+| <a name="output_vnet_name"></a> [vnet\_name](#output\_vnet\_name) | Virtual network name |
+| <a name="output_vnet_rg_name"></a> [vnet\_rg\_name](#output\_vnet\_rg\_name) | Virtual network resource group name |
 <!-- END_TF_DOCS -->
