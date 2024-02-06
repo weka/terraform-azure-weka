@@ -1025,3 +1025,41 @@ func UpdateStateReportingWithoutLocking(ctx context.Context, stateContainerName,
 	}
 	return
 }
+
+func GetInstancePowerState(instance *armcompute.VirtualMachineScaleSetVM) (powerState string) {
+	prefix := "PowerState/"
+	for _, status := range instance.Properties.InstanceView.Statuses {
+		if strings.HasPrefix(*status.Code, prefix) {
+			powerState = strings.TrimPrefix(*status.Code, prefix)
+			return
+		}
+	}
+	return
+}
+
+func GetUnhealthyInstancesToTerminate(ctx context.Context, scaleSetVms []*armcompute.VirtualMachineScaleSetVM) (toTerminate []string) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	for _, vm := range scaleSetVms {
+		if vm.Properties.InstanceView == nil || vm.Properties.InstanceView.VMHealth == nil {
+			continue
+		}
+		healthStatus := *vm.Properties.InstanceView.VMHealth.Status.Code
+		if healthStatus == "HealthState/unhealthy" {
+			instanceState := GetInstancePowerState(vm)
+			logger.Debug().Msgf("instance state: %s", instanceState)
+			if instanceState == "stopped" {
+				toTerminate = append(toTerminate, GetScaleSetVmId(*vm.ID))
+			}
+
+		}
+	}
+
+	logger.Info().Msgf("found %d unhealthy stopped instances to terminate: %s", len(toTerminate), toTerminate)
+	return
+}
+
+func GetScaleSetVmsExpandedView(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) ([]*armcompute.VirtualMachineScaleSetVM, error) {
+	expand := "instanceView"
+	return GetScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, &expand)
+}
