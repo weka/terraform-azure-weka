@@ -74,7 +74,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
   proximity_placement_group_id    = var.vmss_single_placement_group ? local.placement_group_id : null
   single_placement_group          = var.vmss_single_placement_group
   source_image_id                 = var.source_image_id
-  overprovision                   = false
+  overprovision                   = var.backends_overprovision
   tags = merge(var.tags_map, {
     "weka_cluster" : var.cluster_name, "user_id" : data.azurerm_client_config.current.object_id
   })

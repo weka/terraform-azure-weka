@@ -603,3 +603,9 @@ variable "function_access_restriction_enabled" {
   default     = false
   description = "Allow public access, Access restrictions apply to inbound access to internal vent"
 }
+
+variable "backends_overprovision" {
+  type        = bool
+  default     = false
+  description = "Backends vmss overprovision"
+}
