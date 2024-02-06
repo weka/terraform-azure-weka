@@ -13,6 +13,7 @@ function retry {
   done
   [ $count -eq 0 ] && {
       echo "Retry failed [$retry_max]"
+      shutdown -h now
       return 1
   }
   return 0
@@ -75,19 +76,31 @@ EOF
 
 netplan apply
 
+are_routes_ready='ip route | grep eth1'
+for(( i=2; i<${nics_num}; i++ )); do
+  are_routes_ready=$are_routes_ready' && ip route | grep eth'"$i"
+done
 cat >>/usr/sbin/remove-routes.sh <<EOF
 #!/bin/bash
 set -ex
-EOF
-for(( i=1; i<${nics_num}; i++ )); do
-  cat >>/usr/sbin/remove-routes.sh <<EOF
-while ! ip route | grep eth$i; do
+retry_max=24
+for(( i=0; i<\$retry_max; i++ )); do
+  if eval "$are_routes_ready"; then
+    for(( j=1; j<${nics_num}; j++ )); do
+      /usr/sbin/ip route del ${subnet_range} dev eth\$j
+    done
+    break
+  fi
   ip route
   sleep 5
 done
-/usr/sbin/ip route del ${subnet_range} dev eth$i
+if [ \$i -eq \$retry_max ]; then
+  echo "Routes are not ready on time"
+  shutdown -h now
+  exit 1
+fi
+echo "Routes were removed successfully"
 EOF
-done
 
 chmod +x /usr/sbin/remove-routes.sh
 
