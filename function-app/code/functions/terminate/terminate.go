@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 	"weka-deployment/common"
 
@@ -79,17 +78,6 @@ func getInstanceCreationTime(instance *armcompute.VirtualMachineScaleSetVM) (pro
 	return
 }
 
-func getInstancePowerState(instance *armcompute.VirtualMachineScaleSetVM) (powerState string) {
-	prefix := "PowerState/"
-	for _, status := range instance.Properties.InstanceView.Statuses {
-		if strings.HasPrefix(*status.Code, prefix) {
-			powerState = strings.TrimPrefix(*status.Code, prefix)
-			return
-		}
-	}
-	return
-}
-
 func terminateUnneededInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, instances []*armcompute.VirtualMachineScaleSetVM, explicitRemoval []protocol.HgInstance) (terminatedInstancesMap instancesMap, errs []error) {
 	logger := logging.LoggerFromCtx(ctx)
 
@@ -109,7 +97,7 @@ func terminateUnneededInstances(ctx context.Context, subscriptionId, resourceGro
 				continue
 			}
 		}
-		instanceState := getInstancePowerState(instance)
+		instanceState := common.GetInstancePowerState(instance)
 		if instanceState == "running" || instanceState == "starting" {
 			terminateInstanceIds = append(terminateInstanceIds, *instance.InstanceID)
 		}
@@ -123,36 +111,9 @@ func terminateUnneededInstances(ctx context.Context, subscriptionId, resourceGro
 	return
 }
 
-func getUnhealthyInstancesToTerminate(ctx context.Context, scaleSetVms []*armcompute.VirtualMachineScaleSetVM) (toTerminate []string) {
-	logger := logging.LoggerFromCtx(ctx)
-
-	for _, vm := range scaleSetVms {
-		if vm.Properties.InstanceView == nil || vm.Properties.InstanceView.VMHealth == nil {
-			continue
-		}
-		healthStatus := *vm.Properties.InstanceView.VMHealth.Status.Code
-		if healthStatus == "HealthState/unhealthy" {
-			instanceState := getInstancePowerState(vm)
-			logger.Debug().Msgf("instance state: %s", instanceState)
-			if instanceState == "stopped" {
-				toTerminate = append(toTerminate, common.GetScaleSetVmId(*vm.ID))
-			}
-
-		}
-	}
-
-	logger.Info().Msgf("found %d unhealthy stopped instances to terminate: %s", len(toTerminate), toTerminate)
-	return
-}
-
 func terminateUnhealthyInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, toTerminate []string) []error {
 	_, terminateErrors := common.TerminateScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, toTerminate)
 	return terminateErrors
-}
-
-func getScaleSetVmsExpandedView(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) ([]*armcompute.VirtualMachineScaleSetVM, error) {
-	expand := "instanceView"
-	return common.GetScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, &expand)
 }
 
 func setDeletionProtection(ctx context.Context, allVms []*armcompute.VirtualMachineScaleSetVM, excludeInstanceIds []string, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName string) {
@@ -210,13 +171,13 @@ func Terminate(ctx context.Context, scaleResponse protocol.ScaleResponse, subscr
 	response.TransientErrors = scaleResponse.TransientErrors[0:len(scaleResponse.TransientErrors):len(scaleResponse.TransientErrors)]
 
 	// get VMs expanded list which will be used later
-	vms, err := getScaleSetVmsExpandedView(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	vms, err := common.GetScaleSetVmsExpandedView(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
 		err = fmt.Errorf("cannot get VMs list for vmss %s: %v", vmScaleSetName, err)
 		return
 	}
 
-	unhealthyInstanceIds := getUnhealthyInstancesToTerminate(ctx, vms)
+	unhealthyInstanceIds := common.GetUnhealthyInstancesToTerminate(ctx, vms)
 	errs := terminateUnhealthyInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, unhealthyInstanceIds)
 	response.AddTransientErrors(errs)
 
