@@ -34,7 +34,7 @@ func (d *AzureFuncDef) GetFunctionCmdDefinition(name functions_def.FunctionName)
 		funcDefTemplate := `
 		function %s {
 			local json_data=$1
-			curl %s?code=%s -H 'Content-Type:application/json' -d "$json_data"
+			curl --retry 10 %s?code=%s -H 'Content-Type:application/json' -d "$json_data"
 		}
 		`
 		funcDef = fmt.Sprintf(funcDefTemplate, name, functionUrl, d.functionKey)

@@ -28,6 +28,9 @@ func GetReports(ctx context.Context, stateStorageName, stateContainerName string
 	reports.Progress = state.Progress
 	reports.Errors = state.Errors
 	reports.Debug = state.Debug
+	reports.InProgress = state.InProgress
+	reports.Summary = state.Summary
+	reports.InProgress = state.InProgress
 
 	return
 }
