@@ -127,7 +127,6 @@ module "smb_protocol_gateways" {
   frontend_container_cores_num = var.smb_protocol_gateway_fe_cores_num
   smb_cluster_name             = var.smb_cluster_name
   smb_domain_name              = var.smb_domain_name
-  smb_share_name               = var.smb_share_name
   smbw_enabled                 = var.smbw_enabled
   function_app_name            = azurerm_linux_function_app.function_app.name
   depends_on                   = [module.network, azurerm_linux_virtual_machine_scale_set.vmss, azurerm_key_vault_secret.get_weka_io_token, azurerm_proximity_placement_group.ppg, azurerm_private_dns_resolver_dns_forwarding_ruleset.dns_forwarding_ruleset]
