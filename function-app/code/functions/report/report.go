@@ -25,7 +25,7 @@ func UpdateStateReportingWithRetry(ctx context.Context, subscriptionId, resource
 	counter := 0
 	authSleepInterval := 10 //seconds
 	for {
-		err = common.UpdateStateReporting(ctx, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, report)
+		err = common.UpdateStateReporting(ctx, stateContainerName, stateStorageName, report)
 		if err == nil {
 			break
 		}
@@ -85,7 +85,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logger.Info().Msgf("Updating state %s with %s", report.Type, report.Message)
-	err = common.UpdateStateReporting(ctx, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, report)
+	err = common.UpdateStateReporting(ctx, stateContainerName, stateStorageName, report)
 
 	// Sometimes when we create a resource group and immediately run weka terraform deployment, the function-app
 	// permissions are not fully ready when we invoke this endpoint. It results in a blob read permissions issue.
@@ -97,7 +97,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		}
 		err2 := UpdateStateReportingWithRetry(ctx, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, progressReport)
 		if err2 == nil {
-			err = common.UpdateStateReporting(ctx, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, report)
+			err = common.UpdateStateReporting(ctx, stateContainerName, stateStorageName, report)
 		}
 	}
 

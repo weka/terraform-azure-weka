@@ -283,6 +283,7 @@ func UpdateClusterized(ctx context.Context, subscriptionId, resourceGroupName, s
 
 	state.Instances = []string{}
 	state.Clusterized = true
+	state.Summary.Clusterized = true
 	err = WriteState(ctx, stateStorageName, stateContainerName, state)
 
 	logger.Info().Msg("State updated to 'clusterized'")
@@ -909,7 +910,7 @@ func RetrySetDeletionProtectionAndReport(
 
 func ReportMsg(ctx context.Context, hostName, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, reportType, message string) {
 	reportObj := protocol.Report{Type: reportType, Hostname: hostName, Message: message}
-	_ = UpdateStateReporting(ctx, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, reportObj)
+	_ = UpdateStateReporting(ctx, subscriptionId, stateStorageName, reportObj)
 }
 
 func GetWekaClusterPassword(ctx context.Context, keyVaultUri string) (password string, err error) {
@@ -998,7 +999,7 @@ func TerminateScaleSetInstances(ctx context.Context, subscriptionId, resourceGro
 	return
 }
 
-func UpdateStateReporting(ctx context.Context, subscriptionId, resourceGroupName, stateContainerName, stateStorageName string, report protocol.Report) (err error) {
+func UpdateStateReporting(ctx context.Context, stateContainerName, stateStorageName string, report protocol.Report) (err error) {
 	leaseId, err := LockContainer(ctx, stateStorageName, stateContainerName)
 	if err != nil {
 		return
@@ -1006,6 +1007,26 @@ func UpdateStateReporting(ctx context.Context, subscriptionId, resourceGroupName
 	defer UnlockContainer(ctx, stateStorageName, stateContainerName, leaseId)
 
 	return UpdateStateReportingWithoutLocking(ctx, stateContainerName, stateStorageName, report)
+}
+
+func UpdateSummaryAndInProgress(ctx context.Context, stateContainerName, stateStorageName string, summary protocol.ClusterizationStatusSummary, inProgress []string) (err error) {
+	leaseId, err := LockContainer(ctx, stateStorageName, stateContainerName)
+	if err != nil {
+		return
+	}
+	defer UnlockContainer(ctx, stateStorageName, stateContainerName, leaseId)
+	state, err := ReadState(ctx, stateStorageName, stateContainerName)
+	if err != nil {
+		return
+	}
+	state.Summary = summary
+	state.InProgress = inProgress
+	err = WriteState(ctx, stateStorageName, stateContainerName, state)
+	if err != nil {
+		err = fmt.Errorf("failed updating state summary")
+		return
+	}
+	return
 }
 
 func UpdateStateReportingWithoutLocking(ctx context.Context, stateContainerName, stateStorageName string, report protocol.Report) (err error) {
