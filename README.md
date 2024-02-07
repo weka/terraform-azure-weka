@@ -242,7 +242,6 @@ smb_setup_protocol                         = false
 smb_cluster_name                           = ""
 smb_domain_name                            = ""
 smb_dns_ip_address                         = ""
-smb_share_name                             = ""
 ```
 
 <br>In order to create stateless clients, need to set variable:

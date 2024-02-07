@@ -556,12 +556,6 @@ variable "smb_dns_ip_address" {
   default     = ""
 }
 
-variable "smb_share_name" {
-  type        = string
-  description = "The name of the SMB share"
-  default     = "default"
-}
-
 variable "smb_create_private_dns_resolver" {
   type        = bool
   default     = false

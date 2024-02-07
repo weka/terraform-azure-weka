@@ -195,12 +195,6 @@ variable "smb_domain_name" {
   default     = ""
 }
 
-variable "smb_share_name" {
-  type        = string
-  description = "The name of the SMB share"
-  default     = ""
-}
-
 variable "weka_tar_storage_account_id" {
   type    = string
   default = ""
