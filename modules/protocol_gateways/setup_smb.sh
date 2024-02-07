@@ -205,12 +205,6 @@ create_old_smb_cluster || create_new_smb_cluster || exit 1
 
 weka smb cluster wait
 
-# add an SMB share if share_name is not empty
-# 'default' is the fs-name of weka file system created during clusterization
-if [ -n "${share_name}" ]; then
-    weka smb share add ${share_name} default || true
-fi
-
 weka smb cluster status
 
 echo "$(date -u): SMB cluster is created successfully"
