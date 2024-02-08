@@ -13,9 +13,12 @@ module "clients" {
   backend_lb_ip                = azurerm_lb.backend_lb.private_ip_address
   ssh_public_key               = var.ssh_public_key == null ? tls_private_key.ssh_key[0].public_key_openssh : var.ssh_public_key
   ppg_id                       = var.client_placement_group_id == "" ? local.placement_group_id : var.client_placement_group_id
-  assign_public_ip             = var.assign_public_ip
+  assign_public_ip             = false #var.assign_public_ip
   vnet_rg_name                 = local.vnet_rg_name
   source_image_id              = var.client_source_image_id
   sg_id                        = local.sg_id
+  use_vmss                     = var.client_use_vmss
+  zone                         = var.zone
+  subscription_id              = var.subscription_id
   depends_on                   = [azurerm_proximity_placement_group.ppg, module.network]
 }

@@ -416,6 +416,12 @@ variable "client_frontend_cores" {
   default     = 1
 }
 
+variable "client_use_vmss" {
+  type        = bool
+  default     = false
+  description = "Use vmss for clients"
+}
+
 variable "placement_group_id" {
   type        = string
   default     = ""

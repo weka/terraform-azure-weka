@@ -88,3 +88,19 @@ variable "sg_id" {
   type        = string
   description = "Security group id"
 }
+
+variable "use_vmss" {
+  type        = bool
+  description = "Use vmss for clients"
+}
+
+variable "zone" {
+  type        = string
+  description = "The zone in which the resources should be created."
+  default     = "1"
+}
+
+variable "subscription_id" {
+  type        = string
+  description = "The subscription id for the deployment."
+}
