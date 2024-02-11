@@ -69,7 +69,6 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
   upgrade_mode                    = "Manual"
   health_probe_id                 = azurerm_lb_probe.backend_lb_probe.id
   admin_username                  = var.vm_username
-  instances                       = var.cluster_size
   computer_name_prefix            = "${var.prefix}-${var.cluster_name}-backend"
   custom_data                     = base64encode(local.custom_data_script)
   disable_password_authentication = true
@@ -152,7 +151,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
     }
   }
   lifecycle {
-    ignore_changes = [instances, custom_data, tags]
+    ignore_changes = [instances, custom_data, tags, network_interface]
   }
   depends_on = [
     azurerm_lb_backend_address_pool.lb_backend_pool, azurerm_lb_probe.backend_lb_probe,
