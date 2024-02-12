@@ -321,7 +321,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "04bfd112ee5a1f63560f99ecaf196af9"
+  default     = "93aa62e79f037749d81dd00e3d80d0e6"
 }
 
 variable "function_app_dist" {
@@ -596,4 +596,22 @@ variable "function_access_restriction_enabled" {
   type        = bool
   default     = false
   description = "Allow public access, Access restrictions apply to inbound access to internal vent"
+}
+
+variable "script_post_cluster_creation" {
+  type        = string
+  description = "Script to run after cluster creation"
+  default     = ""
+}
+
+variable "script_pre_start_io" {
+  type        = string
+  description = "Script to run before starting IO"
+  default     = ""
+}
+
+variable "clusterization_target" {
+  type        = number
+  description = "The clusterization target"
+  default     = null
 }
