@@ -1,3 +1,8 @@
+locals {
+  clusterization_target = var.clusterization_target != null ? var.clusterization_target : min(var.cluster_size, max(20, ceil(var.cluster_size * 0.8)))
+}
+
+
 resource "azurerm_storage_account" "deployment_sa" {
   count                    = var.deployment_storage_account_name == "" ? 1 : 0
   name                     = "${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}deployment"
@@ -25,7 +30,7 @@ resource "azurerm_storage_blob" "state" {
   storage_account_name   = local.deployment_storage_account_name
   storage_container_name = local.deployment_container_name
   type                   = "Block"
-  source_content         = "{\"initial_size\":${var.cluster_size}, \"desired_size\":${var.cluster_size}, \"instances\":[], \"clusterized\":false}"
+  source_content         = "{\"initial_size\":${var.cluster_size}, \"desired_size\":${var.cluster_size}, \"instances\":[], \"clusterized\":false, \"clusterization_target\":${local.clusterization_target}}"
   depends_on             = [azurerm_storage_container.deployment]
 
   lifecycle {

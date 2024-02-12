@@ -17,7 +17,6 @@ import (
 func Handler(w http.ResponseWriter, r *http.Request) {
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
-	hostsNum, _ := strconv.Atoi(os.Getenv("HOSTS_NUM"))
 	clusterName := os.Getenv("CLUSTER_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
@@ -96,7 +95,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 				StateContainerName: stateContainerName,
 				StateStorageName:   stateStorageName,
 				Cluster: clusterize.ClusterParams{
-					HostsNum:    hostsNum,
 					ClusterName: clusterName,
 					NvmesNum:    nvmesNum,
 					DataProtection: clusterize.DataProtectionParams{

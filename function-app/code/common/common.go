@@ -283,7 +283,7 @@ func UpdateClusterized(ctx context.Context, subscriptionId, resourceGroupName, s
 
 	state.Instances = []string{}
 	state.Clusterized = true
-	state.Summary.Clusterized = true
+
 	err = WriteState(ctx, stateStorageName, stateContainerName, state)
 
 	logger.Info().Msg("State updated to 'clusterized'")
@@ -1009,26 +1009,6 @@ func UpdateStateReporting(ctx context.Context, stateContainerName, stateStorageN
 	return UpdateStateReportingWithoutLocking(ctx, stateContainerName, stateStorageName, report)
 }
 
-func UpdateSummaryAndInProgress(ctx context.Context, stateContainerName, stateStorageName string, summary protocol.ClusterizationStatusSummary, inProgress []string) (err error) {
-	leaseId, err := LockContainer(ctx, stateStorageName, stateContainerName)
-	if err != nil {
-		return
-	}
-	defer UnlockContainer(ctx, stateStorageName, stateContainerName, leaseId)
-	state, err := ReadState(ctx, stateStorageName, stateContainerName)
-	if err != nil {
-		return
-	}
-	state.Summary = summary
-	state.InProgress = inProgress
-	err = WriteState(ctx, stateStorageName, stateContainerName, state)
-	if err != nil {
-		err = fmt.Errorf("failed updating state summary")
-		return
-	}
-	return
-}
-
 func UpdateStateReportingWithoutLocking(ctx context.Context, stateContainerName, stateStorageName string, report protocol.Report) (err error) {
 	state, err := ReadState(ctx, stateStorageName, stateContainerName)
 	if err != nil {
@@ -1083,4 +1063,8 @@ func GetUnhealthyInstancesToTerminate(ctx context.Context, scaleSetVms []*armcom
 func GetScaleSetVmsExpandedView(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) ([]*armcompute.VirtualMachineScaleSetVM, error) {
 	expand := "instanceView"
 	return GetScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, &expand)
+}
+
+func GetAzureInstanceNameCmd() string {
+	return "curl -s -H Metadata:true --noproxy * http://169.254.169.254/metadata/instance?api-version=2021-02-01 | jq '.compute.name' | cut -c2- | rev | cut -c2- | rev"
 }
