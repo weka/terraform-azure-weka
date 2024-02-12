@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/weka/go-cloud-lib/join"
 	"net/http"
 	"os"
 	"strconv"
@@ -42,14 +43,6 @@ func GetObsScript(obsParams AzureObsParams) string {
 	return fmt.Sprintf(
 		dedent.Dedent(template), obsParams.TieringSsdPercent, obsParams.Name, obsParams.ContainerName, obsParams.AccessKey,
 	)
-}
-
-func GetWekaDebugOverrideCmds() string {
-	s := `
-	weka debug override add --key allow_uncomputed_backend_checksum || true
-	weka debug override add --key allow_azure_auto_detection || true
-	`
-	return dedent.Dedent(s)
 }
 
 type ClusterizationParams struct {
@@ -156,11 +149,11 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 	clusterParams.VMNames = vmNamesList
 	clusterParams.IPs = ipsList
 	clusterParams.ObsScript = GetObsScript(p.Obs)
-	clusterParams.DebugOverrideCmds = GetWekaDebugOverrideCmds()
 	clusterParams.WekaPassword = wekaPassword
 	clusterParams.WekaUsername = "admin"
 	clusterParams.InstallDpdk = p.InstallDpdk
 	clusterParams.FindDrivesScript = common.FindDrivesScript
+	clusterParams.ClusterizationTarget = state.ClusterizationTarget
 
 	scriptGenerator := clusterize.ClusterizeScriptGenerator{
 		Params:  clusterParams,
@@ -210,15 +203,48 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 	funcDef := azure_functions_def.NewFuncDef(baseFunctionUrl, functionAppKey)
 	reportFunction := funcDef.GetFunctionCmdDefinition(functions_def.Report)
 
-	if len(state.Instances) == p.Cluster.HostsNum {
+	if len(state.Instances) < state.ClusterizationTarget {
+		msg := fmt.Sprintf("This (%s) is instance %d/%d that is ready for clusterization", instanceName, len(state.Instances), state.DesiredSize)
+		logger.Info().Msgf(msg)
+		clusterizeScript = cloudCommon.GetScriptWithReport(msg, reportFunction)
+	} else if len(state.Instances) == state.ClusterizationTarget {
 		clusterizeScript, err = HandleLastClusterVm(ctx, state, p, funcDef)
 		if err != nil {
 			clusterizeScript = cloudCommon.GetErrorScript(err, reportFunction)
 		}
 	} else {
-		msg := fmt.Sprintf("This (%s) is instance %d/%d that is ready for clusterization", instanceName, len(state.Instances), p.Cluster.HostsNum)
-		logger.Info().Msgf(msg)
-		clusterizeScript = cloudCommon.GetScriptWithReport(msg, reportFunction)
+		wekaPassword, err2 := common.GetWekaClusterPassword(ctx, p.KeyVaultUri)
+		if err2 != nil {
+			logger.Error().Err(err2).Send()
+			return
+		}
+
+		vmsPrivateIps, err2 := common.GetVmsPrivateIps(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName)
+		if err2 != nil {
+			err = fmt.Errorf("failed to get vms private ips: %w", err)
+			logger.Error().Err(err).Send()
+			return
+		}
+
+		var ipsList []string
+		for _, instance := range state.Instances {
+			vm := strings.Split(instance, ":")
+			ipsList = append(ipsList, vmsPrivateIps[vm[0]])
+		}
+
+		joinParams := join.JoinParams{
+			WekaUsername: "admin",
+			WekaPassword: wekaPassword,
+			IPs:          ipsList,
+		}
+
+		joinScriptGenerator := join.JoinScriptGenerator{
+			GetInstanceNameCmd: common.GetAzureInstanceNameCmd(),
+			FindDrivesScript:   dedent.Dedent(common.FindDrivesScript),
+			Params:             joinParams,
+			FuncDef:            funcDef,
+		}
+		clusterizeScript = joinScriptGenerator.GetExistingContainersJoinScript(ctx)
 	}
 	return
 }
@@ -226,7 +252,7 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 func Handler(w http.ResponseWriter, r *http.Request) {
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
-	hostsNum, _ := strconv.Atoi(os.Getenv("HOSTS_NUM"))
+	clusterizationTarget, _ := strconv.Atoi(os.Getenv("CLUSTERIZATION_TARGET"))
 	clusterName := os.Getenv("CLUSTER_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
@@ -249,6 +275,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	functionAppName := os.Getenv("FUNCTION_APP_NAME")
 	proxyUrl := os.Getenv("PROXY_URL")
 	wekaHomeUrl := os.Getenv("WEKA_HOME_URL")
+	preStartIoScript := os.Getenv("PRE_START_IO_SCRIPT")
+	postClusterCreationScript := os.Getenv("POST_CLUSTER_CREATION_SCRIPT")
 
 	addFrontend := false
 	if addFrontendNum > 0 {
@@ -294,19 +322,21 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		VmName:             data.Vm,
 		InstallDpdk:        installDpdk,
 		Cluster: clusterize.ClusterParams{
-			HostsNum:    hostsNum,
-			ClusterName: clusterName,
-			NvmesNum:    nvmesNum,
-			SetObs:      setObs,
-			SmbwEnabled: smbwEnabled,
-			AddFrontend: addFrontend,
-			ProxyUrl:    proxyUrl,
-			WekaHomeUrl: wekaHomeUrl,
+			ClusterizationTarget: clusterizationTarget,
+			ClusterName:          clusterName,
+			NvmesNum:             nvmesNum,
+			SetObs:               setObs,
+			SmbwEnabled:          smbwEnabled,
+			AddFrontend:          addFrontend,
+			ProxyUrl:             proxyUrl,
+			WekaHomeUrl:          wekaHomeUrl,
 			DataProtection: clusterize.DataProtectionParams{
 				StripeWidth:     stripeWidth,
 				ProtectionLevel: protectionLevel,
 				Hotspare:        hotspare,
 			},
+			PreStartIoScript:          preStartIoScript,
+			PostClusterCreationScript: postClusterCreationScript,
 		},
 		Obs: AzureObsParams{
 			Name:              obsName,

@@ -21,10 +21,6 @@ import (
 	"github.com/lithammer/dedent"
 )
 
-func getAzureInstanceNameCmd() string {
-	return "curl -s -H Metadata:true --noproxy * http://169.254.169.254/metadata/instance?api-version=2021-02-01 | jq '.compute.name' | cut -c2- | rev | cut -c2- | rev"
-}
-
 func getWekaIoToken(ctx context.Context, keyVaultUri string) (token string, err error) {
 	token, err = common.GetKeyVaultValue(ctx, keyVaultUri, "get-weka-io-token")
 	return
@@ -133,11 +129,6 @@ func GetDeployScript(
 			return "", err
 		}
 
-		if err != nil {
-			logger.Error().Err(err).Send()
-			return "", err
-		}
-
 		joinParams := join.JoinParams{
 			WekaUsername:   "admin",
 			WekaPassword:   wekaPassword,
@@ -155,7 +146,7 @@ func GetDeployScript(
 
 		joinScriptGenerator := join.JoinScriptGenerator{
 			FailureDomainCmd:   getHashedIpCommand,
-			GetInstanceNameCmd: getAzureInstanceNameCmd(),
+			GetInstanceNameCmd: common.GetAzureInstanceNameCmd(),
 			FindDrivesScript:   dedent.Dedent(common.FindDrivesScript),
 			ScriptBase:         dedent.Dedent(scriptBase),
 			Params:             joinParams,
