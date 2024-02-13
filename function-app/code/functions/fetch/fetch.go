@@ -2,11 +2,12 @@ package fetch
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"weka-deployment/common"
+
+	"github.com/weka/go-cloud-lib/logging"
 )
 
 type ScaleSetInfoResponse struct {
@@ -20,49 +21,48 @@ type ScaleSetInfoResponse struct {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	outputs := make(map[string]interface{})
-	resData := make(map[string]interface{})
-
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
-	prefix := os.Getenv("PREFIX")
-	clusterName := os.Getenv("CLUSTER_NAME")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 
-	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
-
 	ctx := r.Context()
+	logger := logging.LoggerFromCtx(ctx)
 
-	response, err := getScaleSetInfoResponse(
-		ctx, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName, keyVaultUri,
-	)
+	vmssNames, err := common.GetScaleSetsNames(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
 	if err != nil {
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = response
-	}
-
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
-}
-
-func getScaleSetInfoResponse(
-	ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName, keyVaultUri string,
-) (scaleSetInfoResponse ScaleSetInfoResponse, err error) {
-	instances, err := common.GetScaleSetInstancesInfo(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
-	if err != nil {
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
-	scaleSetInfo, err := common.GetScaleSetInfo(ctx, subscriptionId, resourceGroupName, vmScaleSetName, keyVaultUri)
+	response, err := getScaleSetInfoResponse(
+		ctx, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, keyVaultUri, vmssNames,
+	)
 	if err != nil {
+		logger.Error().Err(err).Send()
+		common.WriteErrorResponse(w, err)
+		return
+	}
+	common.WriteSuccessResponse(w, response)
+}
+
+func getScaleSetInfoResponse(
+	ctx context.Context, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, keyVaultUri string, vmScaleSetNames []string,
+) (scaleSetInfoResponse ScaleSetInfoResponse, err error) {
+	var instances []common.ScaleSetInstanceInfo
+
+	for _, vmScaleSetName := range vmScaleSetNames {
+		insts, err := common.GetScaleSetInstancesInfo(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+		if err != nil {
+			return scaleSetInfoResponse, err
+		}
+		instances = append(instances, insts...)
+	}
+
+	wekaAdminPassword, err := common.GetWekaClusterPassword(ctx, keyVaultUri)
+	if err != nil {
+		err = fmt.Errorf("cannot get weka admin password: %v", err)
 		return
 	}
 
@@ -72,8 +72,8 @@ func getScaleSetInfoResponse(
 	}
 
 	scaleSetInfoResponse = ScaleSetInfoResponse{
-		Username:        scaleSetInfo.AdminUsername,
-		Password:        scaleSetInfo.AdminPassword,
+		Username:        common.WekaAdminUsername,
+		Password:        wekaAdminPassword,
 		DesiredCapacity: desiredCapacity,
 		Instances:       instances,
 		BackendIps:      getBackendIps(instances),

@@ -4,16 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/weka/go-cloud-lib/connectors"
-	"github.com/weka/go-cloud-lib/lib/jrpc"
-	"github.com/weka/go-cloud-lib/lib/weka"
-	"github.com/weka/go-cloud-lib/logging"
-	"github.com/weka/go-cloud-lib/protocol"
 	"math/rand"
 	"net/http"
 	"os"
 	"time"
 	"weka-deployment/common"
+
+	"github.com/weka/go-cloud-lib/connectors"
+	"github.com/weka/go-cloud-lib/lib/jrpc"
+	"github.com/weka/go-cloud-lib/lib/weka"
+	"github.com/weka/go-cloud-lib/logging"
+	"github.com/weka/go-cloud-lib/protocol"
 )
 
 func GetReports(ctx context.Context, stateStorageName, stateContainerName string) (reports protocol.Reports, err error) {
@@ -35,7 +36,9 @@ func GetReports(ctx context.Context, stateStorageName, stateContainerName string
 	return
 }
 
-func GetClusterStatus(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, keyVaultUri string) (clusterStatus protocol.ClusterStatus, err error) {
+func GetClusterStatus(
+	ctx context.Context, subscriptionId, resourceGroupName, stateStorageName, stateContainerName, keyVaultUri, clusterName string,
+) (clusterStatus protocol.ClusterStatus, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("fetching cluster status...")
 
@@ -56,19 +59,26 @@ func GetClusterStatus(ctx context.Context, subscriptionId, resourceGroupName, vm
 	}
 
 	jrpcBuilder := func(ip string) *jrpc.BaseClient {
-		return connectors.NewJrpcClient(ctx, ip, weka.ManagementJrpcPort, "admin", wekaPassword)
+		return connectors.NewJrpcClient(ctx, ip, weka.ManagementJrpcPort, common.WekaAdminUsername, wekaPassword)
 	}
 
-	vmIps, err := common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	vmScaleSetNames, err := common.GetScaleSetsNames(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
 	if err != nil {
 		return
 	}
-	ips := make([]string, len(vmIps))
+
+	vmIps, err := common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, vmScaleSetNames)
+	if err != nil {
+		return
+	}
+
+	ips := make([]string, 0, len(vmIps))
 	for _, ip := range vmIps {
 		ips = append(ips, ip)
 	}
-	rand.Seed(time.Now().UnixNano())
-	rand.Shuffle(len(ips), func(i, j int) { ips[i], ips[j] = ips[j], ips[i] })
+
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r.Shuffle(len(ips), func(i, j int) { ips[i], ips[j] = ips[j], ips[i] })
 	logger.Info().Msgf("ips: %s", ips)
 	jpool := &jrpc.Pool{
 		Ips:     ips,
@@ -94,15 +104,31 @@ func GetClusterStatus(ctx context.Context, subscriptionId, resourceGroupName, vm
 	return
 }
 
-func Handler(w http.ResponseWriter, r *http.Request) {
-	outputs := make(map[string]interface{})
-	resData := make(map[string]interface{})
+func GetRefreshStatus(ctx context.Context, subscriptionId, resourceGroupName, stateStorageName, stateContainerName string) (*common.VMSSStateVerbose, error) {
+	scaleSetNames, err := common.GetScaleSetsNames(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
+	if err != nil {
+		return nil, err
+	}
 
+	vmssConfig, err := common.ReadVmssConfig(ctx, stateStorageName, stateContainerName)
+	if err != nil {
+		return nil, err
+	}
+	vmssConfig.CustomData = "<hidden>"
+	vmssConfig.SshPublicKey = "<hidden>"
+
+	result := &common.VMSSStateVerbose{
+		ActiveVmssNames: scaleSetNames,
+		TargetConfig:    vmssConfig,
+	}
+	return result, nil
+}
+
+func Handler(w http.ResponseWriter, r *http.Request) {
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
-	prefix := os.Getenv("PREFIX")
 	clusterName := os.Getenv("CLUSTER_NAME")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 
@@ -118,7 +144,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&invokeRequest); err != nil {
 		err = fmt.Errorf("cannot decode the request: %v", err)
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -127,7 +153,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		err = fmt.Errorf("cannot unmarshal the request data: %v", err)
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -135,32 +161,25 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		if json.Unmarshal([]byte(reqData["Body"].(string)), &requestBody) != nil {
 			err = fmt.Errorf("cannot unmarshal the request body: %v", err)
 			logger.Error().Err(err).Send()
-			w.WriteHeader(http.StatusBadRequest)
+			common.WriteErrorResponse(w, err)
 			return
 		}
 	}
 
-	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName)
 	var result interface{}
 	if requestBody.Type == "" || requestBody.Type == "status" {
-		result, err = GetClusterStatus(ctx, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, keyVaultUri)
+		result, err = GetClusterStatus(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName, keyVaultUri, clusterName)
 	} else if requestBody.Type == "progress" {
 		result, err = GetReports(ctx, stateStorageName, stateContainerName)
+	} else if requestBody.Type == "vmss" {
+		result, err = GetRefreshStatus(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
 	} else {
 		result = "Invalid status type"
 	}
 
 	if err != nil {
-		resData["body"] = err.Error()
-	} else {
-
-		resData["body"] = result
+		common.WriteErrorResponse(w, err)
+		return
 	}
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.WriteSuccessResponse(w, result)
 }

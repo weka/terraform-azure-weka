@@ -2,6 +2,7 @@ package protect
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -20,11 +21,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
-	prefix := os.Getenv("PREFIX")
-	clusterName := os.Getenv("CLUSTER_NAME")
 
-	outputs := make(map[string]interface{})
-	resData := make(map[string]interface{})
 	var invokeRequest common.InvokeRequest
 
 	ctx := r.Context()
@@ -34,6 +31,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	err := d.Decode(&invokeRequest)
 	if err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -41,6 +39,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
 	if err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -48,10 +47,17 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	if json.Unmarshal([]byte(reqData["Body"].(string)), &data) != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
-	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName)
+	vmScaleSetName, err := common.GetScaleSetNameWithLatestConfiguration(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
+	if err != nil {
+		err = fmt.Errorf("cannot get scale set with latest version: %v", err)
+		logger.Error().Err(err).Send()
+		common.WriteErrorResponse(w, err)
+		return
+	}
 
 	instanceName := strings.Split(data.Vm, ":")[0]
 	hostName := strings.Split(data.Vm, ":")[1]
@@ -62,16 +68,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	err = common.RetrySetDeletionProtectionAndReport(ctx, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, vmScaleSetName, instanceId, hostName, maxAttempts, authSleepInterval)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = "protection was set successfully"
+		common.WriteErrorResponse(w, err)
+		return
 	}
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.WriteSuccessResponse(w, "protection was set successfully")
 }

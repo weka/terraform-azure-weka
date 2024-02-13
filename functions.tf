@@ -233,8 +233,15 @@ resource "azurerm_role_assignment" "function_app_reader" {
 }
 
 resource "azurerm_role_assignment" "function_app_scale_set_machine_owner" {
-  scope                = azurerm_linux_virtual_machine_scale_set.vmss.id
-  role_definition_name = "Contributor"
+  scope                = data.azurerm_resource_group.rg.id
+  role_definition_name = "Virtual Machine Contributor"
   principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
-  depends_on           = [azurerm_linux_function_app.function_app, azurerm_linux_virtual_machine_scale_set.vmss]
+  depends_on           = [azurerm_linux_function_app.function_app]
+}
+
+resource "azurerm_role_assignment" "managed_identity_operator" {
+  scope                = data.azurerm_resource_group.rg.id
+  role_definition_name = "Managed Identity Operator"
+  principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
+  depends_on           = [azurerm_linux_function_app.function_app]
 }

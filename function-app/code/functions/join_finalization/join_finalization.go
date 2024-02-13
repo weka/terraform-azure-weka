@@ -3,10 +3,11 @@ package join_finalization
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/weka/go-cloud-lib/logging"
 	"net/http"
 	"os"
 	"weka-deployment/common"
+
+	"github.com/weka/go-cloud-lib/logging"
 )
 
 type RequestBody struct {
@@ -14,9 +15,6 @@ type RequestBody struct {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	outputs := make(map[string]interface{})
-	resData := make(map[string]interface{})
-
 	var invokeRequest common.InvokeRequest
 
 	ctx := r.Context()
@@ -26,6 +24,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	err := d.Decode(&invokeRequest)
 	if err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -33,6 +32,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
 	if err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -40,26 +40,29 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	if json.Unmarshal([]byte(reqData["Body"].(string)), &data) != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
-	prefix := os.Getenv("PREFIX")
-	clusterName := os.Getenv("CLUSTER_NAME")
-	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
+	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
+	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
+
+	vmScaleSetName, err := common.GetScaleSetNameWithLatestConfiguration(ctx, subscriptionId, resourceGroupName, stateStorageName, stateContainerName)
+	if err != nil {
+		err = fmt.Errorf("cannot get scale set with latest version: %v", err)
+		logger.Error().Err(err).Send()
+		common.WriteErrorResponse(w, err)
+		return
+	}
 
 	err = common.SetDeletionProtection(ctx, subscriptionId, resourceGroupName, vmScaleSetName, common.GetScaleSetVmIndex(data.Name), true)
 	if err != nil {
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = "set protection successfully"
+		err = fmt.Errorf("cannot set deletion protection: %v", err)
+		logger.Error().Err(err).Send()
+		common.WriteErrorResponse(w, err)
+		return
 	}
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.WriteSuccessResponse(w, "set protection successfully")
 }

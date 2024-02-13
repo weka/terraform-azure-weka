@@ -92,11 +92,9 @@ func GetShutdownScript() string {
 	return dedent.Dedent(s)
 }
 
-func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p ClusterizationParams, funcDef functions_def.FunctionDef) (clusterizeScript string, err error) {
+func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p ClusterizationParams, funcDef functions_def.FunctionDef, vmScaleSetName string) (clusterizeScript string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("This is the last instance in the cluster, creating obs and clusterization script")
-
-	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName)
 
 	if p.Cluster.SetObs {
 		if p.Obs.AccessKey == "" {
@@ -134,7 +132,7 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 		return
 	}
 
-	vmsPrivateIps, err := common.GetVmsPrivateIps(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName)
+	vmsPrivateIps, err := common.GetVmsPrivateIps(ctx, p.SubscriptionId, p.ResourceGroupName, []string{vmScaleSetName})
 	if err != nil {
 		err = fmt.Errorf("failed to get vms private ips: %w", err)
 		logger.Error().Err(err).Send()
@@ -158,7 +156,7 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 	clusterParams.ObsScript = GetObsScript(p.Obs)
 	clusterParams.DebugOverrideCmds = GetWekaDebugOverrideCmds()
 	clusterParams.WekaPassword = wekaPassword
-	clusterParams.WekaUsername = "admin"
+	clusterParams.WekaUsername = common.WekaAdminUsername
 	clusterParams.InstallDpdk = p.InstallDpdk
 	clusterParams.FindDrivesScript = common.FindDrivesScript
 
@@ -177,7 +175,9 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 
 	instanceName := strings.Split(p.VmName, ":")[0]
 	instanceId := common.GetScaleSetVmIndex(instanceName)
-	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName)
+
+	version := 0 // on cluserization step we are sure that the vmss version is 0 as no refresh was done yet
+	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName, version)
 	vmName := p.VmName
 
 	ip, err := common.GetPublicIp(ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, p.Prefix, p.Cluster.ClusterName, instanceId)
@@ -211,7 +211,7 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 	reportFunction := funcDef.GetFunctionCmdDefinition(functions_def.Report)
 
 	if len(state.Instances) == p.Cluster.HostsNum {
-		clusterizeScript, err = HandleLastClusterVm(ctx, state, p, funcDef)
+		clusterizeScript, err = HandleLastClusterVm(ctx, state, p, funcDef, vmScaleSetName)
 		if err != nil {
 			clusterizeScript = cloudCommon.GetErrorScript(err, reportFunction)
 		}
@@ -255,7 +255,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		addFrontend = true
 	}
 
-	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
 	var invokeRequest common.InvokeRequest
 
@@ -317,19 +316,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		FunctionAppName: functionAppName,
 	}
 
+	status := http.StatusOK
 	if data.Vm == "" {
 		msg := "Cluster name wasn't supplied"
 		logger.Error().Msgf(msg)
 		resData["body"] = msg
+		status = http.StatusBadRequest
 	} else {
 		clusterizeScript := Clusterize(ctx, params)
 		resData["body"] = clusterizeScript
 	}
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.WriteResponse(w, resData, &status)
 }
