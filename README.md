@@ -466,6 +466,7 @@ proxy_url = VALUE
 | Name | Description |
 |------|-------------|
 | <a name="output_backend_ips"></a> [backend\_ips](#output\_backend\_ips) | If 'assign\_public\_ip' is set to true, it will output the public ips, If no it will output the private ips |
+| <a name="output_backend_lb_private_ip"></a> [backend\_lb\_private\_ip](#output\_backend\_lb\_private\_ip) | Backend load balancer ip address |
 | <a name="output_client_ips"></a> [client\_ips](#output\_client\_ips) | If 'private\_network' is set to false, it will output clients public ips, otherwise private ips. |
 | <a name="output_cluster_helper_commands"></a> [cluster\_helper\_commands](#output\_cluster\_helper\_commands) | Useful commands and script to interact with weka cluster |
 | <a name="output_function_app_name"></a> [function\_app\_name](#output\_function\_app\_name) | Function app name |
