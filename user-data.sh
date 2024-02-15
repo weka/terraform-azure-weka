@@ -165,5 +165,7 @@ if [ $retry -gt 0 ]; then
   curl -i "${report_url}?code=${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"debug\", \"message\": \"$msg\"}"
 fi
 
+tcpdump -i eth0 -w outfile.pcap tcp and port 14000 &
+
 chmod +x /tmp/deploy.sh
 /tmp/deploy.sh 2>&1 | tee /tmp/weka_deploy.log
