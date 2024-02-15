@@ -729,6 +729,22 @@ func AssignStorageBlobDataContributorRoleToScaleSet(
 		return nil, err
 	}
 
+	var principalId *string
+	if scaleSet.Identity.PrincipalID != nil {
+		principalId = scaleSet.Identity.PrincipalID
+	} else if len(scaleSet.Identity.UserAssignedIdentities) > 0 {
+		// try user-assigned identity
+		identitites := scaleSet.Identity.UserAssignedIdentities
+		for _, identity := range identitites {
+			principalId = identity.PrincipalID
+			break
+		}
+	} else {
+		err = errors.New("cannot find principal id for the scale set")
+		logger.Error().Err(err).Send()
+		return nil, err
+	}
+
 	// see https://learn.microsoft.com/en-us/rest/api/authorization/role-assignments/create
 	res, err := client.Create(
 		ctx,
@@ -737,7 +753,7 @@ func AssignStorageBlobDataContributorRoleToScaleSet(
 		armauthorization.RoleAssignmentCreateParameters{
 			Properties: &armauthorization.RoleAssignmentProperties{
 				RoleDefinitionID: roleDefinition.ID,
-				PrincipalID:      scaleSet.Identity.PrincipalID,
+				PrincipalID:      principalId,
 			},
 		},
 		nil,
@@ -1531,6 +1547,13 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 		return
 	}
 
+	imageReference := &armcompute.ImageReference{}
+	if strings.HasPrefix(config.SourceImageID, "/communityGalleries") {
+		imageReference.CommunityGalleryImageID = &config.SourceImageID
+	} else {
+		imageReference.ID = &config.SourceImageID
+	}
+
 	var nics []*armcompute.VirtualMachineScaleSetNetworkConfiguration
 
 	primaryNicConfig := getPrimaryNicConfig(&config.PrimaryNIC)
@@ -1590,9 +1613,7 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 							StorageAccountType: osDiskStorageAccountType,
 						},
 					},
-					ImageReference: &armcompute.ImageReference{
-						CommunityGalleryImageID: &config.SourceImageID,
-					},
+					ImageReference: imageReference,
 					DataDisks: []*armcompute.VirtualMachineScaleSetDataDisk{
 						{
 							Lun:          &config.DataDisk.Lun,
