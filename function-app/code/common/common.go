@@ -1315,9 +1315,32 @@ func GetScaleSetNameWithLatestConfiguration(ctx context.Context, subscriptionId,
 		err = fmt.Errorf("failed to read vmss state: %v", err)
 		return
 	}
+	return GetScaleSetNameWithLatestConfigurationFromState(ctx, subscriptionId, resourceGroupName, &vmssState)
+}
+
+func GetScaleSetNameWithLatestConfigurationFromState(ctx context.Context, subscriptionId, resourceGroupName string, vmssState *VMSSState) (scaleSetName string, err error) {
 	latestVersion := vmssState.GetLatestVersion()
 	scaleSetName = GetVmScaleSetName(vmssState.Prefix, vmssState.ClusterName, latestVersion)
 	return scaleSetName, nil
+}
+
+func GetLatestScaleSetConfiguration(ctx context.Context, subscriptionId, resourceGroupName string, vmssState *VMSSState) (vmssConfig *VMSSConfig, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	scaleSetName, err := GetScaleSetNameWithLatestConfigurationFromState(ctx, subscriptionId, resourceGroupName, vmssState)
+	if err != nil {
+		err = fmt.Errorf("cannot get the latest scale set name: %w", err)
+		logger.Error().Err(err).Send()
+		return
+	}
+	scaleSet, err := getScaleSet(ctx, subscriptionId, resourceGroupName, scaleSetName)
+	if err != nil {
+		err = fmt.Errorf("cannot get the latest scale set: %w", err)
+		logger.Error().Err(err).Send()
+		return
+	}
+	vmssConfig = GetVmssConfig(ctx, resourceGroupName, scaleSet)
+	return
 }
 
 func GetScaleSetsByVersion(ctx context.Context, subscriptionId, resourceGroupName string, vmssState *VMSSState) (map[int]*armcompute.VirtualMachineScaleSet, error) {
@@ -1421,13 +1444,20 @@ func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armc
 		ppg = &val
 	}
 
+	var sourceImageID string
+	if scaleSet.Properties.VirtualMachineProfile.StorageProfile.ImageReference.CommunityGalleryImageID != nil {
+		sourceImageID = *scaleSet.Properties.VirtualMachineProfile.StorageProfile.ImageReference.CommunityGalleryImageID
+	} else {
+		sourceImageID = *scaleSet.Properties.VirtualMachineProfile.StorageProfile.ImageReference.ID
+	}
+
 	vmssConfig := &VMSSConfig{
 		Name:              *scaleSet.Name,
 		Location:          *scaleSet.Location,
 		Zones:             PtrArrToStrArray(scaleSet.Zones),
 		ResourceGroupName: resourceGroupName,
 		SKU:               *scaleSet.SKU.Name,
-		SourceImageID:     *scaleSet.Properties.VirtualMachineProfile.StorageProfile.ImageReference.CommunityGalleryImageID,
+		SourceImageID:     sourceImageID,
 		Tags:              PtrMapToStrMap(scaleSet.Tags),
 
 		UpgradeMode:          string(*scaleSet.Properties.UpgradePolicy.Mode),

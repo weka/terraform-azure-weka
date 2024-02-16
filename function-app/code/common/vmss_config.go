@@ -176,8 +176,9 @@ func (q *VMSSState) RemoveVersion(item int) error {
 }
 
 type VMSSStateVerbose struct {
-	ActiveVmssNames []string   `json:"active_vmss_names"`
-	TargetConfig    VMSSConfig `json:"target_config"`
+	ActiveVmssNames []string    `json:"active_vmss_names"`
+	TargetConfig    VMSSConfig  `json:"target_config"`
+	LatestConfig    *VMSSConfig `json:"latest_config,omitempty"`
 }
 
 func ToEnumStrValue[T interface{ ~string }](val string, possibleEnumValues []T) (*T, error) {

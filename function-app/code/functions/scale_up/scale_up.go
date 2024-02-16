@@ -159,6 +159,10 @@ func HandleVmssUpdate(ctx context.Context, currentConfig, newConfig *common.VMSS
 		msg := fmt.Sprintf("cannot change vmss SKU from %s to %s, need refresh", currentConfig.SKU, newConfig.SKU)
 		logger.Info().Msg(msg)
 		refreshNeeded = true
+	} else if currentConfig.SourceImageID != newConfig.SourceImageID {
+		msg := fmt.Sprintf("cannot change vmss source image from %s to %s, need refresh", currentConfig.SourceImageID, newConfig.SourceImageID)
+		logger.Info().Msg(msg)
+		refreshNeeded = true
 	} else {
 		_, err := common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, currentConfig.Name, newConfigHash, *newConfig, desiredSize)
 		if err != nil {
