@@ -58,7 +58,7 @@ output "backend_ips" {
 }
 
 output "client_ips" {
-  value       = var.clients_number > 0 ? module.clients[0].clients_ips : null
+  value       = var.clients_number > 0 ? module.clients[0].client_ips : null
   description = "If 'private_network' is set to false, it will output clients public ips, otherwise private ips."
 }
 
