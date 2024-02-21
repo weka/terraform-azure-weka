@@ -157,7 +157,7 @@ variable "ssh_public_key" {
 
 variable "assign_public_ip" {
   type        = bool
-  default     = true
+  default     = false
   description = "Determines whether to assign public IP to all instances deployed by TF module. Includes backends, clients and protocol gateways."
 }
 
