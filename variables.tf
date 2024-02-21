@@ -156,9 +156,13 @@ variable "ssh_public_key" {
 }
 
 variable "assign_public_ip" {
-  type        = bool
-  default     = false
+  type        = string
+  default     = "auto"
   description = "Determines whether to assign public IP to all instances deployed by TF module. Includes backends, clients and protocol gateways."
+  validation {
+    condition     = var.assign_public_ip == "true" || var.assign_public_ip == "false" || var.assign_public_ip == "auto"
+    error_message = "Allowed assign_public_ip values: [\"true\", \"false\", \"auto\"]."
+  }
 }
 
 variable "install_weka_url" {

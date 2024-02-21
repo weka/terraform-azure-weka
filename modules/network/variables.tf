@@ -77,6 +77,5 @@ variable "sg_id" {
 
 variable "create_nat_gateway" {
   type        = bool
-  default     = false
   description = "NAT needs to be created when no public ip is assigned to the backend, to allow internet access"
 }
