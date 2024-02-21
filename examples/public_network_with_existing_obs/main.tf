@@ -19,4 +19,5 @@ module "weka_deployment" {
   tiering_obs_name               = "obs"
   tiering_obs_container_name     = "obs-container"
   tiering_blob_obs_access_key    = "..."
+  assign_public_ip               = true
 }
