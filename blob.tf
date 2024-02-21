@@ -107,7 +107,7 @@ resource "azurerm_storage_blob" "vmss_config" {
         subnet_id                              = data.azurerm_subnet.subnet.id
         load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
         public_ip_address = {
-          assign            = var.assign_public_ip
+          assign            = local.assign_public_ip
           name              = "${var.prefix}-${var.cluster_name}-public-ip"
           domain_name_label = "${var.prefix}-${var.cluster_name}-backend"
         }

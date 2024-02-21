@@ -23,7 +23,7 @@ module "nfs_protocol_gateways" {
   sg_id                        = local.sg_id
   key_vault_url                = azurerm_key_vault.key_vault.vault_uri
   key_vault_id                 = azurerm_key_vault.key_vault.id
-  assign_public_ip             = var.assign_public_ip
+  assign_public_ip             = local.assign_public_ip
   disk_size                    = var.nfs_protocol_gateway_disk_size
   frontend_container_cores_num = var.nfs_protocol_gateway_fe_cores_num
   function_app_name            = azurerm_linux_function_app.function_app.name
@@ -122,7 +122,7 @@ module "smb_protocol_gateways" {
   sg_id                        = local.sg_id
   key_vault_url                = azurerm_key_vault.key_vault.vault_uri
   key_vault_id                 = azurerm_key_vault.key_vault.id
-  assign_public_ip             = var.assign_public_ip
+  assign_public_ip             = local.assign_public_ip
   disk_size                    = var.smb_protocol_gateway_disk_size
   frontend_container_cores_num = var.smb_protocol_gateway_fe_cores_num
   smb_cluster_name             = var.smb_cluster_name

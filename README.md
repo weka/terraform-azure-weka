@@ -112,9 +112,9 @@ output "deploy_weka_output" {
 ```
 
 ### Private network deployment:
-#### To avoid public ip assignment:
+#### To enable public ip assignment:
 ```hcl
-assign_public_ip   = false
+assign_public_ip   = true
 ```
 #### Vms with no internet outbound:
 In case your vms don't have internet access, you should supply weka tar file url, apt repo url and service endpoints:
