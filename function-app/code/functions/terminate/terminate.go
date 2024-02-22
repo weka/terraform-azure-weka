@@ -184,7 +184,7 @@ func Terminate(ctx context.Context, scaleResponse protocol.ScaleResponse, subscr
 	logger.Info().Msgf("Instances set for explicit removal: %s", scaleResponse.ToTerminate)
 	deltaInstanceIds, err := getDeltaInstancesIds(ctx, subscriptionId, resourceGroupName, vmScaleSetName, scaleResponse)
 	if err != nil {
-		logger.Error().Msgf("%s", err)
+		logger.Error().Err(err).Send()
 		return
 	}
 
@@ -200,7 +200,7 @@ func Terminate(ctx context.Context, scaleResponse protocol.ScaleResponse, subscr
 
 	candidatesToTerminate, err := common.FilterSpecificScaleSetInstances(ctx, vms, deltaInstanceIds)
 	if err != nil {
-		logger.Error().Msgf("%s", err)
+		logger.Error().Err(err).Send()
 		return
 	}
 
@@ -233,44 +233,39 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
 
-	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
+	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName)
 
-	outputs := make(map[string]interface{})
-	resData := make(map[string]interface{})
 	var invokeRequest common.InvokeRequest
 
 	d := json.NewDecoder(r.Body)
-	err := d.Decode(&invokeRequest)
-	if err != nil {
+
+	if err := d.Decode(&invokeRequest); err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
 	var reqData map[string]interface{}
-	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
-	if err != nil {
+
+	if err := json.Unmarshal(invokeRequest.Data["req"], &reqData); err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
 	var scaleResponse protocol.ScaleResponse
 
-	if json.Unmarshal([]byte(reqData["Body"].(string)), &scaleResponse) != nil {
-		logger.Error().Msgf("Failed to parse scaleResponse:%s", reqData["Body"].(string))
+	if err := json.Unmarshal([]byte(reqData["Body"].(string)), &scaleResponse); err != nil {
+		logger.Error().Msgf("Failed to parse scaleResponse: %s", reqData["Body"].(string))
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
 	terminateResponse, err := Terminate(ctx, scaleResponse, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName)
 	if err != nil {
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = terminateResponse
+		logger.Error().Err(err).Send()
+		common.WriteErrorResponse(w, err)
+		return
 	}
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.WriteSuccessResponse(w, terminateResponse)
 }

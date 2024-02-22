@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/weka/go-cloud-lib/join"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"weka-deployment/common"
 	"weka-deployment/functions/azure_functions_def"
+
+	"github.com/weka/go-cloud-lib/join"
 
 	"github.com/lithammer/dedent"
 
@@ -150,7 +151,7 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 	clusterParams.IPs = ipsList
 	clusterParams.ObsScript = GetObsScript(p.Obs)
 	clusterParams.WekaPassword = wekaPassword
-	clusterParams.WekaUsername = "admin"
+	clusterParams.WekaUsername = common.WekaAdminUsername
 	clusterParams.InstallDpdk = p.InstallDpdk
 	clusterParams.FindDrivesScript = common.FindDrivesScript
 	clusterParams.ClusterizationTarget = state.ClusterizationTarget
@@ -233,7 +234,7 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 		}
 
 		joinParams := join.JoinParams{
-			WekaUsername: "admin",
+			WekaUsername: common.WekaAdminUsername,
 			WekaPassword: wekaPassword,
 			IPs:          ipsList,
 		}
@@ -283,7 +284,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		addFrontend = true
 	}
 
-	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
 	var invokeRequest common.InvokeRequest
 
@@ -291,23 +291,24 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	d := json.NewDecoder(r.Body)
-	err := d.Decode(&invokeRequest)
-	if err != nil {
+	if err := d.Decode(&invokeRequest); err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
 	var reqData map[string]interface{}
-	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
-	if err != nil {
+	if err := json.Unmarshal(invokeRequest.Data["req"], &reqData); err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
 	var data RequestBody
 
-	if json.Unmarshal([]byte(reqData["Body"].(string)), &data) != nil {
+	if err := json.Unmarshal([]byte(reqData["Body"].(string)), &data); err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -347,19 +348,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		FunctionAppName: functionAppName,
 	}
 
+	status := http.StatusOK
 	if data.Vm == "" {
 		msg := "Cluster name wasn't supplied"
 		logger.Error().Msgf(msg)
 		resData["body"] = msg
+		status = http.StatusBadRequest
 	} else {
 		clusterizeScript := Clusterize(ctx, params)
 		resData["body"] = clusterizeScript
 	}
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.WriteResponse(w, resData, &status)
 }

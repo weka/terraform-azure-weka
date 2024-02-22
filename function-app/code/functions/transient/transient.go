@@ -2,14 +2,14 @@ package transient
 
 import (
 	"encoding/json"
-	"github.com/weka/go-cloud-lib/logging"
-	"github.com/weka/go-cloud-lib/protocol"
 	"net/http"
 	"weka-deployment/common"
+
+	"github.com/weka/go-cloud-lib/logging"
+	"github.com/weka/go-cloud-lib/protocol"
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
 	var invokeRequest common.InvokeRequest
 
@@ -20,6 +20,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	err := d.Decode(&invokeRequest)
 	if err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -27,13 +28,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
 	if err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
 	var terminateResponse protocol.TerminatedInstancesResponse
 
-	if json.Unmarshal([]byte(reqData["Body"].(string)), &terminateResponse) != nil {
+	if err := json.Unmarshal([]byte(reqData["Body"].(string)), &terminateResponse); err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -47,11 +50,5 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		resData["body"] = "no errors"
 	}
 
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.WriteResponse(w, resData, nil)
 }
