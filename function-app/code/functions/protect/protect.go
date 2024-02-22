@@ -23,8 +23,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	prefix := os.Getenv("PREFIX")
 	clusterName := os.Getenv("CLUSTER_NAME")
 
-	outputs := make(map[string]interface{})
-	resData := make(map[string]interface{})
 	var invokeRequest common.InvokeRequest
 
 	ctx := r.Context()
@@ -34,6 +32,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	err := d.Decode(&invokeRequest)
 	if err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -41,13 +40,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
 	if err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
 	var data RequestBody
 
-	if json.Unmarshal([]byte(reqData["Body"].(string)), &data) != nil {
+	if err := json.Unmarshal([]byte(reqData["Body"].(string)), &data); err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -62,16 +63,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	err = common.RetrySetDeletionProtectionAndReport(ctx, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, vmScaleSetName, instanceId, hostName, maxAttempts, authSleepInterval)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = "protection was set successfully"
+		logger.Error().Err(err).Send()
+		common.WriteErrorResponse(w, err)
+		return
 	}
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.WriteSuccessResponse(w, "protection was set successfully")
 }

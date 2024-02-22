@@ -11,8 +11,6 @@ import (
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	outputs := make(map[string]interface{})
-	resData := make(map[string]interface{})
 	var invokeRequest common.InvokeRequest
 
 	ctx := r.Context()
@@ -22,6 +20,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	err := d.Decode(&invokeRequest)
 	if err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -29,27 +28,23 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
 	if err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
 	var info protocol.HostGroupInfoResponse
 
-	if json.Unmarshal([]byte(reqData["Body"].(string)), &info) != nil {
+	if err := json.Unmarshal([]byte(reqData["Body"].(string)), &info); err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
 	scaleResponse, err := scale_down.ScaleDown(ctx, info)
 	if err != nil {
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = scaleResponse
+		logger.Error().Err(err).Send()
+		common.WriteErrorResponse(w, err)
+		return
 	}
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.WriteSuccessResponse(w, scaleResponse)
 }

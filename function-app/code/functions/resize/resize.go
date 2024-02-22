@@ -4,16 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/weka/go-cloud-lib/logging"
 	"net/http"
 	"os"
 	"weka-deployment/common"
+
+	"github.com/weka/go-cloud-lib/logging"
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	outputs := make(map[string]interface{})
-	resData := make(map[string]interface{})
-
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
@@ -42,20 +40,20 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		err = fmt.Errorf("cannot unmarshal the request data: %v", err)
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
-	if json.Unmarshal([]byte(reqData["Body"].(string)), &size) != nil {
+	if err := json.Unmarshal([]byte(reqData["Body"].(string)), &size); err != nil {
 		err = fmt.Errorf("cannot unmarshal the request body: %v", err)
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 	if size.Value == nil {
 		err := fmt.Errorf("wrong request format. 'new_size' is required")
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -65,26 +63,20 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if *size.Value < minCusterSize {
 		err = fmt.Errorf("invalid size, minimal cluster size is %d", minCusterSize)
 		logger.Error().Err(err).Send()
+		common.WriteErrorResponse(w, err)
+		return
 	}
 
-	if err == nil {
-		vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
-		err = updateDesiredClusterSize(ctx, *size.Value, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName)
-	}
-
+	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName)
+	err = updateDesiredClusterSize(ctx, *size.Value, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName)
 	if err != nil {
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = fmt.Sprintf("Updated the desizred cluster size to %d successfully", *size.Value)
+		logger.Error().Err(err).Send()
+		common.WriteErrorResponse(w, err)
+		return
 	}
 
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	msg := fmt.Sprintf("Updated the desired cluster size to %d successfully", *size.Value)
+	common.WriteSuccessResponse(w, msg)
 }
 
 func updateDesiredClusterSize(ctx context.Context, newSize int, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName string) error {

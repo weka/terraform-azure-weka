@@ -106,7 +106,7 @@ func GetDeployScript(
 			return "", err
 		}
 
-		vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
+		vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName)
 		vmsPrivateIps, err := common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 		if err != nil {
 			logger.Error().Err(err).Send()
@@ -124,13 +124,13 @@ func GetDeployScript(
 			}
 		}
 		if len(ips) == 0 {
-			err = fmt.Errorf("no instances found for instance group %s, can't join", vmScaleSetName)
+			err = fmt.Errorf("no instances found for scale set %s, can't join", vmScaleSetName)
 			logger.Error().Err(err).Send()
 			return "", err
 		}
 
 		joinParams := join.JoinParams{
-			WekaUsername:   "admin",
+			WekaUsername:   common.WekaAdminUsername,
 			WekaPassword:   wekaPassword,
 			IPs:            ips,
 			InstallDpdk:    installDpdk,
@@ -160,19 +160,6 @@ func GetDeployScript(
 
 type RequestBody struct {
 	Vm string `json:"vm"`
-}
-
-func writeResponse(w http.ResponseWriter, outputs, resData map[string]interface{}, err error) {
-	if err != nil {
-		resData["body"] = err.Error()
-	}
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
 }
 
 func getGateway(subnet string) string {
@@ -217,8 +204,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	installUrl := os.Getenv("INSTALL_URL")
 	proxyUrl := os.Getenv("PROXY_URL")
 
-	outputs := make(map[string]interface{})
-	resData := make(map[string]interface{})
 	var invokeRequest common.InvokeRequest
 
 	ctx := r.Context()
@@ -229,8 +214,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		err = fmt.Errorf("cannot decode the request: %v", err)
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
-		writeResponse(w, outputs, resData, err)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -239,18 +223,16 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		err = fmt.Errorf("cannot unmarshal the request data: %v", err)
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
-		writeResponse(w, outputs, resData, err)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
 	var data RequestBody
 
-	if json.Unmarshal([]byte(reqData["Body"].(string)), &data) != nil {
+	if err := json.Unmarshal([]byte(reqData["Body"].(string)), &data); err != nil {
 		err = fmt.Errorf("cannot unmarshal the request body: %v", err)
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
-		writeResponse(w, outputs, resData, err)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -277,9 +259,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-	} else {
-		resData["body"] = bashScript
+		common.WriteErrorResponse(w, err)
+		return
 	}
-	writeResponse(w, outputs, resData, err)
+	common.WriteSuccessResponse(w, bashScript)
 }
