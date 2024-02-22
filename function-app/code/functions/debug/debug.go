@@ -34,7 +34,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	protectionLevel, _ := strconv.Atoi(os.Getenv("PROTECTION_LEVEL"))
 	hotspare, _ := strconv.Atoi(os.Getenv("HOTSPARE"))
 
-	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
+	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName)
 
 	outputs := make(map[string]interface{})
 	resData := make(map[string]interface{})
@@ -65,16 +65,16 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if json.Unmarshal([]byte(reqData["Body"].(string)), &function) != nil {
+	if err := json.Unmarshal([]byte(reqData["Body"].(string)), &function); err != nil {
 		err = fmt.Errorf("cannot unmarshal the request body: %v", err)
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 	if function.Function == nil {
 		err := fmt.Errorf("wrong request format. 'function' is required")
 		logger.Error().Err(err).Send()
-		w.WriteHeader(http.StatusBadRequest)
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
