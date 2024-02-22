@@ -3,10 +3,11 @@ package join_finalization
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/weka/go-cloud-lib/logging"
 	"net/http"
 	"os"
 	"weka-deployment/common"
+
+	"github.com/weka/go-cloud-lib/logging"
 )
 
 type RequestBody struct {
@@ -14,9 +15,6 @@ type RequestBody struct {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	outputs := make(map[string]interface{})
-	resData := make(map[string]interface{})
-
 	var invokeRequest common.InvokeRequest
 
 	ctx := r.Context()
@@ -26,6 +24,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	err := d.Decode(&invokeRequest)
 	if err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -33,13 +32,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
 	if err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
 	var data RequestBody
 
-	if json.Unmarshal([]byte(reqData["Body"].(string)), &data) != nil {
+	if err := json.Unmarshal([]byte(reqData["Body"].(string)), &data); err != nil {
 		logger.Error().Msg("Bad request")
+		common.WriteErrorResponse(w, err)
 		return
 	}
 
@@ -47,19 +48,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
 	prefix := os.Getenv("PREFIX")
 	clusterName := os.Getenv("CLUSTER_NAME")
-	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
+	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName)
 
 	err = common.SetDeletionProtection(ctx, subscriptionId, resourceGroupName, vmScaleSetName, common.GetScaleSetVmIndex(data.Name), true)
 	if err != nil {
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = "set protection successfully"
+		err = fmt.Errorf("cannot set deletion protection: %w", err)
+		logger.Error().Err(err).Send()
+		common.WriteErrorResponse(w, err)
+		return
 	}
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.WriteSuccessResponse(w, "set protection successfully")
 }

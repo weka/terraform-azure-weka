@@ -2,11 +2,12 @@ package fetch
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"weka-deployment/common"
+
+	"github.com/weka/go-cloud-lib/logging"
 )
 
 type ScaleSetInfoResponse struct {
@@ -20,9 +21,6 @@ type ScaleSetInfoResponse struct {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	outputs := make(map[string]interface{})
-	resData := make(map[string]interface{})
-
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
@@ -31,26 +29,20 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	clusterName := os.Getenv("CLUSTER_NAME")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 
-	vmScaleSetName := fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
+	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName)
 
 	ctx := r.Context()
+	logger := logging.LoggerFromCtx(ctx)
 
 	response, err := getScaleSetInfoResponse(
 		ctx, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName, keyVaultUri,
 	)
 	if err != nil {
-		resData["body"] = err.Error()
-	} else {
-		resData["body"] = response
+		logger.Error().Err(err).Send()
+		common.WriteErrorResponse(w, err)
+		return
 	}
-
-	outputs["res"] = resData
-	invokeResponse := common.InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
-
-	responseJson, _ := json.Marshal(invokeResponse)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	common.WriteSuccessResponse(w, response)
 }
 
 func getScaleSetInfoResponse(
@@ -61,8 +53,9 @@ func getScaleSetInfoResponse(
 		return
 	}
 
-	scaleSetInfo, err := common.GetScaleSetInfo(ctx, subscriptionId, resourceGroupName, vmScaleSetName, keyVaultUri)
+	wekaAdminPassword, err := common.GetWekaClusterPassword(ctx, keyVaultUri)
 	if err != nil {
+		err = fmt.Errorf("cannot get weka admin password: %v", err)
 		return
 	}
 
@@ -72,8 +65,8 @@ func getScaleSetInfoResponse(
 	}
 
 	scaleSetInfoResponse = ScaleSetInfoResponse{
-		Username:        scaleSetInfo.AdminUsername,
-		Password:        scaleSetInfo.AdminPassword,
+		Username:        common.WekaAdminUsername,
+		Password:        wekaAdminPassword,
 		DesiredCapacity: desiredCapacity,
 		Instances:       instances,
 		BackendIps:      getBackendIps(instances),

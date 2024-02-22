@@ -321,7 +321,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "93aa62e79f037749d81dd00e3d80d0e6"
+  default     = "64b82f6331447d6bbd9ac6d7b4b1d494"
 }
 
 variable "function_app_dist" {
@@ -614,4 +614,10 @@ variable "clusterization_target" {
   type        = number
   description = "The clusterization target"
   default     = null
+}
+
+variable "user_data" {
+  type        = string
+  description = "User data to pass to vms."
+  default     = ""
 }

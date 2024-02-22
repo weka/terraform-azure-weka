@@ -2,13 +2,17 @@ package common
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
@@ -24,6 +28,8 @@ import (
 	"github.com/weka/go-cloud-lib/protocol"
 	reportLib "github.com/weka/go-cloud-lib/report"
 )
+
+const WekaAdminUsername = "admin"
 
 type InvokeRequest struct {
 	Data     map[string]json.RawMessage
@@ -43,6 +49,34 @@ for d in json.load(sys.stdin)['disks']:
 	if d['isRotational'] or 'nvme' not in d['devPath']: continue
 	print(d['devPath'])
 `
+
+func WriteResponse(w http.ResponseWriter, resData map[string]any, statusCode *int) {
+	outputs := make(map[string]any)
+
+	outputs["res"] = resData
+	invokeResponse := InvokeResponse{Outputs: outputs, Logs: nil, ReturnValue: nil}
+
+	responseJson, _ := json.Marshal(invokeResponse)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(responseJson)
+}
+
+func WriteErrorResponse(w http.ResponseWriter, err error) {
+	resData := make(map[string]any)
+	resData["body"] = err.Error()
+
+	badReqStatus := http.StatusBadRequest
+	WriteResponse(w, resData, &badReqStatus)
+}
+
+func WriteSuccessResponse(w http.ResponseWriter, data any) {
+	resData := make(map[string]any)
+	resData["body"] = data
+
+	successStatus := http.StatusOK
+	WriteResponse(w, resData, &successStatus)
+}
 
 func leaseContainerAcquire(ctx context.Context, storageAccountName, containerName string, leaseIdIn *string) (leaseIdOut *string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
@@ -139,7 +173,7 @@ func UnlockContainer(ctx context.Context, storageAccountName, containerName stri
 	return err
 }
 
-func ReadBlobObject(ctx context.Context, stateStorageName, containerName, blobName string) (state []byte, err error) {
+func ReadBlobObject(ctx context.Context, storageName, containerName, blobName string) (state []byte, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
@@ -148,7 +182,7 @@ func ReadBlobObject(ctx context.Context, stateStorageName, containerName, blobNa
 		return
 	}
 
-	blobClient, err := azblob.NewClient(getBlobUrl(stateStorageName), credential, nil)
+	blobClient, err := azblob.NewClient(getBlobUrl(storageName), credential, nil)
 	if err != nil {
 		logger.Error().Msgf("azblob.NewClient: %s", err)
 		return
@@ -185,7 +219,7 @@ func ReadState(ctx context.Context, stateStorageName, containerName string) (sta
 	return
 }
 
-func WriteBlobObject(ctx context.Context, stateStorageName, containerName, blobName string, state []byte) (err error) {
+func WriteBlobObject(ctx context.Context, storageName, containerName, blobName string, state []byte) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
@@ -194,7 +228,7 @@ func WriteBlobObject(ctx context.Context, stateStorageName, containerName, blobN
 		return
 	}
 
-	blobClient, err := azblob.NewClient(getBlobUrl(stateStorageName), credential, nil)
+	blobClient, err := azblob.NewClient(getBlobUrl(storageName), credential, nil)
 	if err != nil {
 		logger.Error().Err(err).Send()
 		return
@@ -661,6 +695,22 @@ func AssignStorageBlobDataContributorRoleToScaleSet(
 		return nil, err
 	}
 
+	var principalId *string
+	if scaleSet.Identity.PrincipalID != nil {
+		principalId = scaleSet.Identity.PrincipalID
+	} else if len(scaleSet.Identity.UserAssignedIdentities) > 0 {
+		// try user-assigned identity
+		identitites := scaleSet.Identity.UserAssignedIdentities
+		for _, identity := range identitites {
+			principalId = identity.PrincipalID
+			break
+		}
+	} else {
+		err = errors.New("cannot find principal id for the scale set")
+		logger.Error().Err(err).Send()
+		return nil, err
+	}
+
 	// see https://learn.microsoft.com/en-us/rest/api/authorization/role-assignments/create
 	res, err := client.Create(
 		ctx,
@@ -669,12 +719,18 @@ func AssignStorageBlobDataContributorRoleToScaleSet(
 		armauthorization.RoleAssignmentCreateParameters{
 			Properties: &armauthorization.RoleAssignmentProperties{
 				RoleDefinitionID: roleDefinition.ID,
-				PrincipalID:      scaleSet.Identity.PrincipalID,
+				PrincipalID:      principalId,
 			},
 		},
 		nil,
 	)
 	if err != nil {
+		var responseErr *azcore.ResponseError
+		if errors.As(err, &responseErr) && responseErr.ErrorCode == "RoleAssignmentExists" {
+			logger.Info().Msg("role assignment already exists")
+			return nil, nil
+		}
+
 		err = fmt.Errorf("cannot create the role assignment: %v", err)
 		logger.Error().Err(err).Send()
 		return nil, err
@@ -718,6 +774,21 @@ func getScaleSet(ctx context.Context, subscriptionId, resourceGroupName, vmScale
 	return &scaleSet.VirtualMachineScaleSet, nil
 }
 
+func GetScaleSetOrNil(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (*armcompute.VirtualMachineScaleSet, error) {
+	logger := logging.LoggerFromCtx(ctx)
+	scaleSet, err := getScaleSet(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	if err != nil {
+		var responseErr *azcore.ResponseError
+		if errors.As(err, &responseErr) && responseErr.ErrorCode == "ResourceNotFound" {
+			// scale set is not found
+			return nil, nil
+		}
+		logger.Error().Err(err).Send()
+		return nil, err
+	}
+	return scaleSet, nil
+}
+
 // Gets single scale set info
 func GetScaleSetInfo(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, keyVaultUri string) (*ScaleSetInfo, error) {
 	logger := logging.LoggerFromCtx(ctx)
@@ -737,7 +808,7 @@ func GetScaleSetInfo(ctx context.Context, subscriptionId, resourceGroupName, vmS
 	scaleSetInfo := ScaleSetInfo{
 		Id:            *scaleSet.ID,
 		Name:          *scaleSet.Name,
-		AdminUsername: "admin",
+		AdminUsername: WekaAdminUsername,
 		AdminPassword: wekaPassword,
 		Capacity:      int(*scaleSet.SKU.Capacity),
 		VMSize:        *scaleSet.SKU.Name,
@@ -877,7 +948,7 @@ func RetrySetDeletionProtectionAndReport(
 		if err == nil {
 			msg := "Deletion protection was set successfully"
 			logger.Info().Msg(msg)
-			ReportMsg(ctx, hostName, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, "progress", msg)
+			ReportMsg(ctx, hostName, stateContainerName, stateStorageName, "progress", msg)
 			break
 		}
 
@@ -885,8 +956,8 @@ func RetrySetDeletionProtectionAndReport(
 			counter++
 			// deletion protection invoked by terminate function
 			if maxAttempts == 0 {
-				msg := fmt.Sprintf("Deletion protection set authorization isn't ready, will retry on next scale down workflow")
-				ReportMsg(ctx, hostName, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, "debug", msg)
+				msg := "Deletion protection set authorization isn't ready, will retry on next scale down workflow"
+				ReportMsg(ctx, hostName, stateContainerName, stateStorageName, "debug", msg)
 				return
 			}
 
@@ -895,7 +966,7 @@ func RetrySetDeletionProtectionAndReport(
 			}
 			msg := fmt.Sprintf("Deletion protection set authorization isn't ready, going to sleep for %s", sleepInterval)
 			logger.Info().Msg(msg)
-			ReportMsg(ctx, hostName, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, "debug", msg)
+			ReportMsg(ctx, hostName, stateContainerName, stateStorageName, "debug", msg)
 			time.Sleep(sleepInterval)
 		} else {
 			break
@@ -903,14 +974,14 @@ func RetrySetDeletionProtectionAndReport(
 	}
 	if err != nil {
 		logger.Error().Err(err).Send()
-		ReportMsg(ctx, hostName, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, "error", err.Error())
+		ReportMsg(ctx, hostName, stateContainerName, stateStorageName, "error", err.Error())
 	}
 	return
 }
 
-func ReportMsg(ctx context.Context, hostName, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, reportType, message string) {
+func ReportMsg(ctx context.Context, hostName, stateContainerName, stateStorageName, reportType, message string) {
 	reportObj := protocol.Report{Type: reportType, Hostname: hostName, Message: message}
-	_ = UpdateStateReporting(ctx, subscriptionId, stateStorageName, reportObj)
+	_ = UpdateStateReporting(ctx, stateContainerName, stateStorageName, reportObj)
 }
 
 func GetWekaClusterPassword(ctx context.Context, keyVaultUri string) (password string, err error) {
@@ -1009,6 +1080,28 @@ func UpdateStateReporting(ctx context.Context, stateContainerName, stateStorageN
 	return UpdateStateReportingWithoutLocking(ctx, stateContainerName, stateStorageName, report)
 }
 
+func AddClusterUpdate(ctx context.Context, stateContainerName, stateStorageName string, update protocol.Update) (err error) {
+	leaseId, err := LockContainer(ctx, stateStorageName, stateContainerName)
+	if err != nil {
+		return
+	}
+	defer UnlockContainer(ctx, stateStorageName, stateContainerName, leaseId)
+
+	state, err := ReadState(ctx, stateStorageName, stateContainerName)
+	if err != nil {
+		return
+	}
+
+	reportLib.AddClusterUpdate(update, &state)
+
+	err = WriteState(ctx, stateStorageName, stateContainerName, state)
+	if err != nil {
+		err = fmt.Errorf("failed addind cluster update to state")
+		return
+	}
+	return
+}
+
 func UpdateStateReportingWithoutLocking(ctx context.Context, stateContainerName, stateStorageName string, report protocol.Report) (err error) {
 	state, err := ReadState(ctx, stateStorageName, stateContainerName)
 	if err != nil {
@@ -1067,4 +1160,448 @@ func GetScaleSetVmsExpandedView(ctx context.Context, subscriptionId, resourceGro
 
 func GetAzureInstanceNameCmd() string {
 	return "curl -s -H Metadata:true --noproxy * http://169.254.169.254/metadata/instance?api-version=2021-02-01 | jq '.compute.name' | cut -c2- | rev | cut -c2- | rev"
+}
+
+func ReadVmssConfig(ctx context.Context, storageName, containerName string) (vmssConfig VMSSConfig, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	asByteArray, err := ReadBlobObject(ctx, storageName, containerName, "vmss-config")
+	if err != nil {
+		return
+	}
+
+	// calculate hash of the config (used to identify vmss config changes)
+	hash := sha256.Sum256(asByteArray)
+	hashStr := fmt.Sprintf("%x", hash)
+
+	err = json.Unmarshal(asByteArray, &vmssConfig)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	// take first 16 characters of the hash
+	vmssConfig.ConfigHash = hashStr[:16]
+	return
+}
+
+func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armcompute.VirtualMachineScaleSet) *VMSSConfig {
+	var identityIds []string
+	if scaleSet.Identity != nil && scaleSet.Identity.UserAssignedIdentities != nil {
+		for identityId := range scaleSet.Identity.UserAssignedIdentities {
+			identityIds = append(identityIds, identityId)
+		}
+	}
+
+	var sshPublicKey string
+	if scaleSet.Properties.VirtualMachineProfile.OSProfile.LinuxConfiguration.SSH.PublicKeys != nil {
+		sshPublicKey = *scaleSet.Properties.VirtualMachineProfile.OSProfile.LinuxConfiguration.SSH.PublicKeys[0].KeyData
+	}
+
+	var primaryNic *PrimaryNIC
+	var secondaryNics *SecondaryNICs
+
+	for _, nic := range scaleSet.Properties.VirtualMachineProfile.NetworkProfile.NetworkInterfaceConfigurations {
+		ipConfigs := make([]IPConfiguration, len(nic.Properties.IPConfigurations))
+
+		for i, ipConfig := range nic.Properties.IPConfigurations {
+			loadBalancerBackendAddressPoolIDs := make([]string, len(ipConfig.Properties.LoadBalancerBackendAddressPools))
+			for j, loadBalancerBackendAddressPool := range ipConfig.Properties.LoadBalancerBackendAddressPools {
+				loadBalancerBackendAddressPoolIDs[j] = *loadBalancerBackendAddressPool.ID
+			}
+			ipConfigs[i] = IPConfiguration{
+				LoadBalancerBackendAddressPoolIDs: loadBalancerBackendAddressPoolIDs,
+				SubnetID:                          *ipConfig.Properties.Subnet.ID,
+				Primary:                           *ipConfig.Properties.Primary,
+			}
+			if ipConfig.Properties.PublicIPAddressConfiguration != nil {
+				ipConfigs[i].PublicIPAddress = &PublicIPAddress{
+					Assign:          true,
+					DomainNameLabel: *ipConfig.Properties.PublicIPAddressConfiguration.Properties.DNSSettings.DomainNameLabel,
+					Name:            *ipConfig.Properties.PublicIPAddressConfiguration.Name,
+				}
+			}
+		}
+
+		if nic.Properties.Primary != nil && *nic.Properties.Primary {
+			primaryNic = &PrimaryNIC{
+				EnableAcceleratedNetworking: *nic.Properties.EnableAcceleratedNetworking,
+				Name:                        *nic.Name,
+				NetworkSecurityGroupID:      *nic.Properties.NetworkSecurityGroup.ID,
+				IPConfigurations:            ipConfigs,
+			}
+		} else if secondaryNics == nil {
+			nicNameParts := strings.Split(*nic.Name, "-")
+			// remove the last part of the nic name which is the index
+			namePrefix := strings.Join(nicNameParts[:len(nicNameParts)-1], "-")
+
+			secondaryNics = &SecondaryNICs{
+				EnableAcceleratedNetworking: *nic.Properties.EnableAcceleratedNetworking,
+				NamePrefix:                  namePrefix,
+				IPConfigurations:            ipConfigs,
+				NetworkSecurityGroupID:      *nic.Properties.NetworkSecurityGroup.ID,
+				Number:                      len(scaleSet.Properties.VirtualMachineProfile.NetworkProfile.NetworkInterfaceConfigurations) - 1,
+			}
+		}
+		if primaryNic != nil && secondaryNics != nil {
+			break
+		}
+	}
+
+	var customData string
+	if scaleSet.Properties.VirtualMachineProfile.OSProfile.CustomData != nil {
+		customData = *scaleSet.Properties.VirtualMachineProfile.OSProfile.CustomData
+	}
+
+	var ppg *string
+	if scaleSet.Properties.ProximityPlacementGroup != nil {
+		ppg = scaleSet.Properties.ProximityPlacementGroup.ID
+		upperCaseRg := strings.ToUpper(resourceGroupName)
+		val := strings.Replace(*ppg, upperCaseRg, resourceGroupName, 1)
+		ppg = &val
+	}
+
+	var sourceImageID string
+	if scaleSet.Properties.VirtualMachineProfile.StorageProfile.ImageReference.CommunityGalleryImageID != nil {
+		sourceImageID = *scaleSet.Properties.VirtualMachineProfile.StorageProfile.ImageReference.CommunityGalleryImageID
+	} else {
+		sourceImageID = *scaleSet.Properties.VirtualMachineProfile.StorageProfile.ImageReference.ID
+	}
+
+	tags := PtrMapToStrMap(scaleSet.Tags)
+	configHash := ""
+	if val, ok := tags["config_hash"]; ok {
+		configHash = val
+	}
+
+	vmssConfig := &VMSSConfig{
+		Name:              *scaleSet.Name,
+		Location:          *scaleSet.Location,
+		Zones:             PtrArrToStrArray(scaleSet.Zones),
+		ResourceGroupName: resourceGroupName,
+		SKU:               *scaleSet.SKU.Name,
+		SourceImageID:     sourceImageID,
+		Tags:              tags,
+
+		UpgradeMode:          string(*scaleSet.Properties.UpgradePolicy.Mode),
+		OrchestrationMode:    string(*scaleSet.Properties.OrchestrationMode),
+		HealthProbeID:        *scaleSet.Properties.VirtualMachineProfile.NetworkProfile.HealthProbe.ID,
+		Overprovision:        *scaleSet.Properties.Overprovision,
+		SinglePlacementGroup: *scaleSet.Properties.SinglePlacementGroup,
+
+		Identity: Identity{
+			IdentityIDs: identityIds,
+			Type:        string(*scaleSet.Identity.Type),
+		},
+		AdminUsername:      *scaleSet.Properties.VirtualMachineProfile.OSProfile.AdminUsername,
+		SshPublicKey:       sshPublicKey,
+		ComputerNamePrefix: *scaleSet.Properties.VirtualMachineProfile.OSProfile.ComputerNamePrefix,
+		CustomData:         customData,
+
+		DisablePasswordAuthentication: *scaleSet.Properties.VirtualMachineProfile.OSProfile.LinuxConfiguration.DisablePasswordAuthentication,
+		ProximityPlacementGroupID:     ppg,
+
+		OSDisk: OSDisk{
+			Caching:            string(*scaleSet.Properties.VirtualMachineProfile.StorageProfile.OSDisk.Caching),
+			StorageAccountType: string(*scaleSet.Properties.VirtualMachineProfile.StorageProfile.OSDisk.ManagedDisk.StorageAccountType),
+			SizeGB:             scaleSet.Properties.VirtualMachineProfile.StorageProfile.OSDisk.DiskSizeGB,
+		},
+		DataDisk: DataDisk{
+			Caching:            string(*scaleSet.Properties.VirtualMachineProfile.StorageProfile.DataDisks[0].Caching),
+			CreateOption:       string(*scaleSet.Properties.VirtualMachineProfile.StorageProfile.DataDisks[0].CreateOption),
+			DiskSizeGB:         *scaleSet.Properties.VirtualMachineProfile.StorageProfile.DataDisks[0].DiskSizeGB,
+			Lun:                *scaleSet.Properties.VirtualMachineProfile.StorageProfile.DataDisks[0].Lun,
+			StorageAccountType: string(*scaleSet.Properties.VirtualMachineProfile.StorageProfile.DataDisks[0].ManagedDisk.StorageAccountType),
+		},
+		PrimaryNIC:    *primaryNic,
+		SecondaryNICs: *secondaryNics,
+		ConfigHash:    configHash,
+	}
+	return vmssConfig
+}
+
+func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, configHash string, config VMSSConfig, vmssSize int) (id *string, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	client, err := armcompute.NewVirtualMachineScaleSetsClient(subscriptionId, credential, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	config.Tags["config_hash"] = configHash
+	config.Tags["config_applied_at"] = time.Now().Format(time.RFC3339)
+	size := int64(vmssSize)
+	forceDeletion := false
+	sshKeyPath := fmt.Sprintf("/home/%s/.ssh/authorized_keys", config.AdminUsername)
+
+	tags := StrMapToPtrMap(config.Tags)
+	zones := StrArrToPtrArray(config.Zones)
+
+	identities := make(map[string]*armcompute.UserAssignedIdentitiesValue)
+	for _, identityID := range config.Identity.IdentityIDs {
+		identities[identityID] = &armcompute.UserAssignedIdentitiesValue{}
+	}
+
+	var osDiskSizeGb *int32
+	if config.OSDisk.SizeGB != nil {
+		osDiskSizeGb = config.OSDisk.SizeGB
+	}
+
+	identityType, err := ToEnumStrValue[armcompute.ResourceIdentityType](config.Identity.Type, armcompute.PossibleResourceIdentityTypeValues())
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	upgradeMode, err := ToEnumStrValue[armcompute.UpgradeMode](config.UpgradeMode, armcompute.PossibleUpgradeModeValues())
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	orchestrationMode, err := ToEnumStrValue[armcompute.OrchestrationMode](config.OrchestrationMode, armcompute.PossibleOrchestrationModeValues())
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	osDiskCaching, err := ToEnumStrValue[armcompute.CachingTypes](config.OSDisk.Caching, armcompute.PossibleCachingTypesValues())
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	osDiskCreateOption := armcompute.DiskCreateOptionTypesFromImage
+	osDiskStorageAccountType, err := ToEnumStrValue[armcompute.StorageAccountTypes](config.OSDisk.StorageAccountType, armcompute.PossibleStorageAccountTypesValues())
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+	dataDiskCreateOption, err := ToEnumStrValue[armcompute.DiskCreateOptionTypes](config.DataDisk.CreateOption, armcompute.PossibleDiskCreateOptionTypesValues())
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	dataDiskCaching, err := ToEnumStrValue[armcompute.CachingTypes](config.DataDisk.Caching, armcompute.PossibleCachingTypesValues())
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+	dataDiskStorageAccountType, err := ToEnumStrValue[armcompute.StorageAccountTypes](config.DataDisk.StorageAccountType, armcompute.PossibleStorageAccountTypesValues())
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	imageReference := &armcompute.ImageReference{}
+	sourceImageIdLower := strings.ToLower(config.SourceImageID)
+	if strings.HasPrefix(sourceImageIdLower, "/communitygalleries") {
+		imageReference.CommunityGalleryImageID = &config.SourceImageID
+	} else {
+		imageReference.ID = &config.SourceImageID
+	}
+
+	var nics []*armcompute.VirtualMachineScaleSetNetworkConfiguration
+
+	primaryNicConfig := getPrimaryNicConfig(&config.PrimaryNIC)
+	nics = append(nics, primaryNicConfig)
+
+	secondaryNicsConfig := getSecondaryNicsConfig(&config.SecondaryNICs)
+	nics = append(nics, secondaryNicsConfig...)
+
+	vmss := armcompute.VirtualMachineScaleSet{
+		Location: &config.Location,
+		Identity: &armcompute.VirtualMachineScaleSetIdentity{
+			Type:                   identityType,
+			UserAssignedIdentities: identities,
+		},
+		SKU: &armcompute.SKU{
+			Name:     &config.SKU,
+			Capacity: &size,
+		},
+		Tags:  tags,
+		Zones: zones,
+		Properties: &armcompute.VirtualMachineScaleSetProperties{
+			Overprovision: &config.Overprovision,
+			UpgradePolicy: &armcompute.UpgradePolicy{
+				Mode: upgradeMode,
+			},
+			SinglePlacementGroup: &config.SinglePlacementGroup,
+			OrchestrationMode:    orchestrationMode,
+			ScaleInPolicy: &armcompute.ScaleInPolicy{
+				ForceDeletion: &forceDeletion,
+			},
+			ProximityPlacementGroup: &armcompute.SubResource{
+				ID: config.ProximityPlacementGroupID,
+			},
+			VirtualMachineProfile: &armcompute.VirtualMachineScaleSetVMProfile{
+				OSProfile: &armcompute.VirtualMachineScaleSetOSProfile{
+					AdminUsername:      &config.AdminUsername,
+					ComputerNamePrefix: &config.ComputerNamePrefix,
+					LinuxConfiguration: &armcompute.LinuxConfiguration{
+						DisablePasswordAuthentication: &config.DisablePasswordAuthentication,
+						SSH: &armcompute.SSHConfiguration{
+							PublicKeys: []*armcompute.SSHPublicKey{
+								{
+									KeyData: &config.SshPublicKey,
+									Path:    &sshKeyPath,
+								},
+							},
+						},
+					},
+					CustomData: &config.CustomData,
+				},
+				StorageProfile: &armcompute.VirtualMachineScaleSetStorageProfile{
+					OSDisk: &armcompute.VirtualMachineScaleSetOSDisk{
+						CreateOption: &osDiskCreateOption,
+						Caching:      osDiskCaching,
+						DiskSizeGB:   osDiskSizeGb,
+						ManagedDisk: &armcompute.VirtualMachineScaleSetManagedDiskParameters{
+							StorageAccountType: osDiskStorageAccountType,
+						},
+					},
+					ImageReference: imageReference,
+					DataDisks: []*armcompute.VirtualMachineScaleSetDataDisk{
+						{
+							Lun:          &config.DataDisk.Lun,
+							CreateOption: dataDiskCreateOption,
+							Caching:      dataDiskCaching,
+							DiskSizeGB:   &config.DataDisk.DiskSizeGB,
+							ManagedDisk: &armcompute.VirtualMachineScaleSetManagedDiskParameters{
+								StorageAccountType: dataDiskStorageAccountType,
+							},
+						},
+					},
+				},
+				NetworkProfile: &armcompute.VirtualMachineScaleSetNetworkProfile{
+					HealthProbe: &armcompute.APIEntityReference{
+						ID: &config.HealthProbeID,
+					},
+					NetworkInterfaceConfigurations: nics,
+				},
+			},
+		},
+	}
+
+	poller, err := client.BeginCreateOrUpdate(ctx, resourceGroupName, vmScaleSetName, vmss, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+	resp, err := poller.PollUntilDone(ctx, &runtime.PollUntilDoneOptions{Frequency: time.Second})
+	if err != nil {
+		err = fmt.Errorf("cannot create/update vmss: %v", err)
+		return
+	}
+	id = resp.VirtualMachineScaleSet.ID
+	logger.Info().Msgf("vmss %s created/updated successfully", *id)
+	return
+}
+
+func getPrimaryNicConfig(primaryNic *PrimaryNIC) *armcompute.VirtualMachineScaleSetNetworkConfiguration {
+	var loadBalancerAddrPoolIds []*armcompute.SubResource
+	for _, lbId := range primaryNic.IPConfigurations[0].LoadBalancerBackendAddressPoolIDs {
+		loadBalancerAddrPoolIds = append(loadBalancerAddrPoolIds, &armcompute.SubResource{ID: &lbId})
+	}
+
+	var publicIPConfig *armcompute.VirtualMachineScaleSetPublicIPAddressConfiguration
+	if primaryNic.IPConfigurations[0].PublicIPAddress.Assign {
+		publicIPConfig = &armcompute.VirtualMachineScaleSetPublicIPAddressConfiguration{
+			Name: &primaryNic.IPConfigurations[0].PublicIPAddress.Name,
+			Properties: &armcompute.VirtualMachineScaleSetPublicIPAddressConfigurationProperties{
+				DNSSettings: &armcompute.VirtualMachineScaleSetPublicIPAddressConfigurationDNSSettings{
+					DomainNameLabel: &primaryNic.IPConfigurations[0].PublicIPAddress.DomainNameLabel,
+				},
+			},
+		}
+	}
+
+	ipConfigName := "ipconfig0"
+
+	primaryNicConfig := armcompute.VirtualMachineScaleSetNetworkConfiguration{
+		Name: &primaryNic.Name,
+		Properties: &armcompute.VirtualMachineScaleSetNetworkConfigurationProperties{
+			Primary:                     TruePtr(),
+			EnableAcceleratedNetworking: &primaryNic.EnableAcceleratedNetworking,
+			NetworkSecurityGroup: &armcompute.SubResource{
+				ID: &primaryNic.NetworkSecurityGroupID,
+			},
+			IPConfigurations: []*armcompute.VirtualMachineScaleSetIPConfiguration{
+				{
+					Name: &ipConfigName,
+					Properties: &armcompute.VirtualMachineScaleSetIPConfigurationProperties{
+						Primary: &primaryNic.IPConfigurations[0].Primary,
+						Subnet: &armcompute.APIEntityReference{
+							ID: &primaryNic.IPConfigurations[0].SubnetID,
+						},
+						LoadBalancerBackendAddressPools: loadBalancerAddrPoolIds,
+						PublicIPAddressConfiguration:    publicIPConfig,
+					},
+				},
+			},
+		},
+	}
+	return &primaryNicConfig
+}
+
+func getSecondaryNicsConfig(secondaryNics *SecondaryNICs) []*armcompute.VirtualMachineScaleSetNetworkConfiguration {
+	nicsConfigs := make([]*armcompute.VirtualMachineScaleSetNetworkConfiguration, secondaryNics.Number)
+
+	var loadBalancerAddrPoolIds []*armcompute.SubResource
+	for _, lbId := range secondaryNics.IPConfigurations[0].LoadBalancerBackendAddressPoolIDs {
+		loadBalancerAddrPoolIds = append(loadBalancerAddrPoolIds, &armcompute.SubResource{ID: &lbId})
+	}
+
+	for i := 0; i < secondaryNics.Number; i++ {
+		nicName := fmt.Sprintf("%s-%d", secondaryNics.NamePrefix, i+1)
+		ipConfigName := fmt.Sprintf("%s%d", "ipconfig", i+1)
+
+		nicConfig := armcompute.VirtualMachineScaleSetNetworkConfiguration{
+			Name: &nicName,
+			Properties: &armcompute.VirtualMachineScaleSetNetworkConfigurationProperties{
+				EnableAcceleratedNetworking: &secondaryNics.EnableAcceleratedNetworking,
+				NetworkSecurityGroup: &armcompute.SubResource{
+					ID: &secondaryNics.NetworkSecurityGroupID,
+				},
+				IPConfigurations: []*armcompute.VirtualMachineScaleSetIPConfiguration{
+					{
+						Name: &ipConfigName,
+						Properties: &armcompute.VirtualMachineScaleSetIPConfigurationProperties{
+							Primary: &secondaryNics.IPConfigurations[0].Primary,
+							Subnet: &armcompute.APIEntityReference{
+								ID: &secondaryNics.IPConfigurations[0].SubnetID,
+							},
+							LoadBalancerBackendAddressPools: loadBalancerAddrPoolIds,
+						},
+					},
+				},
+			},
+		}
+		nicsConfigs[i] = &nicConfig
+	}
+	return nicsConfigs
+}
+
+func GetCurrentScaleSetConfiguration(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (config *VMSSConfig, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	scaleSet, err := GetScaleSetOrNil(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+	if scaleSet == nil {
+		return nil, nil
+	}
+
+	config = GetVmssConfig(ctx, resourceGroupName, scaleSet)
+	return
 }
