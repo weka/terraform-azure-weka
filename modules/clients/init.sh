@@ -52,7 +52,7 @@ while ! ip route | grep eth$i; do
   ip route
   sleep 5
 done
-/usr/sbin/ip route del ${subnet_range} dev eth$i
+ip route del ${subnet_range} dev eth$i
 EOF
 done
 
