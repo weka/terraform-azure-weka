@@ -36,6 +36,7 @@ resource "azurerm_public_ip" "public_ip" {
   #zones               = [var.zone]
   allocation_method = "Static"
   sku               = "Standard"
+  tags              = var.tags_map
 }
 
 resource "azurerm_network_interface" "public_first_nic" {
@@ -44,6 +45,7 @@ resource "azurerm_network_interface" "public_first_nic" {
   enable_accelerated_networking = var.clients_use_dpdk
   resource_group_name           = var.rg_name
   location                      = data.azurerm_resource_group.rg.location
+  tags                          = var.tags_map
   ip_configuration {
     name                          = "ipconfig0"
     subnet_id                     = data.azurerm_subnet.subnet.id
@@ -65,6 +67,7 @@ resource "azurerm_network_interface" "private_first_nic" {
   enable_accelerated_networking = var.clients_use_dpdk
   resource_group_name           = var.rg_name
   location                      = data.azurerm_resource_group.rg.location
+  tags                          = var.tags_map
   ip_configuration {
     name                          = "ipconfig0"
     subnet_id                     = data.azurerm_subnet.subnet.id
@@ -85,6 +88,7 @@ resource "azurerm_network_interface" "private_nics" {
   enable_accelerated_networking = var.clients_use_dpdk
   resource_group_name           = var.rg_name
   location                      = data.azurerm_resource_group.rg.location
+  tags                          = var.tags_map
   ip_configuration {
     name                          = "ipconfig${count.index + var.clients_number}"
     subnet_id                     = data.azurerm_subnet.subnet.id
@@ -104,7 +108,7 @@ resource "azurerm_linux_virtual_machine" "this" {
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = var.rg_name
   admin_username      = var.vm_username
-  tags                = merge({ "weka_cluster" : var.clients_name })
+  tags                = merge({ "weka_cluster_client" : var.clients_name }, var.tags_map)
   custom_data         = local.vms_custom_data
   source_image_id     = var.source_image_id
   size                = var.instance_type
