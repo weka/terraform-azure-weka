@@ -416,6 +416,12 @@ variable "client_frontend_cores" {
   default     = 1
 }
 
+variable "clients_custom_data" {
+  type        = string
+  description = "Custom data to pass to the client instances"
+  default     = ""
+}
+
 variable "placement_group_id" {
   type        = string
   default     = ""

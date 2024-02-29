@@ -94,3 +94,9 @@ variable "tags_map" {
   default     = {}
   description = "A map of tags to assign the same metadata to all resources in the environment. Format: key:value."
 }
+
+variable "custom_data" {
+  type        = string
+  description = "Custom data to pass to the instances"
+  default     = ""
+}
