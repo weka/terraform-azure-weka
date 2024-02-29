@@ -24,7 +24,7 @@ locals {
     clients_use_dpdk             = var.clients_use_dpdk
   })
 
-  custom_data_parts = [local.preparation_script, local.mount_wekafs_script]
+  custom_data_parts = [local.preparation_script, local.mount_wekafs_script, "${var.custom_data}\n"]
   vms_custom_data   = base64encode(join("\n", local.custom_data_parts))
 }
 

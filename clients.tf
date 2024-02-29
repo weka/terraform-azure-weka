@@ -18,5 +18,6 @@ module "clients" {
   source_image_id              = var.client_source_image_id
   sg_id                        = local.sg_id
   tags_map                     = var.tags_map
+  custom_data                  = var.clients_custom_data
   depends_on                   = [azurerm_proximity_placement_group.ppg, module.network]
 }
