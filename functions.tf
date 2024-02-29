@@ -18,6 +18,7 @@ locals {
   obs_scope                        = var.tiering_obs_name != "" ? "${data.azurerm_storage_account.obs_sa[0].id}/blobServices/default/containers/${local.obs_container_name}" : ""
   function_app_name                = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-function-app"
   install_weka_url                 = var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.weka.io/dist/v1/install/${var.weka_version}/${var.weka_version}"
+  supported_regions                = split("\n", chomp(file("${path.module}/supported_regions/${var.function_app_dist}.txt")))
 }
 
 resource "azurerm_log_analytics_workspace" "la_workspace" {
@@ -184,6 +185,11 @@ resource "azurerm_linux_function_app" "function_app" {
       error_message = "Please update function app code version."
     }
     ignore_changes = [site_config, tags]
+
+    precondition {
+      condition     = contains(local.supported_regions, data.azurerm_resource_group.rg.location)
+      error_message = "The region '${data.azurerm_resource_group.rg.location}' is not supported for the function_app_dist '${var.function_app_dist}'. Supported regions: ${join(", ", local.supported_regions)}"
+    }
   }
 
   depends_on = [module.network, azurerm_storage_account.deployment_sa, azurerm_subnet.logicapp_subnet_delegation]
