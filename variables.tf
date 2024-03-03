@@ -245,6 +245,14 @@ variable "containers_config_map" {
       nics     = 8
       memory   = ["357GB", "384GB"]
     }
+    Standard_L8as_v3 = {
+      compute  = 1
+      drive    = 1
+      frontend = 1
+      nvme     = 1
+      nics     = 4
+      memory   = ["33GB", "31GB"]
+    }
   }
   validation {
     condition     = alltrue([for m in flatten([for i in values(var.containers_config_map) : (flatten(i.memory))]) : tonumber(trimsuffix(m, "GB")) <= 384])
