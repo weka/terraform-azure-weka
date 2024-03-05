@@ -386,16 +386,10 @@ variable "clients_number" {
   default     = 0
 }
 
-variable "client_instance_type_map" {
-  type = object({
-    x86_64 = string
-    arm64  = string
-  })
+variable "client_instance_type" {
+  type        = string
   description = "The client virtual machine type (sku) to deploy."
-  default = {
-    x86_64 = "Standard_D8_v5"
-    arm64  = "Standard_E2ps_v5"
-  }
+  default     = ""
 }
 
 variable "client_source_image_id" {
