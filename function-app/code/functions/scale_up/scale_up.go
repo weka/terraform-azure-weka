@@ -68,32 +68,31 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	returnMsg := ""
 	// after vmss creation we need to wait until vmss is clusterized
 	if !state.Clusterized {
 		msg := fmt.Sprintf("Not clusterized yet, initial size %d is set", state.InitialSize)
 		handleProgressingClusterization(ctx, &state, subscriptionId, resourceGroupName, *scaleSet.Name, stateContainerName, stateStorageName)
 		logger.Info().Msg(msg)
-		common.WriteSuccessResponse(w, msg)
-		return
-	}
+		returnMsg = msg
+	} else {
+		currentConfig := common.GetVmssConfig(ctx, resourceGroupName, scaleSet)
 
-	currentConfig := common.GetVmssConfig(ctx, resourceGroupName, scaleSet)
+		// 2. Update flow: compare current vmss config with expected vmss config and update if needed
+		if vmssConfig.ConfigHash != currentConfig.ConfigHash {
+			diff := common.VmssConfigsDiff(*currentConfig, vmssConfig)
+			logger.Info().Msgf("vmss config diff: %s", diff)
 
-	// 2. Update flow: compare current vmss config with expected vmss config and update if needed
-	if vmssConfig.ConfigHash != currentConfig.ConfigHash {
-		diff := common.VmssConfigsDiff(*currentConfig, vmssConfig)
-		logger.Info().Msgf("vmss config diff: %s", diff)
-
-		err := handleVmssUpdate(ctx, currentConfig, &vmssConfig, state.DesiredSize)
-		if err != nil {
-			common.WriteErrorResponse(w, err)
+			err := handleVmssUpdate(ctx, currentConfig, &vmssConfig, state.DesiredSize)
+			if err != nil {
+				common.WriteErrorResponse(w, err)
+				return
+			}
+			common.WriteSuccessResponse(w, "vmss update handled successfully")
 			return
 		}
-		common.WriteSuccessResponse(w, "vmss update handled successfully")
-		return
+		returnMsg = "vmss is up to date"
 	}
-
-	returnMsg := "vmss is up to date"
 
 	// Scale up latest vmss if needed
 	err = common.ScaleUp(ctx, subscriptionId, resourceGroupName, *scaleSet.Name, int64(state.DesiredSize))
