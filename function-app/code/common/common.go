@@ -1131,6 +1131,14 @@ func GetInstancePowerState(instance *armcompute.VirtualMachineScaleSetVM) (power
 	return
 }
 
+func GetInstanceProvisioningState(instance *armcompute.VirtualMachineScaleSetVM) (provisioningState string) {
+	provisioningState = "unknown"
+	if instance.Properties.ProvisioningState != nil {
+		provisioningState = *instance.Properties.ProvisioningState
+	}
+	return strings.ToLower(provisioningState)
+}
+
 func GetUnhealthyInstancesToTerminate(ctx context.Context, scaleSetVms []*armcompute.VirtualMachineScaleSetVM) (toTerminate []string) {
 	logger := logging.LoggerFromCtx(ctx)
 
@@ -1140,12 +1148,12 @@ func GetUnhealthyInstancesToTerminate(ctx context.Context, scaleSetVms []*armcom
 		}
 		healthStatus := *vm.Properties.InstanceView.VMHealth.Status.Code
 		if healthStatus == "HealthState/unhealthy" {
-			instanceState := GetInstancePowerState(vm)
-			logger.Debug().Msgf("instance state: %s", instanceState)
-			if instanceState == "stopped" {
+			instancePowerState := GetInstancePowerState(vm)
+			instanceProvisioningState := GetInstanceProvisioningState(vm)
+			logger.Debug().Msgf("instance power state: %s, provisioning state: %s", instancePowerState, instanceProvisioningState)
+			if instancePowerState == "stopped" || instanceProvisioningState == "failed" {
 				toTerminate = append(toTerminate, GetScaleSetVmId(*vm.ID))
 			}
-
 		}
 	}
 
