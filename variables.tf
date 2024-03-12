@@ -123,7 +123,7 @@ variable "logic_app_subnet_delegation_cidr" {
 variable "weka_version" {
   type        = string
   description = "The Weka version to deploy."
-  default     = "4.2.8.66"
+  default     = "4.2.9-1"
 }
 
 variable "get_weka_io_token" {
@@ -327,7 +327,7 @@ variable "function_app_version" {
 variable "function_app_dist" {
   type        = string
   description = "Function app code dist"
-  default     = "dev"
+  default     = "release"
 
   validation {
     condition     = contains(["dev", "release"], var.function_app_dist)
