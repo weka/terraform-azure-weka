@@ -5,7 +5,7 @@ locals {
 
 resource "azurerm_storage_account" "deployment_sa" {
   count                    = var.deployment_storage_account_name == "" ? 1 : 0
-  name                     = "${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}deployment"
+  name                     = substr("${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}deployment", 0, 24)
   location                 = data.azurerm_resource_group.rg.location
   resource_group_name      = var.rg_name
   account_kind             = "StorageV2"
