@@ -1,5 +1,5 @@
 resource "azurerm_storage_account" "logicapp" {
-  name                     = "${var.prefix}${var.cluster_name}logicappsa"
+  name                     = substr("${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}logicappsa", 0, 24)
   resource_group_name      = var.rg_name
   location                 = local.location
   account_tier             = "Standard"
