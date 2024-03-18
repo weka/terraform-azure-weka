@@ -14,7 +14,7 @@ module "weka_deployment" {
   vnet_name                           = "vnet-name"
   vnet_rg_name                        = "vnet-rg-name"
   sg_id                               = "/subscriptions/../resourceGroups/../providers/Microsoft.Network/networkSecurityGroups/.."
-  install_weka_url                    = "https://wekatars.blob.core.windows.net/tars/weka-4.2.9-1.tar?<SAS_TOKEN>"
+  install_weka_url                    = "https://wekatars.blob.core.windows.net/tars/weka-4.2.9.28.tar?<SAS_TOKEN>"
   assign_public_ip                    = false
   cluster_size                        = 6
   tiering_enable_obs_integration      = true
