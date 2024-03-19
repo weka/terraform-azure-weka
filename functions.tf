@@ -18,7 +18,7 @@ locals {
   obs_scope                        = var.tiering_obs_name != "" ? "${data.azurerm_storage_account.obs_sa[0].id}/blobServices/default/containers/${local.obs_container_name}" : ""
   function_app_name                = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-function-app"
   install_weka_url                 = var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.weka.io/dist/v1/install/${var.weka_version}/${var.weka_version}"
-  supported_regions                = split("\n", chomp(file("${path.module}/supported_regions/${var.function_app_dist}.txt")))
+  supported_regions                = split("\n", replace(chomp(file("${path.module}/supported_regions/${var.function_app_dist}.txt")), "\r", ""))
 }
 
 resource "azurerm_log_analytics_workspace" "la_workspace" {
