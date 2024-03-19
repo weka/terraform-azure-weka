@@ -1409,6 +1409,13 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 		return
 	}
 
+	var ppgSubResource *armcompute.SubResource
+	if config.ProximityPlacementGroupID != nil {
+		ppgSubResource = &armcompute.SubResource{
+			ID: config.ProximityPlacementGroupID,
+		}
+	}
+
 	imageReference := &armcompute.ImageReference{}
 	sourceImageIdLower := strings.ToLower(config.SourceImageID)
 	if strings.HasPrefix(sourceImageIdLower, "/communitygalleries") {
@@ -1447,9 +1454,7 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 			ScaleInPolicy: &armcompute.ScaleInPolicy{
 				ForceDeletion: &forceDeletion,
 			},
-			ProximityPlacementGroup: &armcompute.SubResource{
-				ID: config.ProximityPlacementGroupID,
-			},
+			ProximityPlacementGroup: ppgSubResource,
 			VirtualMachineProfile: &armcompute.VirtualMachineScaleSetVMProfile{
 				OSProfile: &armcompute.VirtualMachineScaleSetOSProfile{
 					AdminUsername:      &config.AdminUsername,
