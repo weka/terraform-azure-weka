@@ -244,6 +244,46 @@ variable "containers_config_map" {
       nvme     = 8
       nics     = 8
       memory   = ["357GB", "384GB"]
+    },
+    Standard_L8as_v3 = {
+      compute  = 1
+      drive    = 1
+      frontend = 1
+      nvme     = 1
+      nics     = 4
+      memory   = ["29GB", "29GB"]
+    },
+    Standard_L16as_v3 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 2
+      nics     = 8
+      memory   = ["72GB", "73GB"]
+    },
+    Standard_L32as_v3 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 4
+      nics     = 8
+      memory   = ["190GB", "190GB"]
+    },
+    Standard_L48as_v3 = {
+      compute  = 3
+      drive    = 3
+      frontend = 1
+      nvme     = 6
+      nics     = 8
+      memory   = ["308GB", "308GB"]
+    },
+    Standard_L64as_v3 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 8
+      nics     = 8
+      memory   = ["384GB", "384GB"]
     }
   }
   validation {
