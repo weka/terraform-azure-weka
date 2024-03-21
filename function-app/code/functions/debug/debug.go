@@ -10,6 +10,8 @@ import (
 	"weka-deployment/functions/azure_functions_def"
 	clusterizeFunc "weka-deployment/functions/clusterize"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5"
+
 	"github.com/weka/go-cloud-lib/clusterize"
 	"github.com/weka/go-cloud-lib/logging"
 )
@@ -17,6 +19,7 @@ import (
 func Handler(w http.ResponseWriter, r *http.Request) {
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
+	stateBlobName := os.Getenv("STATE_BLOB_NAME")
 	clusterName := os.Getenv("CLUSTER_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
@@ -81,19 +84,30 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	logger.Info().Msgf("The requested function is %s", *function.Function)
 	var result interface{}
 
+	stateParams := common.BlobObjParams{
+		StorageName:   stateStorageName,
+		ContainerName: stateContainerName,
+		BlobName:      stateBlobName,
+	}
+
+	vmssParams := &common.ScaleSetParams{
+		SubscriptionId:    subscriptionId,
+		ResourceGroupName: resourceGroupName,
+		ScaleSetName:      vmScaleSetName,
+	}
+
 	if *function.Function == "clusterize" {
-		state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
+		state, err := common.ReadState(ctx, stateParams)
 		if err != nil {
 			result = clusterizeFunc.GetErrorScript(err)
 		} else {
 			params := clusterizeFunc.ClusterizationParams{
-				SubscriptionId:     subscriptionId,
-				ResourceGroupName:  resourceGroupName,
-				Location:           location,
-				Prefix:             prefix,
-				KeyVaultUri:        keyVaultUri,
-				StateContainerName: stateContainerName,
-				StateStorageName:   stateStorageName,
+				SubscriptionId:    subscriptionId,
+				ResourceGroupName: resourceGroupName,
+				Location:          location,
+				Prefix:            prefix,
+				KeyVaultUri:       keyVaultUri,
+				StateParams:       stateParams,
 				Cluster: clusterize.ClusterParams{
 					ClusterName: clusterName,
 					NvmesNum:    nvmesNum,
@@ -117,15 +131,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else if *function.Function == "instances" {
-		expand := "instanceView"
-		instances, err1 := common.GetScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, &expand)
+		expand := armcompute.ExpandTypeForListVMsInstanceView
+		instances, err1 := common.GetUniformScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, &expand)
 		if err1 != nil {
 			result = err1.Error()
 		} else {
 			result = instances
 		}
 	} else if *function.Function == "interfaces" {
-		interfaces, err1 := common.GetScaleSetVmsNetworkPrimaryNICs(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+		interfaces, err1 := common.GetScaleSetVmsNetworkPrimaryNICs(ctx, vmssParams, nil)
 		if err1 != nil {
 			result = err1.Error()
 		} else {
@@ -138,7 +152,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		ips, err1 := common.GetPublicIp(ctx, subscriptionId, resourceGroupName, vmScaleSetName, prefix, clusterName, *function.IpIndex)
+		ips, err1 := common.GetPublicIp(ctx, vmssParams, prefix, clusterName, *function.IpIndex)
 		if err1 != nil {
 			result = err1.Error()
 		} else {

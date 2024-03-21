@@ -14,18 +14,23 @@ import (
 func Handler(w http.ResponseWriter, r *http.Request) {
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
+	stateBlobName := os.Getenv("STATE_BLOB_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
 	prefix := os.Getenv("PREFIX")
 	clusterName := os.Getenv("CLUSTER_NAME")
+	nfsStateContainerName := os.Getenv("NFS_STATE_CONTAINER_NAME")
+	nfsStateBlobName := os.Getenv("NFS_STATE_BLOB_NAME")
+	nfsScaleSetName := os.Getenv("NFS_VMSS_NAME")
 
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
 
 	var invokeRequest common.InvokeRequest
 
-	var size struct {
-		Value *int `json:"value"`
+	var resizeReq struct {
+		Value    *int    `json:"value"`
+		Protocol *string `json:"protocol"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&invokeRequest); err != nil {
@@ -44,49 +49,66 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := json.Unmarshal([]byte(reqData["Body"].(string)), &size); err != nil {
+	if err := json.Unmarshal([]byte(reqData["Body"].(string)), &resizeReq); err != nil {
 		err = fmt.Errorf("cannot unmarshal the request body: %v", err)
 		logger.Error().Err(err).Send()
 		common.WriteErrorResponse(w, err)
 		return
 	}
-	if size.Value == nil {
+	if resizeReq.Value == nil {
 		err := fmt.Errorf("wrong request format. 'new_size' is required")
 		logger.Error().Err(err).Send()
 		common.WriteErrorResponse(w, err)
 		return
 	}
 
-	logger.Info().Msgf("The requested new size is %d", *size.Value)
+	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName)
+
+	stateParams := common.BlobObjParams{
+		StorageName:   stateStorageName,
+		ContainerName: stateContainerName,
+		BlobName:      stateBlobName,
+	}
+	isNFSProtocol := resizeReq.Protocol != nil && *resizeReq.Protocol == "nfs"
+	if isNFSProtocol {
+		stateParams.ContainerName = nfsStateContainerName
+		stateParams.BlobName = nfsStateBlobName
+
+		vmScaleSetName = nfsScaleSetName
+
+		logger = logger.WithStrValue("protocol", "nfs")
+	}
+
+	logger.Info().Msgf("The requested new size is %d", *resizeReq.Value)
 
 	minCusterSize := 6
-	if *size.Value < minCusterSize {
+	if *resizeReq.Value < minCusterSize && !isNFSProtocol {
 		err = fmt.Errorf("invalid size, minimal cluster size is %d", minCusterSize)
 		logger.Error().Err(err).Send()
 		common.WriteErrorResponse(w, err)
 		return
 	}
 
-	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName)
-	err = updateDesiredClusterSize(ctx, *size.Value, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName)
+	err = updateDesiredClusterSize(ctx, *resizeReq.Value, subscriptionId, resourceGroupName, vmScaleSetName, stateParams)
 	if err != nil {
 		logger.Error().Err(err).Send()
 		common.WriteErrorResponse(w, err)
 		return
 	}
 
-	msg := fmt.Sprintf("Updated the desired cluster size to %d successfully", *size.Value)
+	msg := fmt.Sprintf("Updated the desired cluster size to %d successfully", *resizeReq.Value)
+	logger.Info().Msg(msg)
 	common.WriteSuccessResponse(w, msg)
 }
 
-func updateDesiredClusterSize(ctx context.Context, newSize int, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName string) error {
-	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
+func updateDesiredClusterSize(ctx context.Context, newSize int, subscriptionId, resourceGroupName, vmScaleSetName string, stateParams common.BlobObjParams) error {
+	state, err := common.ReadState(ctx, stateParams)
 	if err != nil {
 		return err
 	}
 
 	if !state.Clusterized {
-		err = fmt.Errorf("weka cluster is not ready")
+		err = fmt.Errorf("weka cluster is not ready (vmss: %s)", vmScaleSetName)
 		logger := logging.LoggerFromCtx(ctx)
 		logger.Error().Err(err).Send()
 		return err
@@ -94,7 +116,7 @@ func updateDesiredClusterSize(ctx context.Context, newSize int, subscriptionId, 
 	oldSize := state.DesiredSize
 	state.DesiredSize = newSize
 
-	err = common.WriteState(ctx, stateStorageName, stateContainerName, state)
+	err = common.WriteState(ctx, stateParams, state)
 	if err != nil {
 		err = fmt.Errorf("cannot update state to %d: %v", newSize, err)
 		return err

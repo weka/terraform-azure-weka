@@ -21,6 +21,8 @@ locals {
   log_analytics_workspace_id  = var.enable_application_insights ? var.log_analytics_workspace_id == "" ? azurerm_log_analytics_workspace.la_workspace[0].id : var.log_analytics_workspace_id : ""
   application_insights_id     = var.enable_application_insights ? var.application_insights_name == "" ? azurerm_application_insights.application_insights[0].id : data.azurerm_application_insights.application_insights[0].id : ""
   insights_instrumenation_key = var.enable_application_insights ? var.application_insights_name == "" ? azurerm_application_insights.application_insights[0].instrumentation_key : data.azurerm_application_insights.application_insights[0].instrumentation_key : ""
+  # nfs autoscaling
+  nfs_deployment_container_name = var.nfs_deployment_container_name == "" ? azurerm_storage_container.nfs_deployment[0].name : var.nfs_deployment_container_name
 }
 
 resource "azurerm_log_analytics_workspace" "la_workspace" {
@@ -146,6 +148,7 @@ resource "azurerm_linux_function_app" "function_app" {
     "APPINSIGHTS_INSTRUMENTATIONKEY" = local.insights_instrumenation_key
     "STATE_STORAGE_NAME"             = local.deployment_storage_account_name
     "STATE_CONTAINER_NAME"           = local.deployment_container_name
+    "STATE_BLOB_NAME"                = "state"
     "HOSTS_NUM"                      = var.cluster_size
     "CLUSTER_NAME"                   = var.cluster_name
     "PROTECTION_LEVEL"               = var.protection_level
@@ -164,6 +167,7 @@ resource "azurerm_linux_function_app" "function_app" {
     COMPUTE_CONTAINER_CORES_NUM      = var.set_dedicated_fe_container == false ? var.containers_config_map[var.instance_type].compute + 1 : var.containers_config_map[var.instance_type].compute
     FRONTEND_CONTAINER_CORES_NUM     = var.set_dedicated_fe_container == false ? 0 : var.containers_config_map[var.instance_type].frontend
     COMPUTE_MEMORY                   = var.containers_config_map[var.instance_type].memory[local.get_compute_memory_index]
+    DISK_SIZE                        = local.disk_size
     "NVMES_NUM"                      = var.containers_config_map[var.instance_type].nvme
     "TIERING_SSD_PERCENT"            = var.tiering_enable_ssd_percent
     "PREFIX"                         = var.prefix
@@ -186,6 +190,18 @@ resource "azurerm_linux_function_app" "function_app" {
     HASH                        = var.function_app_version
     WEBSITE_RUN_FROM_PACKAGE    = "https://${local.weka_sa}.blob.core.windows.net/${local.weka_sa_container}/${local.function_app_zip_name}"
     WEBSITE_VNET_ROUTE_ALL      = true
+
+    NFS_STATE_CONTAINER_NAME          = local.nfs_deployment_container_name
+    NFS_STATE_BLOB_NAME               = "nfs_state"
+    NFS_INTERFACE_GROUP_NAME          = var.nfs_interface_group_name
+    NFS_CLIENT_GROUP_NAME             = var.nfs_client_group_name
+    NFS_SECONDARY_IPS_NUM             = var.nfs_protocol_gateway_secondary_ips_per_nic
+    NFS_PROTOCOL_GATEWAY_FE_CORES_NUM = var.nfs_protocol_gateway_fe_cores_num
+    NFS_PROTOCOL_GATEWAYS_NUM         = var.nfs_protocol_gateways_number
+    NFS_VMSS_NAME                     = var.nfs_protocol_gateways_number > 0 ? "${var.prefix}-${var.cluster_name}-nfs-protocol-gateway-vmss" : ""
+    # TODO: do not use disk size for getting device name
+    NFS_DISK_SIZE = var.nfs_protocol_gateway_disk_size + 10 * var.nfs_protocol_gateway_fe_cores_num
+    BACKEND_LB_IP = var.create_lb ? azurerm_lb.backend_lb[0].private_ip_address : ""
   }
 
   identity {

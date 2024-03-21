@@ -9,6 +9,8 @@ resource "azurerm_user_assigned_identity" "this" {
   location            = data.azurerm_resource_group.rg.location
   name                = "${var.clients_name}-identity"
   resource_group_name = data.azurerm_resource_group.rg.name
+
+  depends_on = [azurerm_role_definition.nics_reader]
 }
 
 resource "azurerm_role_definition" "nics_reader" {

@@ -65,30 +65,6 @@ variable "gateways_name" {
   type        = string
   description = "The protocol group name."
 }
-
-variable "interface_group_name" {
-  type        = string
-  description = "Interface group name."
-  default     = "weka-ig"
-
-  validation {
-    condition     = length(var.interface_group_name) <= 11
-    error_message = "The interface group name should be up to 11 characters long."
-  }
-}
-
-variable "client_group_name" {
-  type        = string
-  description = "Client access group name."
-  default     = "weka-cg"
-}
-
-variable "backend_lb_ip" {
-  type        = string
-  description = "The backend load balancer ip address."
-  default     = ""
-}
-
 variable "vm_username" {
   type        = string
   description = "The user name for logging in to the virtual machines."
@@ -150,15 +126,6 @@ variable "frontend_container_cores_num" {
   }
 }
 
-variable "install_weka_url" {
-  type        = string
-  description = "The URL of the Weka release download tar file."
-
-  validation {
-    condition     = length(var.install_weka_url) > 0
-    error_message = "The URL should not be empty."
-  }
-}
 variable "key_vault_url" {
   type        = string
   description = "The URL of the Azure Key Vault."
@@ -222,4 +189,19 @@ variable "vm_identity_name" {
   type        = string
   description = "The name of the user assigned identity for the protocol gateway VMs."
   default     = ""
+}
+
+variable "deploy_function_url" {
+  type        = string
+  description = "The URL of deploy function from function app."
+}
+
+variable "report_function_url" {
+  type        = string
+  description = "The URL of report function from function app."
+}
+
+variable "function_app_default_key" {
+  type        = string
+  description = "The default key of the function app."
 }

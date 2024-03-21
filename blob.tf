@@ -128,3 +128,32 @@ resource "azurerm_storage_blob" "vmss_config" {
     azurerm_proximity_placement_group.ppg, azurerm_lb_rule.backend_lb_rule, azurerm_lb_rule.ui_lb_rule
   ]
 }
+
+# state for protocols
+resource "azurerm_storage_container" "nfs_deployment" {
+  count                 = var.nfs_deployment_container_name == "" ? 1 : 0
+  name                  = "${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}-protocol-deployment"
+  storage_account_name  = local.deployment_storage_account_name
+  container_access_type = "private"
+  depends_on            = [azurerm_storage_account.deployment_sa]
+}
+
+resource "azurerm_storage_blob" "nfs_state" {
+  count                  = var.nfs_protocol_gateways_number > 0 ? 1 : 0
+  name                   = "nfs_state"
+  storage_account_name   = local.deployment_storage_account_name
+  storage_container_name = local.nfs_deployment_container_name
+  type                   = "Block"
+  source_content = jsonencode({
+    initial_size          = var.nfs_protocol_gateways_number
+    desired_size          = var.nfs_protocol_gateways_number
+    instances             = []
+    clusterized           = false
+    clusterization_target = var.nfs_protocol_gateways_number
+  })
+  depends_on = [azurerm_storage_container.nfs_deployment]
+
+  lifecycle {
+    ignore_changes = all
+  }
+}
