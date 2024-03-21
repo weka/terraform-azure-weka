@@ -11,7 +11,8 @@ import (
 )
 
 type RequestBody struct {
-	Name string `json:"name"`
+	Name     string `json:"name"`
+	Protocol string `json:"protocol"`
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -48,9 +49,22 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
 	prefix := os.Getenv("PREFIX")
 	clusterName := os.Getenv("CLUSTER_NAME")
-	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName)
+	nfsScaleSetName := os.Getenv("NFS_VMSS_NAME")
 
-	err = common.SetDeletionProtection(ctx, subscriptionId, resourceGroupName, vmScaleSetName, common.GetScaleSetVmIndex(data.Name), true)
+	vmssParams := &common.ScaleSetParams{
+		SubscriptionId:    subscriptionId,
+		ResourceGroupName: resourceGroupName,
+		ScaleSetName:      common.GetVmScaleSetName(prefix, clusterName),
+		Flexible:          false,
+	}
+	if data.Protocol == "nfs" {
+		vmssParams.ScaleSetName = nfsScaleSetName
+		vmssParams.Flexible = true
+	}
+
+	instanceId := common.GetScaleSetVmIndex(data.Name, vmssParams.Flexible)
+
+	err = common.SetDeletionProtection(ctx, vmssParams, instanceId, true)
 	if err != nil {
 		err = fmt.Errorf("cannot set deletion protection: %w", err)
 		logger.Error().Err(err).Send()

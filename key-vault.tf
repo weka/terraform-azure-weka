@@ -104,7 +104,6 @@ resource "random_password" "weka_password" {
   min_upper   = 1
   numeric     = true
   min_numeric = 1
-  special     = false
 }
 
 resource "azurerm_key_vault_secret" "weka_password_secret" {

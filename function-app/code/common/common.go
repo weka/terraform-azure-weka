@@ -47,6 +47,12 @@ type InvokeResponse struct {
 	ReturnValue interface{}
 }
 
+type BlobObjParams struct {
+	StorageName   string
+	ContainerName string
+	BlobName      string
+}
+
 const FindDrivesScript = `
 import json
 import sys
@@ -191,7 +197,7 @@ func UnlockContainer(ctx context.Context, storageAccountName, containerName stri
 	return err
 }
 
-func ReadBlobObject(ctx context.Context, storageName, containerName, blobName string) (state []byte, err error) {
+func ReadBlobObject(ctx context.Context, bl BlobObjParams) (state []byte, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := getCredential(ctx)
@@ -199,13 +205,13 @@ func ReadBlobObject(ctx context.Context, storageName, containerName, blobName st
 		return
 	}
 
-	blobClient, err := azblob.NewClient(getBlobUrl(storageName), credential, nil)
+	blobClient, err := azblob.NewClient(getBlobUrl(bl.StorageName), credential, nil)
 	if err != nil {
 		logger.Error().Msgf("azblob.NewClient: %s", err)
 		return
 	}
 
-	downloadResponse, err := blobClient.DownloadStream(ctx, containerName, blobName, nil)
+	downloadResponse, err := blobClient.DownloadStream(ctx, bl.ContainerName, bl.BlobName, nil)
 	if err != nil {
 		logger.Error().Msgf("blobClient.DownloadStream: %s", err)
 		return
@@ -220,10 +226,10 @@ func ReadBlobObject(ctx context.Context, storageName, containerName, blobName st
 
 }
 
-func ReadState(ctx context.Context, stateStorageName, containerName string) (state protocol.ClusterState, err error) {
+func ReadState(ctx context.Context, stateParams BlobObjParams) (state protocol.ClusterState, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	stateAsByteArray, err := ReadBlobObject(ctx, stateStorageName, containerName, "state")
+	stateAsByteArray, err := ReadBlobObject(ctx, stateParams)
 	if err != nil {
 		return
 	}
@@ -236,7 +242,7 @@ func ReadState(ctx context.Context, stateStorageName, containerName string) (sta
 	return
 }
 
-func WriteBlobObject(ctx context.Context, storageName, containerName, blobName string, state []byte) (err error) {
+func WriteBlobObject(ctx context.Context, bl BlobObjParams, state []byte) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := getCredential(ctx)
@@ -244,19 +250,19 @@ func WriteBlobObject(ctx context.Context, storageName, containerName, blobName s
 		return
 	}
 
-	blobClient, err := azblob.NewClient(getBlobUrl(storageName), credential, nil)
+	blobClient, err := azblob.NewClient(getBlobUrl(bl.StorageName), credential, nil)
 	if err != nil {
 		logger.Error().Err(err).Send()
 		return
 	}
 
-	_, err = blobClient.UploadBuffer(ctx, containerName, blobName, state, &azblob.UploadBufferOptions{})
+	_, err = blobClient.UploadBuffer(ctx, bl.ContainerName, bl.BlobName, state, &azblob.UploadBufferOptions{})
 
 	return
 
 }
 
-func WriteState(ctx context.Context, stateStorageName, containerName string, state protocol.ClusterState) (err error) {
+func WriteState(ctx context.Context, stateParams BlobObjParams, state protocol.ClusterState) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	stateAsByteArray, err := json.Marshal(state)
@@ -265,7 +271,7 @@ func WriteState(ctx context.Context, stateStorageName, containerName string, sta
 		return
 	}
 
-	err = WriteBlobObject(ctx, stateStorageName, containerName, "state", stateAsByteArray)
+	err = WriteBlobObject(ctx, stateParams, stateAsByteArray)
 	return
 }
 
@@ -285,16 +291,16 @@ func (e *ShutdownRequired) Error() string {
 	return e.Message
 }
 
-func AddInstanceToState(ctx context.Context, subscriptionId, resourceGroupName, stateStorageName, stateContainerName, newInstance string) (state protocol.ClusterState, err error) {
+func AddInstanceToState(ctx context.Context, subscriptionId, resourceGroupName string, stateParams BlobObjParams, newInstance protocol.Vm) (state protocol.ClusterState, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	leaseId, err := LockContainer(ctx, stateStorageName, stateContainerName)
+	leaseId, err := LockContainer(ctx, stateParams.StorageName, stateParams.ContainerName)
 	if err != nil {
 		return
 	}
-	defer UnlockContainer(ctx, stateStorageName, stateContainerName, leaseId)
+	defer UnlockContainer(ctx, stateParams.StorageName, stateParams.ContainerName, leaseId)
 
-	state, err = ReadState(ctx, stateStorageName, stateContainerName)
+	state, err = ReadState(ctx, stateParams)
 	if err != nil {
 		return
 	}
@@ -312,29 +318,29 @@ func AddInstanceToState(ctx context.Context, subscriptionId, resourceGroupName, 
 		logger.Error().Err(err).Send()
 	} else {
 		state.Instances = append(state.Instances, newInstance)
-		err = WriteState(ctx, stateStorageName, stateContainerName, state)
+		err = WriteState(ctx, stateParams, state)
 	}
 	return
 }
 
-func UpdateClusterized(ctx context.Context, subscriptionId, resourceGroupName, stateStorageName, stateContainerName string) (state protocol.ClusterState, err error) {
+func UpdateClusterized(ctx context.Context, subscriptionId, resourceGroupName string, stateParams BlobObjParams) (state protocol.ClusterState, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	leaseId, err := LockContainer(ctx, stateStorageName, stateContainerName)
+	leaseId, err := LockContainer(ctx, stateParams.StorageName, stateParams.ContainerName)
 	if err != nil {
 		return
 	}
-	defer UnlockContainer(ctx, stateStorageName, stateContainerName, leaseId)
+	defer UnlockContainer(ctx, stateParams.StorageName, stateParams.ContainerName, leaseId)
 
-	state, err = ReadState(ctx, stateStorageName, stateContainerName)
+	state, err = ReadState(ctx, stateParams)
 	if err != nil {
 		return
 	}
 
-	state.Instances = []string{}
+	state.Instances = []protocol.Vm{}
 	state.Clusterized = true
 
-	err = WriteState(ctx, stateStorageName, stateContainerName, state)
+	err = WriteState(ctx, stateParams, state)
 
 	logger.Info().Msg("State updated to 'clusterized'")
 	return
@@ -480,9 +486,9 @@ func GetKeyVaultValue(ctx context.Context, keyVaultUri, secretName string) (secr
 	return
 }
 
-// Gets all network interfaces in a VM scale set
+// Gets all network interfaces in a VM scale set (Uniform)
 // see https://learn.microsoft.com/en-us/rest/api/virtualnetwork/network-interface-in-vm-ss/list-virtual-machine-scale-set-network-interfaces
-func getScaleSetVmsNetworkInterfaces(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (networkInterfaces []*armnetwork.Interface, err error) {
+func getUniformScaleSetVmsNetworkInterfaces(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (networkInterfaces []*armnetwork.Interface, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := getCredential(ctx)
@@ -509,9 +515,65 @@ func getScaleSetVmsNetworkInterfaces(ctx context.Context, subscriptionId, resour
 	return
 }
 
-func GetScaleSetVmsNetworkPrimaryNICs(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (networkInterfaces []*armnetwork.Interface, err error) {
-	nics, err := getScaleSetVmsNetworkInterfaces(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+func getFlexibleScaleSetVmsNetworkInterfaces(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, onlyPrimary bool, vms []*VMInfoSummary) (networkInterfaces []*armnetwork.Interface, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	if vms == nil {
+		azVms, err := getFlexibleScaleSetVms(ctx, subscriptionId, resourceGroupName, vmScaleSetName, nil)
+		if err != nil {
+			err = fmt.Errorf("cannot get scale set vms: %v", err)
+			logger.Error().Err(err).Send()
+			return nil, err
+		}
+		vms = VMsToVmInfoSummary(azVms)
+	}
+
+	nicIds := make([]string, 0)
+	for _, vm := range vms {
+		if vm.NetworkProfile != nil && vm.NetworkProfile.NetworkInterfaces != nil {
+			for _, nic := range vm.NetworkProfile.NetworkInterfaces {
+				if onlyPrimary && nic.Properties.Primary == nil || !*nic.Properties.Primary {
+					continue
+				}
+				nicIds = append(nicIds, *nic.ID)
+			}
+		}
+	}
+
+	credential, err := getCredential(ctx)
 	if err != nil {
+		logger.Error().Err(err).Send()
+		return nil, err
+	}
+
+	client, err := armnetwork.NewInterfacesClient(subscriptionId, credential, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return nil, err
+	}
+
+	for _, nicId := range nicIds {
+		nicIdParts := strings.Split(nicId, "/")
+		nicName := nicIdParts[len(nicIdParts)-1]
+		resp, err := client.Get(ctx, resourceGroupName, nicName, nil)
+		if err != nil {
+			logger.Error().Err(err).Send()
+			return nil, err
+		}
+		networkInterfaces = append(networkInterfaces, &resp.Interface)
+	}
+	return
+}
+
+func GetScaleSetVmsNetworkPrimaryNICs(ctx context.Context, vmssParams *ScaleSetParams, forVms []*VMInfoSummary) (networkInterfaces []*armnetwork.Interface, err error) {
+	var nics []*armnetwork.Interface
+	if vmssParams.Flexible {
+		nics, err = getFlexibleScaleSetVmsNetworkInterfaces(ctx, vmssParams.SubscriptionId, vmssParams.ResourceGroupName, vmssParams.ScaleSetName, true, forVms)
+	} else {
+		nics, err = getUniformScaleSetVmsNetworkInterfaces(ctx, vmssParams.SubscriptionId, vmssParams.ResourceGroupName, vmssParams.ScaleSetName)
+	}
+	if err != nil {
+		err = fmt.Errorf("cannot get scale set vms network interfaces: %v", err)
 		return nil, err
 	}
 
@@ -528,21 +590,52 @@ func GetScaleSetVmsNetworkPrimaryNICs(ctx context.Context, subscriptionId, resou
 	return
 }
 
-func GetPublicIp(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, prefix, clusterName, instanceIndex string) (publicIp string, err error) {
+func GetScaleSetSecondaryIps(ctx context.Context, vmssParams *ScaleSetParams) (secondaryIps []string, err error) {
+	var nics []*armnetwork.Interface
+	if vmssParams.Flexible {
+		nics, err = getFlexibleScaleSetVmsNetworkInterfaces(ctx, vmssParams.SubscriptionId, vmssParams.ResourceGroupName, vmssParams.ScaleSetName, false, nil)
+	} else {
+		nics, err = getUniformScaleSetVmsNetworkInterfaces(ctx, vmssParams.SubscriptionId, vmssParams.ResourceGroupName, vmssParams.ScaleSetName)
+	}
+	if err != nil {
+		err = fmt.Errorf("cannot get scale set vms network interfaces: %v", err)
+		return nil, err
+	}
+
+	for _, nic := range nics {
+		if nic.Properties == nil || nic.Properties.VirtualMachine == nil || len(nic.Properties.IPConfigurations) < 1 {
+			continue
+		}
+		for _, ipConfig := range nic.Properties.IPConfigurations {
+			isPrimary := ipConfig.Properties.Primary != nil && *ipConfig.Properties.Primary
+			if !isPrimary && ipConfig.Properties.PrivateIPAddress != nil {
+				secondaryIps = append(secondaryIps, *ipConfig.Properties.PrivateIPAddress)
+			}
+		}
+	}
+	return
+}
+
+func GetPublicIp(ctx context.Context, vmssParams *ScaleSetParams, prefix, clusterName, instanceIndex string) (publicIp string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
+
+	if vmssParams.Flexible {
+		err = errors.New("ignore getting public ip for flexible scale set VM")
+		return
+	}
 
 	credential, err := getCredential(ctx)
 	if err != nil {
 		return
 	}
 
-	client, err := armnetwork.NewPublicIPAddressesClient(subscriptionId, credential, nil)
+	client, err := armnetwork.NewPublicIPAddressesClient(vmssParams.SubscriptionId, credential, nil)
 	if err != nil {
 		logger.Error().Err(err).Send()
 		return
 	}
-	interfaceName := fmt.Sprintf("%s-%s-backend-nic", prefix, clusterName)
-	pager := client.NewListVirtualMachineScaleSetVMPublicIPAddressesPager(resourceGroupName, vmScaleSetName, instanceIndex, interfaceName, "ipconfig1", nil)
+	interfaceName := fmt.Sprintf("%s-%s-backend-nic-0", prefix, clusterName)
+	pager := client.NewListVirtualMachineScaleSetVMPublicIPAddressesPager(vmssParams.ResourceGroupName, vmssParams.ScaleSetName, instanceIndex, interfaceName, "ipconfig0", nil)
 
 	for pager.More() {
 		nextResult, err1 := pager.NextPage(ctx)
@@ -553,16 +646,17 @@ func GetPublicIp(ctx context.Context, subscriptionId, resourceGroupName, vmScale
 		publicIp = *nextResult.Value[0].Properties.IPAddress
 		return
 	}
+
 	return
 }
 
-func GetVmsPrivateIps(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (vmsPrivateIps map[string]string, err error) {
+func GetVmsPrivateIps(ctx context.Context, vmssParams *ScaleSetParams) (vmsPrivateIps map[string]string, err error) {
 	//returns compute_name to private ip map
 
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("fetching scale set vms private ips")
 
-	networkInterfaces, err := GetScaleSetVmsNetworkPrimaryNICs(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	networkInterfaces, err := GetScaleSetVmsNetworkPrimaryNICs(ctx, vmssParams, nil)
 	if err != nil {
 		return
 	}
@@ -823,9 +917,18 @@ func GetScaleSetInfo(ctx context.Context, subscriptionId, resourceGroupName, vmS
 	return &scaleSetInfo, err
 }
 
+func GetScaleSetInstances(ctx context.Context, vmssParams *ScaleSetParams) (vms []*VMInfoSummary, err error) {
+	if vmssParams.Flexible {
+		vms, err = GetFlexibleScaleSetInstances(ctx, vmssParams.SubscriptionId, vmssParams.ResourceGroupName, vmssParams.ScaleSetName, nil)
+	} else {
+		vms, err = GetUniformScaleSetInstances(ctx, vmssParams.SubscriptionId, vmssParams.ResourceGroupName, vmssParams.ScaleSetName, nil)
+	}
+	return
+}
+
 // Gets a list of all VMs in a scale set
 // see https://learn.microsoft.com/en-us/rest/api/compute/virtual-machine-scale-set-vms/list
-func GetScaleSetInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, expand *string) (vms []*armcompute.VirtualMachineScaleSetVM, err error) {
+func GetUniformScaleSetInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, expand *armcompute.ExpandTypeForListVMs) (vms []*VMInfoSummary, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := getCredential(ctx)
@@ -839,9 +942,14 @@ func GetScaleSetInstances(ctx context.Context, subscriptionId, resourceGroupName
 		return
 	}
 
+	var expandStr *string
+	if expand != nil {
+		expandStr = (*string)(expand)
+	}
+
 	pager := client.NewListPager(
 		resourceGroupName, vmScaleSetName, &armcompute.VirtualMachineScaleSetVMsClientListOptions{
-			Expand: expand,
+			Expand: expandStr,
 		})
 
 	for pager.More() {
@@ -851,14 +959,97 @@ func GetScaleSetInstances(ctx context.Context, subscriptionId, resourceGroupName
 			logger.Error().Err(err).Send()
 			return nil, err
 		}
-		vms = append(vms, nextResult.Value...)
+		vmsSummary := UniformVmssVMsToVmInfoSummary(nextResult.Value)
+		vms = append(vms, vmsSummary...)
 	}
 	return
 }
 
-type ScaleSetInstanceInfo struct {
-	Id        string
-	PrivateIp string
+func GetFlexibleScaleSetInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, expand *armcompute.ExpandTypeForListVMs) (vms []*VMInfoSummary, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	azVMs, err := getFlexibleScaleSetVms(ctx, subscriptionId, resourceGroupName, vmScaleSetName, expand)
+	if err != nil {
+		return
+	}
+	vms = VMsToVmInfoSummary(azVMs)
+
+	vmNamesToVms := make(map[string]*VMInfoSummary, len(vms))
+	for _, vm := range vms {
+		vmNamesToVms[vm.Name] = vm
+	}
+
+	// fetch vms ids along with protection policy info (can only be fethced via VMSS VMs client)
+	credential, err := getCredential(ctx)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	client, err := armcompute.NewVirtualMachineScaleSetVMsClient(subscriptionId, credential, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	vmssVmPager := client.NewListPager(resourceGroupName, vmScaleSetName, nil)
+	for vmssVmPager.More() {
+		nextResult, err := vmssVmPager.NextPage(ctx)
+		if err != nil {
+			err = fmt.Errorf("cannot get scale set %s vms: %v", vmScaleSetName, err)
+			logger.Error().Err(err).Send()
+			return nil, err
+		}
+		for _, vmssVm := range nextResult.Value {
+			vmName := *vmssVm.Name
+			vm, ok := vmNamesToVms[vmName]
+			if ok {
+				if vmssVm.Properties != nil && vmssVm.Properties.ProtectionPolicy != nil {
+					vm.ProtectionPolicy = vmssVm.Properties.ProtectionPolicy
+				}
+			} else {
+				err = fmt.Errorf("cannot find vm %s from the flexible scale set %s", vmName, vmScaleSetName)
+				logger.Error().Err(err).Send()
+				return nil, err
+			}
+		}
+	}
+	return
+}
+
+func getFlexibleScaleSetVms(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, expand *armcompute.ExpandTypeForListVMs) (vms []*armcompute.VirtualMachine, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msg("fetching flexible scale set vms")
+
+	credential, err := getCredential(ctx)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	client, err := armcompute.NewVirtualMachinesClient(subscriptionId, credential, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	filter := fmt.Sprintf("'virtualMachineScaleSet/id' eq '/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachineScaleSets/%s'", subscriptionId, resourceGroupName, vmScaleSetName)
+	options := &armcompute.VirtualMachinesClientListOptions{
+		Filter: &filter,
+		Expand: expand,
+	}
+
+	pager := client.NewListPager(resourceGroupName, options)
+	for pager.More() {
+		nextResult, err := pager.NextPage(ctx)
+		if err != nil {
+			err = fmt.Errorf("cannot get flexible scale set %s vms: %v", vmScaleSetName, err)
+			logger.Error().Err(err).Send()
+			return nil, err
+		}
+		vms = append(vms, nextResult.Value...)
+	}
+	return
 }
 
 func GetScaleSetVmId(resourceId string) string {
@@ -868,11 +1059,16 @@ func GetScaleSetVmId(resourceId string) string {
 	return vmId
 }
 
-func GetScaleSetInstancesInfo(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (instances []ScaleSetInstanceInfo, err error) {
+func GetScaleSetInstancesInfo(ctx context.Context, vmssParams *ScaleSetParams) (instances []protocol.HgInstance, err error) {
 	logger := logging.LoggerFromCtx(ctx)
-	logger.Info().Msgf("Getting scale set instances %s info", vmScaleSetName)
+	logger.Info().Msgf("Getting scale set instances %s info", vmssParams.ScaleSetName)
 
-	netInterfaces, err := GetScaleSetVmsNetworkPrimaryNICs(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	vms, err := GetScaleSetInstances(ctx, vmssParams)
+	if err != nil {
+		return
+	}
+
+	netInterfaces, err := GetScaleSetVmsNetworkPrimaryNICs(ctx, vmssParams, vms)
 	if err != nil {
 		return
 	}
@@ -884,18 +1080,14 @@ func GetScaleSetInstancesInfo(ctx context.Context, subscriptionId, resourceGroup
 		instanceIdPrivateIp[id] = privateIp
 	}
 
-	vms, err := GetScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, nil)
-	if err != nil {
-		return
-	}
 	for _, vm := range vms {
-		id := GetScaleSetVmId(*vm.ID)
+		id := GetScaleSetVmId(vm.ID)
 		// get private ip if exists
 		var privateIp string
 		if val, ok := instanceIdPrivateIp[id]; ok {
 			privateIp = val
 		}
-		instanceInfo := ScaleSetInstanceInfo{
+		instanceInfo := protocol.HgInstance{
 			Id:        id,
 			PrivateIp: privateIp,
 		}
@@ -904,12 +1096,17 @@ func GetScaleSetInstancesInfo(ctx context.Context, subscriptionId, resourceGroup
 	return
 }
 
-func GetScaleSetVmIndex(vmName string) string {
+func GetScaleSetVmIndex(vmName string, flexible bool) string {
+	if flexible {
+		// In flexible scale sets, the vm 'name' is same as 'instanceId'
+		return vmName
+	}
 	instanceNameParts := strings.Split(vmName, "_")
 	return instanceNameParts[len(instanceNameParts)-1]
 }
 
-func SetDeletionProtection(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, instanceId string, protect bool) (err error) {
+// NOTE: works both for Uniform and Flexible scale sets
+func SetDeletionProtection(ctx context.Context, vmssParams *ScaleSetParams, instanceId string, protect bool) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("Setting deletion protection: %t on instanceId %s", protect, instanceId)
 
@@ -918,7 +1115,7 @@ func SetDeletionProtection(ctx context.Context, subscriptionId, resourceGroupNam
 		return
 	}
 
-	client, err := armcompute.NewVirtualMachineScaleSetVMsClient(subscriptionId, credential, nil)
+	client, err := armcompute.NewVirtualMachineScaleSetVMsClient(vmssParams.SubscriptionId, credential, nil)
 	if err != nil {
 		logger.Error().Err(err).Send()
 		return
@@ -926,8 +1123,8 @@ func SetDeletionProtection(ctx context.Context, subscriptionId, resourceGroupNam
 
 	_, err = client.BeginUpdate(
 		ctx,
-		resourceGroupName,
-		vmScaleSetName,
+		vmssParams.ResourceGroupName,
+		vmssParams.ScaleSetName,
 		instanceId,
 		armcompute.VirtualMachineScaleSetVM{
 			Properties: &armcompute.VirtualMachineScaleSetVMProperties{
@@ -942,18 +1139,18 @@ func SetDeletionProtection(ctx context.Context, subscriptionId, resourceGroupNam
 }
 
 func RetrySetDeletionProtectionAndReport(
-	ctx context.Context, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, vmScaleSetName, instanceId, hostName string,
+	ctx context.Context, vmssParams *ScaleSetParams, stateParams BlobObjParams, instanceId, hostName string,
 	maxAttempts int, sleepInterval time.Duration,
 ) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("Setting deletion protection on %s", hostName)
 	counter := 0
 	for {
-		err = SetDeletionProtection(ctx, subscriptionId, resourceGroupName, vmScaleSetName, instanceId, true)
+		err = SetDeletionProtection(ctx, vmssParams, instanceId, true)
 		if err == nil {
 			msg := "Deletion protection was set successfully"
 			logger.Info().Msg(msg)
-			ReportMsg(ctx, hostName, stateContainerName, stateStorageName, "progress", msg)
+			ReportMsg(ctx, hostName, stateParams, "progress", msg)
 			break
 		}
 
@@ -962,7 +1159,7 @@ func RetrySetDeletionProtectionAndReport(
 			// deletion protection invoked by terminate function
 			if maxAttempts == 0 {
 				msg := "Deletion protection set authorization isn't ready, will retry on next scale down workflow"
-				ReportMsg(ctx, hostName, stateContainerName, stateStorageName, "debug", msg)
+				ReportMsg(ctx, hostName, stateParams, "debug", msg)
 				return
 			}
 
@@ -971,7 +1168,7 @@ func RetrySetDeletionProtectionAndReport(
 			}
 			msg := fmt.Sprintf("Deletion protection set authorization isn't ready, going to sleep for %s", sleepInterval)
 			logger.Info().Msg(msg)
-			ReportMsg(ctx, hostName, stateContainerName, stateStorageName, "debug", msg)
+			ReportMsg(ctx, hostName, stateParams, "debug", msg)
 			time.Sleep(sleepInterval)
 		} else {
 			break
@@ -979,14 +1176,14 @@ func RetrySetDeletionProtectionAndReport(
 	}
 	if err != nil {
 		logger.Error().Err(err).Send()
-		ReportMsg(ctx, hostName, stateContainerName, stateStorageName, "error", err.Error())
+		ReportMsg(ctx, hostName, stateParams, "error", err.Error())
 	}
 	return
 }
 
-func ReportMsg(ctx context.Context, hostName, stateContainerName, stateStorageName, reportType, message string) {
+func ReportMsg(ctx context.Context, hostName string, stateParams BlobObjParams, reportType, message string) {
 	reportObj := protocol.Report{Type: reportType, Hostname: hostName, Message: message}
-	_ = UpdateStateReporting(ctx, stateContainerName, stateStorageName, reportObj)
+	_ = UpdateStateReporting(ctx, stateParams, reportObj)
 }
 
 func GetWekaClusterPassword(ctx context.Context, keyVaultUri string) (password string, err error) {
@@ -995,19 +1192,6 @@ func GetWekaClusterPassword(ctx context.Context, keyVaultUri string) (password s
 
 func GetVmScaleSetName(prefix, clusterName string) string {
 	return fmt.Sprintf("%s-%s-vmss", prefix, clusterName)
-}
-
-func GetScaleSetInstanceIds(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (instanceIds []string, err error) {
-	vms, err := GetScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, nil)
-	if err != nil {
-		return
-	}
-
-	for _, vm := range vms {
-		instanceIds = append(instanceIds, GetScaleSetVmId(*vm.ID))
-	}
-
-	return
 }
 
 type InstanceIdsSet map[string]types.Nilt
@@ -1020,14 +1204,14 @@ func GetInstanceIpsSet(scaleResponse protocol.ScaleResponse) InstanceIdsSet {
 	return instanceIpsSet
 }
 
-func FilterSpecificScaleSetInstances(ctx context.Context, allVms []*armcompute.VirtualMachineScaleSetVM, instanceIds []string) (vms []*armcompute.VirtualMachineScaleSetVM, err error) {
+func FilterSpecificScaleSetInstances(ctx context.Context, allVms []*VMInfoSummary, instanceIds []string) (vms []*VMInfoSummary, err error) {
 	instanceIdsSet := make(InstanceIdsSet)
 	for _, instanceId := range instanceIds {
 		instanceIdsSet[instanceId] = types.Nilv
 	}
 
 	for _, vm := range allVms {
-		if _, ok := instanceIdsSet[GetScaleSetVmId(*vm.ID)]; ok {
+		if _, ok := instanceIdsSet[GetScaleSetVmId(vm.ID)]; ok {
 			vms = append(vms, vm)
 		}
 	}
@@ -1035,8 +1219,64 @@ func FilterSpecificScaleSetInstances(ctx context.Context, allVms []*armcompute.V
 	return
 }
 
-func TerminateScaleSetInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, terminateInstanceIds []string) (terminatedInstances []string, errs []error) {
+func TerminateScaleSetInstances(ctx context.Context, vmssParams *ScaleSetParams, terminateInstanceIds []string) (terminatedInstances []string, errs []error) {
 	logger := logging.LoggerFromCtx(ctx)
+
+	if len(terminateInstanceIds) == 0 {
+		return
+	}
+	for _, instanceId := range terminateInstanceIds {
+		err := SetDeletionProtection(ctx, vmssParams, instanceId, false)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		logger.Info().Msgf("Deleting instanceId %s", instanceId)
+		if vmssParams.Flexible {
+			err = deleteFlexibleScaleSetVM(ctx, vmssParams.SubscriptionId, vmssParams.ResourceGroupName, vmssParams.ScaleSetName, instanceId)
+		} else {
+			err = deleteUniformScaleSetVM(ctx, vmssParams.SubscriptionId, vmssParams.ResourceGroupName, vmssParams.ScaleSetName, instanceId)
+		}
+		if err != nil {
+			logger.Error().Err(err).Send()
+			errs = append(errs, err)
+			continue
+		}
+		terminatedInstances = append(terminatedInstances, instanceId)
+	}
+
+	return
+}
+
+func deleteFlexibleScaleSetVM(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, instanceId string) (err error) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msgf("Deleting instanceId %s from Flexible VMSS %s", instanceId, vmScaleSetName)
+
+	credential, err := getCredential(ctx)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	client, err := armcompute.NewVirtualMachinesClient(subscriptionId, credential, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	force := true
+	_, err = client.BeginDelete(ctx, resourceGroupName, instanceId, &armcompute.VirtualMachinesClientBeginDeleteOptions{
+		ForceDeletion: &force,
+	})
+	if err != nil {
+		logger.Error().Err(err).Send()
+	}
+	return
+}
+
+func deleteUniformScaleSetVM(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, instanceId string) (err error) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msgf("Deleting instanceId %s from Uniform VMSS %s", instanceId, vmScaleSetName)
 
 	credential, err := getCredential(ctx)
 	if err != nil {
@@ -1049,56 +1289,47 @@ func TerminateScaleSetInstances(ctx context.Context, subscriptionId, resourceGro
 		return
 	}
 
-	if len(terminateInstanceIds) == 0 {
-		return
-	}
 	force := true
-	for _, instanceId := range terminateInstanceIds {
-		err = SetDeletionProtection(ctx, subscriptionId, resourceGroupName, vmScaleSetName, instanceId, false)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-		logger.Info().Msgf("Deleting instanceId %s", instanceId)
-		_, err = client.BeginDelete(ctx, resourceGroupName, vmScaleSetName, instanceId, &armcompute.VirtualMachineScaleSetVMsClientBeginDeleteOptions{
+	_, err = client.BeginDelete(
+		ctx,
+		resourceGroupName,
+		vmScaleSetName,
+		instanceId,
+		&armcompute.VirtualMachineScaleSetVMsClientBeginDeleteOptions{
 			ForceDeletion: &force,
-		})
-		if err != nil {
-			logger.Error().Err(err).Send()
-			errs = append(errs, err)
-			continue
-		}
-		terminatedInstances = append(terminatedInstances, instanceId)
+		},
+	)
+	if err != nil {
+		logger.Error().Err(err).Send()
 	}
-
 	return
 }
 
-func UpdateStateReporting(ctx context.Context, stateContainerName, stateStorageName string, report protocol.Report) (err error) {
-	leaseId, err := LockContainer(ctx, stateStorageName, stateContainerName)
+func UpdateStateReporting(ctx context.Context, stateParams BlobObjParams, report protocol.Report) (err error) {
+	leaseId, err := LockContainer(ctx, stateParams.StorageName, stateParams.ContainerName)
 	if err != nil {
 		return
 	}
-	defer UnlockContainer(ctx, stateStorageName, stateContainerName, leaseId)
+	defer UnlockContainer(ctx, stateParams.StorageName, stateParams.ContainerName, leaseId)
 
-	return UpdateStateReportingWithoutLocking(ctx, stateContainerName, stateStorageName, report)
+	return UpdateStateReportingWithoutLocking(ctx, stateParams, report)
 }
 
-func AddClusterUpdate(ctx context.Context, stateContainerName, stateStorageName string, update protocol.Update) (err error) {
-	leaseId, err := LockContainer(ctx, stateStorageName, stateContainerName)
+func AddClusterUpdate(ctx context.Context, stateParams BlobObjParams, update protocol.Update) (err error) {
+	leaseId, err := LockContainer(ctx, stateParams.StorageName, stateParams.ContainerName)
 	if err != nil {
 		return
 	}
-	defer UnlockContainer(ctx, stateStorageName, stateContainerName, leaseId)
+	defer UnlockContainer(ctx, stateParams.StorageName, stateParams.ContainerName, leaseId)
 
-	state, err := ReadState(ctx, stateStorageName, stateContainerName)
+	state, err := ReadState(ctx, stateParams)
 	if err != nil {
 		return
 	}
 
 	reportLib.AddClusterUpdate(update, &state)
 
-	err = WriteState(ctx, stateStorageName, stateContainerName, state)
+	err = WriteState(ctx, stateParams, state)
 	if err != nil {
 		err = fmt.Errorf("failed addind cluster update to state")
 		return
@@ -1106,8 +1337,8 @@ func AddClusterUpdate(ctx context.Context, stateContainerName, stateStorageName 
 	return
 }
 
-func UpdateStateReportingWithoutLocking(ctx context.Context, stateContainerName, stateStorageName string, report protocol.Report) (err error) {
-	state, err := ReadState(ctx, stateStorageName, stateContainerName)
+func UpdateStateReportingWithoutLocking(ctx context.Context, stateParams BlobObjParams, report protocol.Report) (err error) {
+	state, err := ReadState(ctx, stateParams)
 	if err != nil {
 		return
 	}
@@ -1116,7 +1347,7 @@ func UpdateStateReportingWithoutLocking(ctx context.Context, stateContainerName,
 		err = fmt.Errorf("failed updating state report")
 		return
 	}
-	err = WriteState(ctx, stateStorageName, stateContainerName, state)
+	err = WriteState(ctx, stateParams, state)
 	if err != nil {
 		err = fmt.Errorf("failed updating state report")
 		return
@@ -1124,9 +1355,9 @@ func UpdateStateReportingWithoutLocking(ctx context.Context, stateContainerName,
 	return
 }
 
-func GetInstancePowerState(instance *armcompute.VirtualMachineScaleSetVM) (powerState string) {
+func GetInstancePowerState(instance *VMInfoSummary) (powerState string) {
 	prefix := "PowerState/"
-	for _, status := range instance.Properties.InstanceView.Statuses {
+	for _, status := range instance.InstanceViewStatuses {
 		if strings.HasPrefix(*status.Code, prefix) {
 			powerState = strings.TrimPrefix(*status.Code, prefix)
 			return
@@ -1135,28 +1366,28 @@ func GetInstancePowerState(instance *armcompute.VirtualMachineScaleSetVM) (power
 	return
 }
 
-func GetInstanceProvisioningState(instance *armcompute.VirtualMachineScaleSetVM) (provisioningState string) {
+func GetInstanceProvisioningState(instance *VMInfoSummary) (provisioningState string) {
 	provisioningState = "unknown"
-	if instance.Properties.ProvisioningState != nil {
-		provisioningState = *instance.Properties.ProvisioningState
+	if instance.ProvisioningState != nil {
+		provisioningState = *instance.ProvisioningState
 	}
 	return strings.ToLower(provisioningState)
 }
 
-func GetUnhealthyInstancesToTerminate(ctx context.Context, scaleSetVms []*armcompute.VirtualMachineScaleSetVM) (toTerminate []string) {
+func GetUnhealthyInstancesToTerminate(ctx context.Context, scaleSetVms []*VMInfoSummary) (toTerminate []string) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	for _, vm := range scaleSetVms {
-		if vm.Properties.InstanceView == nil || vm.Properties.InstanceView.VMHealth == nil {
+		if vm.VMHealth == nil {
 			continue
 		}
-		healthStatus := *vm.Properties.InstanceView.VMHealth.Status.Code
+		healthStatus := *vm.VMHealth.Status.Code
 		if healthStatus == "HealthState/unhealthy" {
 			instancePowerState := GetInstancePowerState(vm)
 			instanceProvisioningState := GetInstanceProvisioningState(vm)
 			logger.Debug().Msgf("instance power state: %s, provisioning state: %s", instancePowerState, instanceProvisioningState)
 			if instancePowerState == "stopped" || instanceProvisioningState == "failed" {
-				toTerminate = append(toTerminate, GetScaleSetVmId(*vm.ID))
+				toTerminate = append(toTerminate, GetScaleSetVmId(vm.ID))
 			}
 		}
 	}
@@ -1165,9 +1396,13 @@ func GetUnhealthyInstancesToTerminate(ctx context.Context, scaleSetVms []*armcom
 	return
 }
 
-func GetScaleSetVmsExpandedView(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) ([]*armcompute.VirtualMachineScaleSetVM, error) {
-	expand := "instanceView"
-	return GetScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, &expand)
+func GetScaleSetVmsExpandedView(ctx context.Context, p *ScaleSetParams) ([]*VMInfoSummary, error) {
+	expand := armcompute.ExpandTypeForListVMsInstanceView
+	if p.Flexible {
+		return GetFlexibleScaleSetInstances(ctx, p.SubscriptionId, p.ResourceGroupName, p.ScaleSetName, &expand)
+	} else {
+		return GetUniformScaleSetInstances(ctx, p.SubscriptionId, p.ResourceGroupName, p.ScaleSetName, &expand)
+	}
 }
 
 func GetAzureInstanceNameCmd() string {
@@ -1177,7 +1412,12 @@ func GetAzureInstanceNameCmd() string {
 func ReadVmssConfig(ctx context.Context, storageName, containerName string) (vmssConfig VMSSConfig, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	asByteArray, err := ReadBlobObject(ctx, storageName, containerName, "vmss-config")
+	params := BlobObjParams{
+		StorageName:   storageName,
+		ContainerName: containerName,
+		BlobName:      "vmss-config",
+	}
+	asByteArray, err := ReadBlobObject(ctx, params)
 	if err != nil {
 		return
 	}
@@ -1623,10 +1863,10 @@ func getSecondaryNicsConfig(secondaryNics *SecondaryNICs) []*armcompute.VirtualM
 	return nicsConfigs
 }
 
-func GetCurrentScaleSetConfiguration(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (config *VMSSConfig, err error) {
+func GetCurrentScaleSetConfiguration(ctx context.Context, vmssParams *ScaleSetParams) (config *VMSSConfig, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	scaleSet, err := GetScaleSetOrNil(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	scaleSet, err := GetScaleSetOrNil(ctx, vmssParams.SubscriptionId, vmssParams.ResourceGroupName, vmssParams.ScaleSetName)
 	if err != nil {
 		logger.Error().Err(err).Send()
 		return
@@ -1635,6 +1875,6 @@ func GetCurrentScaleSetConfiguration(ctx context.Context, subscriptionId, resour
 		return nil, nil
 	}
 
-	config = GetVmssConfig(ctx, resourceGroupName, scaleSet)
+	config = GetVmssConfig(ctx, vmssParams.ResourceGroupName, scaleSet)
 	return
 }

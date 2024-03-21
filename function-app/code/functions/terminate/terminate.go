@@ -10,7 +10,6 @@ import (
 	"time"
 	"weka-deployment/common"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5"
 	"github.com/weka/go-cloud-lib/logging"
 	"github.com/weka/go-cloud-lib/protocol"
 )
@@ -20,20 +19,20 @@ type VmInfo struct {
 	InstanceId string
 }
 
-type instancesMap map[string]*armcompute.VirtualMachineScaleSetVM
+type instancesMap map[string]*common.VMInfoSummary
 
-func instancesToMap(instances []*armcompute.VirtualMachineScaleSetVM) instancesMap {
+func instancesToMap(instances []*common.VMInfoSummary) instancesMap {
 	im := make(instancesMap)
 	for _, instance := range instances {
-		im[common.GetScaleSetVmId(*instance.ID)] = instance
+		im[common.GetScaleSetVmId(instance.ID)] = instance
 	}
 	return im
 }
 
-func getDeltaInstancesIds(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, scaleResponse protocol.ScaleResponse) (deltaInstanceIDs []string, err error) {
+func getDeltaInstancesIds(ctx context.Context, vmssParams *common.ScaleSetParams, scaleResponse protocol.ScaleResponse) (deltaInstanceIDs []string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("Getting delta instances")
-	netInterfaces, err := common.GetScaleSetVmsNetworkPrimaryNICs(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	netInterfaces, err := common.GetScaleSetVmsNetworkPrimaryNICs(ctx, vmssParams, nil)
 	if err != nil {
 		return
 	}
@@ -59,17 +58,17 @@ func getDeltaInstancesIds(ctx context.Context, subscriptionId, resourceGroupName
 	return
 }
 
-func setForExplicitRemoval(instance *armcompute.VirtualMachineScaleSetVM, toRemove []protocol.HgInstance) bool {
+func setForExplicitRemoval(instance *common.VMInfoSummary, toRemove []protocol.HgInstance) bool {
 	for _, i := range toRemove {
-		if common.GetScaleSetVmId(*instance.ID) == i.Id {
+		if common.GetScaleSetVmId(instance.ID) == i.Id {
 			return true
 		}
 	}
 	return false
 }
 
-func getInstanceCreationTime(instance *armcompute.VirtualMachineScaleSetVM) (provisionTime *time.Time) {
-	for _, status := range instance.Properties.InstanceView.Statuses {
+func getInstanceCreationTime(instance *common.VMInfoSummary) (provisionTime *time.Time) {
+	for _, status := range instance.InstanceViewStatuses {
 		if *status.Code == "ProvisioningState/succeeded" {
 			provisionTime = status.Time
 			return
@@ -78,32 +77,32 @@ func getInstanceCreationTime(instance *armcompute.VirtualMachineScaleSetVM) (pro
 	return
 }
 
-func terminateUnneededInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, instances []*armcompute.VirtualMachineScaleSetVM, explicitRemoval []protocol.HgInstance) (terminatedInstancesMap instancesMap, errs []error) {
+func terminateUnneededInstances(ctx context.Context, vmssParams *common.ScaleSetParams, instances []*common.VMInfoSummary, explicitRemoval []protocol.HgInstance) (terminatedInstancesMap instancesMap, errs []error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	terminateInstanceIds := make([]string, 0)
 	imap := instancesToMap(instances)
 
 	for _, instance := range instances {
-		logger.Info().Msgf("Handling instance %s(%s) removal", *instance.Name, *instance.InstanceID)
+		logger.Info().Msgf("Handling instance %s(%s) removal", instance.Name, instance.InstanceID)
 		if !setForExplicitRemoval(instance, explicitRemoval) {
 			instanceCreationTime := getInstanceCreationTime(instance)
 			if instanceCreationTime == nil {
-				logger.Info().Msgf("Couldn't retrieve instance %s creation time, it is probably too new, giving grace time before removal", *instance.InstanceID)
+				logger.Info().Msgf("Couldn't retrieve instance %s creation time, it is probably too new, giving grace time before removal", instance.InstanceID)
 				continue
 			}
 			if time.Since(*instanceCreationTime) < time.Minute*30 {
-				logger.Info().Msgf("Instance %s is not explicitly set for removal, giving 30M grace time", *instance.InstanceID)
+				logger.Info().Msgf("Instance %s is not explicitly set for removal, giving 30M grace time", instance.InstanceID)
 				continue
 			}
 		}
 		instanceState := common.GetInstancePowerState(instance)
 		if instanceState == "running" || instanceState == "starting" {
-			terminateInstanceIds = append(terminateInstanceIds, *instance.InstanceID)
+			terminateInstanceIds = append(terminateInstanceIds, instance.InstanceID)
 		}
 	}
 
-	terminatedInstances, errs := common.TerminateScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, terminateInstanceIds)
+	terminatedInstances, errs := common.TerminateScaleSetInstances(ctx, vmssParams, terminateInstanceIds)
 	terminatedInstancesMap = make(instancesMap)
 	for _, id := range terminatedInstances {
 		terminatedInstancesMap[id] = imap[id]
@@ -111,21 +110,21 @@ func terminateUnneededInstances(ctx context.Context, subscriptionId, resourceGro
 	return
 }
 
-func terminateUnhealthyInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, toTerminate []string) []error {
-	_, terminateErrors := common.TerminateScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, toTerminate)
+func terminateUnhealthyInstances(ctx context.Context, vmssParams *common.ScaleSetParams, toTerminate []string) []error {
+	_, terminateErrors := common.TerminateScaleSetInstances(ctx, vmssParams, toTerminate)
 	return terminateErrors
 }
 
-func setDeletionProtection(ctx context.Context, allVms []*armcompute.VirtualMachineScaleSetVM, excludeInstanceIds []string, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName string) {
+func setDeletionProtection(ctx context.Context, allVms []*common.VMInfoSummary, excludeInstanceIds []string, vmssParams *common.ScaleSetParams, stateParams common.BlobObjParams) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	// check deletion protection
 	var vmsWithoutProtection []VmInfo
 
 	for _, vm := range allVms {
-		protectionPolicyExists := vm.Properties.ProtectionPolicy != nil && vm.Properties.ProtectionPolicy.ProtectFromScaleSetActions != nil
-		protected := protectionPolicyExists && *vm.Properties.ProtectionPolicy.ProtectFromScaleSetActions
-		instanceId := common.GetScaleSetVmId(*vm.ID)
+		protectionPolicyExists := vm.ProtectionPolicy != nil && vm.ProtectionPolicy.ProtectFromScaleSetActions != nil
+		protected := protectionPolicyExists && *vm.ProtectionPolicy.ProtectFromScaleSetActions
+		instanceId := vm.InstanceID
 
 		for _, excludedId := range excludeInstanceIds {
 			if instanceId == excludedId {
@@ -133,8 +132,8 @@ func setDeletionProtection(ctx context.Context, allVms []*armcompute.VirtualMach
 				continue
 			}
 		}
-		if !protected {
-			vmInfo := VmInfo{HostName: *vm.Properties.OSProfile.ComputerName, InstanceId: instanceId}
+		if !protected && vm.ComputerName != nil {
+			vmInfo := VmInfo{HostName: *vm.ComputerName, InstanceId: instanceId}
 			vmsWithoutProtection = append(vmsWithoutProtection, vmInfo)
 		}
 	}
@@ -144,12 +143,13 @@ func setDeletionProtection(ctx context.Context, allVms []*armcompute.VirtualMach
 	for _, vm := range vmsWithoutProtection {
 		logger.Info().Msgf("Setting deletion protection for VM %v", vm)
 		// do not retry, but report
-		common.RetrySetDeletionProtectionAndReport(ctx, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, vmScaleSetName, vm.InstanceId, vm.HostName, 0, time.Second)
+		common.RetrySetDeletionProtectionAndReport(ctx, vmssParams, stateParams, vm.InstanceId, vm.HostName, 0, time.Second)
 	}
 }
 
-func Terminate(ctx context.Context, scaleResponse protocol.ScaleResponse, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName string) (response protocol.TerminatedInstancesResponse, err error) {
+func Terminate(ctx context.Context, scaleResponse protocol.ScaleResponse, vmssParams *common.ScaleSetParams, stateParams common.BlobObjParams) (response protocol.TerminatedInstancesResponse, err error) {
 	logger := logging.LoggerFromCtx(ctx)
+	logger = logger.WithStrValue("vmss", vmssParams.ScaleSetName)
 	logger.Info().Msg("Running termination function...")
 
 	response.Version = protocol.Version
@@ -159,8 +159,8 @@ func Terminate(ctx context.Context, scaleResponse protocol.ScaleResponse, subscr
 		return
 	}
 
-	if vmScaleSetName == "" {
-		err = errors.New("instance group is mandatory")
+	if vmssParams.ScaleSetName == "" {
+		err = errors.New("vmScaleSetName is empty")
 		return
 	}
 	if len(scaleResponse.Hosts) == 0 {
@@ -171,18 +171,18 @@ func Terminate(ctx context.Context, scaleResponse protocol.ScaleResponse, subscr
 	response.TransientErrors = scaleResponse.TransientErrors[0:len(scaleResponse.TransientErrors):len(scaleResponse.TransientErrors)]
 
 	// get VMs expanded list which will be used later
-	vms, err := common.GetScaleSetVmsExpandedView(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	vms, err := common.GetScaleSetVmsExpandedView(ctx, vmssParams)
 	if err != nil {
-		err = fmt.Errorf("cannot get VMs list for vmss %s: %v", vmScaleSetName, err)
+		err = fmt.Errorf("cannot get VMs list for vmss %s: %v", vmssParams.ScaleSetName, err)
 		return
 	}
 
 	unhealthyInstanceIds := common.GetUnhealthyInstancesToTerminate(ctx, vms)
-	errs := terminateUnhealthyInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, unhealthyInstanceIds)
+	errs := terminateUnhealthyInstances(ctx, vmssParams, unhealthyInstanceIds)
 	response.AddTransientErrors(errs)
 
 	logger.Info().Msgf("Instances set for explicit removal: %s", scaleResponse.ToTerminate)
-	deltaInstanceIds, err := getDeltaInstancesIds(ctx, subscriptionId, resourceGroupName, vmScaleSetName, scaleResponse)
+	deltaInstanceIds, err := getDeltaInstancesIds(ctx, vmssParams, scaleResponse)
 	if err != nil {
 		logger.Error().Err(err).Send()
 		return
@@ -191,7 +191,7 @@ func Terminate(ctx context.Context, scaleResponse protocol.ScaleResponse, subscr
 	// NOTE: we want to have deletion protection set for all instances (which are not selected for termination)
 	// in order to avoid races, this step is presented here, during "terminate" step
 	unprotectedVmIds := append(deltaInstanceIds, unhealthyInstanceIds...)
-	setDeletionProtection(ctx, vms, unprotectedVmIds, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName)
+	setDeletionProtection(ctx, vms, unprotectedVmIds, vmssParams, stateParams)
 
 	if len(deltaInstanceIds) == 0 {
 		logger.Info().Msgf("No delta instances ids")
@@ -204,7 +204,7 @@ func Terminate(ctx context.Context, scaleResponse protocol.ScaleResponse, subscr
 		return
 	}
 
-	terminatedInstancesMap, errs := terminateUnneededInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, candidatesToTerminate, scaleResponse.ToTerminate)
+	terminatedInstancesMap, errs := terminateUnneededInstances(ctx, vmssParams, candidatesToTerminate, scaleResponse.ToTerminate)
 	response.AddTransientErrors(errs)
 
 	for instanceId, instance := range terminatedInstancesMap {
@@ -229,6 +229,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	clusterName := os.Getenv("CLUSTER_NAME")
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
+	stateBlobName := os.Getenv("STATE_BLOB_NAME")
+	nfsStateContainerName := os.Getenv("NFS_STATE_CONTAINER_NAME")
+	nfsStateBlobName := os.Getenv("NFS_STATE_BLOB_NAME")
+	nfsScaleSetName := os.Getenv("NFS_VMSS_NAME")
 
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
@@ -261,11 +265,47 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	terminateResponse, err := Terminate(ctx, scaleResponse, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName)
+	stateParams := common.BlobObjParams{
+		StorageName:   stateStorageName,
+		ContainerName: stateContainerName,
+		BlobName:      stateBlobName,
+	}
+	vmssParams := &common.ScaleSetParams{
+		SubscriptionId:    subscriptionId,
+		ResourceGroupName: resourceGroupName,
+		ScaleSetName:      vmScaleSetName,
+		Flexible:          false,
+	}
+	terminateResponse, err := Terminate(ctx, scaleResponse, vmssParams, stateParams)
 	if err != nil {
 		logger.Error().Err(err).Send()
 		common.WriteErrorResponse(w, err)
 		return
 	}
+
+	// terminate NFS instances (if NFS is configured)
+	if nfsScaleSetName != "" {
+		nfsParams := common.BlobObjParams{
+			StorageName:   stateStorageName,
+			ContainerName: nfsStateContainerName,
+			BlobName:      nfsStateBlobName,
+		}
+		nfsVmssParams := &common.ScaleSetParams{
+			SubscriptionId:    subscriptionId,
+			ResourceGroupName: resourceGroupName,
+			ScaleSetName:      nfsScaleSetName,
+			Flexible:          true,
+		}
+		nfsTerminateResponse, err := Terminate(ctx, scaleResponse, nfsVmssParams, nfsParams)
+		if err != nil {
+			logger.Error().Err(err).Send()
+			common.WriteErrorResponse(w, err)
+			return
+		}
+		// merge responses
+		terminateResponse.Instances = append(terminateResponse.Instances, nfsTerminateResponse.Instances...)
+		terminateResponse.TransientErrors = append(terminateResponse.TransientErrors, nfsTerminateResponse.TransientErrors...)
+	}
+
 	common.WriteSuccessResponse(w, terminateResponse)
 }
