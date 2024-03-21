@@ -15,10 +15,14 @@ import (
 var (
 	stateStorageName   = os.Getenv("STATE_STORAGE_NAME")
 	stateContainerName = os.Getenv("STATE_CONTAINER_NAME")
+	stateBlobName      = os.Getenv("STATE_BLOB_NAME")
 	prefix             = os.Getenv("PREFIX")
 	clusterName        = os.Getenv("CLUSTER_NAME")
 	subscriptionId     = os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName  = os.Getenv("RESOURCE_GROUP_NAME")
+	nfsContainerName   = os.Getenv("NFS_STATE_CONTAINER_NAME")
+	nfsStateBlobName   = os.Getenv("NFS_STATE_BLOB_NAME")
+	nfsScaleSetName    = os.Getenv("NFS_VMSS_NAME")
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -26,8 +30,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName)
+	stateParams := common.BlobObjParams{
+		StorageName:   stateStorageName,
+		ContainerName: stateContainerName,
+		BlobName:      stateBlobName,
+	}
 
-	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
+	state, err := common.ReadState(ctx, stateParams)
 	if err != nil {
 		logger.Error().Err(err).Msg("cannot read state")
 		common.WriteErrorResponse(w, err)
@@ -72,7 +81,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	// after vmss creation we need to wait until vmss is clusterized
 	if !state.Clusterized {
 		msg := fmt.Sprintf("Not clusterized yet, initial size %d is set", state.InitialSize)
-		handleProgressingClusterization(ctx, &state, subscriptionId, resourceGroupName, *scaleSet.Name, stateContainerName, stateStorageName)
+		handleProgressingClusterization(ctx, &state, subscriptionId, resourceGroupName, *scaleSet.Name, stateParams)
 		logger.Info().Msg(msg)
 		returnMsg = msg
 	} else {
@@ -83,7 +92,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			diff := common.VmssConfigsDiff(*currentConfig, vmssConfig)
 			logger.Info().Msgf("vmss config diff: %s", diff)
 
-			err := handleVmssUpdate(ctx, currentConfig, &vmssConfig, state.DesiredSize)
+			err := handleVmssUpdate(ctx, currentConfig, &vmssConfig, stateParams, state.DesiredSize)
 			if err != nil {
 				common.WriteErrorResponse(w, err)
 				return
@@ -101,7 +110,51 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	returnMsg = fmt.Sprintf("%s; scaled up vmss %s to size %d successfully", returnMsg, *scaleSet.Name, state.DesiredSize)
+	logger.Info().Msg(returnMsg)
+
+	// handle NFS vmss
+	if nfsScaleSetName != "" {
+		message, err := handleNFSScaleUp(ctx)
+		if err != nil {
+			common.WriteErrorResponse(w, err)
+			return
+		}
+		returnMsg = fmt.Sprintf("%s; %s", returnMsg, message)
+	}
+
 	common.WriteSuccessResponse(w, returnMsg)
+}
+
+func handleNFSScaleUp(ctx context.Context) (message string, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	nfsStateParams := common.BlobObjParams{
+		StorageName:   stateStorageName,
+		ContainerName: nfsContainerName,
+		BlobName:      nfsStateBlobName,
+	}
+	nfsState, err := common.ReadState(ctx, nfsStateParams)
+	if err != nil {
+		logger.Error().Err(err).Msg("cannot read NFS state")
+		return
+	}
+
+	if !nfsState.Clusterized {
+		message = fmt.Sprintf("NFS not clusterized yet, initial size %d is set", nfsState.InitialSize)
+
+		handleProgressingClusterization(ctx, &nfsState, subscriptionId, resourceGroupName, nfsScaleSetName, nfsStateParams)
+		logger.Info().Msg(message)
+		return
+	}
+
+	err = common.ScaleUp(ctx, subscriptionId, resourceGroupName, nfsScaleSetName, int64(nfsState.DesiredSize))
+	if err != nil {
+		err = fmt.Errorf("cannot scale up NFS vmss: %v", err)
+		return
+	}
+	message = fmt.Sprintf("scaled up NFS vmss %s to size %d successfully", nfsScaleSetName, nfsState.DesiredSize)
+	logger.Info().Msg(message)
+	return
 }
 
 func createVmss(ctx context.Context, vmssConfig *common.VMSSConfig, vmssName string, vmssSize int) error {
@@ -117,7 +170,7 @@ func createVmss(ctx context.Context, vmssConfig *common.VMSSConfig, vmssName str
 	return nil
 }
 
-func handleVmssUpdate(ctx context.Context, currentConfig, newConfig *common.VMSSConfig, desiredSize int) error {
+func handleVmssUpdate(ctx context.Context, currentConfig, newConfig *common.VMSSConfig, stateParams common.BlobObjParams, desiredSize int) error {
 	logger := logging.LoggerFromCtx(ctx)
 
 	newConfigHash := newConfig.ConfigHash
@@ -134,7 +187,7 @@ func handleVmssUpdate(ctx context.Context, currentConfig, newConfig *common.VMSS
 		logger.Error().Err(err).Send()
 		errStr := err.Error()
 		update.Error = &errStr
-		return common.AddClusterUpdate(ctx, stateContainerName, stateStorageName, update)
+		return common.AddClusterUpdate(ctx, stateParams, update)
 	}
 
 	_, err := common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, currentConfig.Name, newConfigHash, *newConfig, desiredSize)
@@ -146,28 +199,28 @@ func handleVmssUpdate(ctx context.Context, currentConfig, newConfig *common.VMSS
 		logger.Info().Msgf("updated vmss %s to new config_hash %s", currentConfig.Name, newConfigHash)
 	}
 
-	return common.AddClusterUpdate(ctx, stateContainerName, stateStorageName, update)
+	return common.AddClusterUpdate(ctx, stateParams, update)
 }
 
-func handleProgressingClusterization(ctx context.Context, state *protocol.ClusterState, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName string) {
+func handleProgressingClusterization(ctx context.Context, state *protocol.ClusterState, subscriptionId, resourceGroupName, vmScaleSetName string, stateParams common.BlobObjParams) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	vms, err := common.GetScaleSetVmsExpandedView(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
 		msg := fmt.Sprintf("Failed getting vms list for vmss %s: %v", vmScaleSetName, err)
-		common.ReportMsg(ctx, "vmss", stateContainerName, stateStorageName, "error", msg)
+		common.ReportMsg(ctx, "vmss", stateParams, "error", msg)
 		return
 	}
 	toTerminate := common.GetUnhealthyInstancesToTerminate(ctx, vms)
 	if len(toTerminate) > 0 {
 		msg := fmt.Sprintf("Terminating unhealthy instances indexes: %v", toTerminate)
-		common.ReportMsg(ctx, "vmss", stateContainerName, stateStorageName, "debug", msg)
+		common.ReportMsg(ctx, "vmss", stateParams, "debug", msg)
 	}
 
 	_, terminateErrors := common.TerminateScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, toTerminate)
 	if len(terminateErrors) > 0 {
 		msg := fmt.Sprintf("errors during terminating unhealthy instances: %v", terminateErrors)
 		logger.Info().Msgf(msg)
-		common.ReportMsg(ctx, "vmss", stateContainerName, stateStorageName, "error", msg)
+		common.ReportMsg(ctx, "vmss", stateParams, "error", msg)
 	}
 }

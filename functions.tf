@@ -19,6 +19,9 @@ locals {
   function_app_name                = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-function-app"
   install_weka_url                 = var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.weka.io/dist/v1/install/${var.weka_version}/${var.weka_version}"
   supported_regions                = split("\n", replace(chomp(file("${path.module}/supported_regions/${var.function_app_dist}.txt")), "\r", ""))
+  # nfs autoscaling
+  nfs_deployment_container_name = var.nfs_deployment_container_name == "" ? azurerm_storage_container.nfs_deployment[0].name : var.nfs_deployment_container_name
+  nfs_deployment_sa_scope       = "${local.deployment_storage_account_id}/blobServices/default/containers/${local.nfs_deployment_container_name}"
 }
 
 resource "azurerm_log_analytics_workspace" "la_workspace" {
@@ -133,6 +136,7 @@ resource "azurerm_linux_function_app" "function_app" {
     "APPINSIGHTS_INSTRUMENTATIONKEY" = azurerm_application_insights.application_insights.instrumentation_key
     "STATE_STORAGE_NAME"             = local.deployment_storage_account_name
     "STATE_CONTAINER_NAME"           = local.deployment_container_name
+    "STATE_BLOB_NAME"                = "state"
     "HOSTS_NUM"                      = var.cluster_size
     "CLUSTER_NAME"                   = var.cluster_name
     "PROTECTION_LEVEL"               = var.protection_level
@@ -151,6 +155,7 @@ resource "azurerm_linux_function_app" "function_app" {
     COMPUTE_CONTAINER_CORES_NUM      = var.set_dedicated_fe_container == false ? var.containers_config_map[var.instance_type].compute + 1 : var.containers_config_map[var.instance_type].compute
     FRONTEND_CONTAINER_CORES_NUM     = var.set_dedicated_fe_container == false ? 0 : var.containers_config_map[var.instance_type].frontend
     COMPUTE_MEMORY                   = var.containers_config_map[var.instance_type].memory[local.get_compute_memory_index]
+    DISK_SIZE                        = local.disk_size
     "NVMES_NUM"                      = var.containers_config_map[var.instance_type].nvme
     "TIERING_SSD_PERCENT"            = var.tiering_enable_ssd_percent
     "PREFIX"                         = var.prefix
@@ -173,6 +178,17 @@ resource "azurerm_linux_function_app" "function_app" {
     HASH                        = var.function_app_version
     WEBSITE_RUN_FROM_PACKAGE    = "https://${local.weka_sa}.blob.core.windows.net/${local.weka_sa_container}/${local.function_app_zip_name}"
     WEBSITE_VNET_ROUTE_ALL      = true
+
+    NFS_STATE_CONTAINER_NAME          = local.nfs_deployment_container_name
+    NFS_STATE_BLOB_NAME               = "nfs_state"
+    NFS_INTERFACE_GROUP_NAME          = var.nfs_interface_group_name
+    NFS_CLIENT_GROUP_NAME             = var.nfs_client_group_name
+    NFS_SECONDARY_IPS_NUM             = var.nfs_protocol_gateway_secondary_ips_per_nic
+    NFS_PROTOCOL_GATEWAY_FE_CORES_NUM = var.nfs_protocol_gateway_fe_cores_num
+    NFS_PROTOCOL_GATEWAYS_NUMBER      = var.nfs_protocol_gateways_number
+    NFS_VMSS_NAME                     = var.nfs_protocol_gateways_number > 0 ? "${var.prefix}-${var.cluster_name}-nfs-protocol-gateway-vmss" : ""
+    NFS_DISK_SIZE                     = var.nfs_protocol_gateway_disk_size * 10 * var.nfs_protocol_gateway_fe_cores_num
+    BACKEND_LB_IP                     = azurerm_lb.backend_lb.private_ip_address
   }
 
   identity {
@@ -199,6 +215,14 @@ data "azurerm_subscription" "primary" {}
 
 resource "azurerm_role_assignment" "storage_blob_data_contributor" {
   scope                = local.deployment_storage_account_scope
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
+  depends_on           = [azurerm_linux_function_app.function_app, azurerm_storage_account.deployment_sa]
+}
+
+resource "azurerm_role_assignment" "nfs_storage_blob_data_contributor" {
+  count                = var.nfs_protocol_gateways_number > 0 ? 1 : 0
+  scope                = local.nfs_deployment_sa_scope
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
   depends_on           = [azurerm_linux_function_app.function_app, azurerm_storage_account.deployment_sa]

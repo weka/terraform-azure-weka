@@ -17,6 +17,7 @@ import (
 func Handler(w http.ResponseWriter, r *http.Request) {
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
+	stateBlobName := os.Getenv("STATE_BLOB_NAME")
 	clusterName := os.Getenv("CLUSTER_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
@@ -81,19 +82,24 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	logger.Info().Msgf("The requested function is %s", *function.Function)
 	var result interface{}
 
+	stateParams := common.BlobObjParams{
+		StorageName:   stateStorageName,
+		ContainerName: stateContainerName,
+		BlobName:      stateBlobName,
+	}
+
 	if *function.Function == "clusterize" {
-		state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
+		state, err := common.ReadState(ctx, stateParams)
 		if err != nil {
 			result = clusterizeFunc.GetErrorScript(err)
 		} else {
 			params := clusterizeFunc.ClusterizationParams{
-				SubscriptionId:     subscriptionId,
-				ResourceGroupName:  resourceGroupName,
-				Location:           location,
-				Prefix:             prefix,
-				KeyVaultUri:        keyVaultUri,
-				StateContainerName: stateContainerName,
-				StateStorageName:   stateStorageName,
+				SubscriptionId:    subscriptionId,
+				ResourceGroupName: resourceGroupName,
+				Location:          location,
+				Prefix:            prefix,
+				KeyVaultUri:       keyVaultUri,
+				StateParams:       stateParams,
 				Cluster: clusterize.ClusterParams{
 					ClusterName: clusterName,
 					NvmesNum:    nvmesNum,

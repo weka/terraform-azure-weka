@@ -116,7 +116,7 @@ func terminateUnhealthyInstances(ctx context.Context, subscriptionId, resourceGr
 	return terminateErrors
 }
 
-func setDeletionProtection(ctx context.Context, allVms []*armcompute.VirtualMachineScaleSetVM, excludeInstanceIds []string, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName string) {
+func setDeletionProtection(ctx context.Context, allVms []*armcompute.VirtualMachineScaleSetVM, excludeInstanceIds []string, subscriptionId, resourceGroupName, vmScaleSetName string, stateParams common.BlobObjParams) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	// check deletion protection
@@ -144,12 +144,13 @@ func setDeletionProtection(ctx context.Context, allVms []*armcompute.VirtualMach
 	for _, vm := range vmsWithoutProtection {
 		logger.Info().Msgf("Setting deletion protection for VM %v", vm)
 		// do not retry, but report
-		common.RetrySetDeletionProtectionAndReport(ctx, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, vmScaleSetName, vm.InstanceId, vm.HostName, 0, time.Second)
+		common.RetrySetDeletionProtectionAndReport(ctx, subscriptionId, resourceGroupName, stateParams, vmScaleSetName, vm.InstanceId, vm.HostName, 0, time.Second)
 	}
 }
 
-func Terminate(ctx context.Context, scaleResponse protocol.ScaleResponse, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName string) (response protocol.TerminatedInstancesResponse, err error) {
+func Terminate(ctx context.Context, scaleResponse protocol.ScaleResponse, subscriptionId, resourceGroupName, vmScaleSetName string, stateParams common.BlobObjParams) (response protocol.TerminatedInstancesResponse, err error) {
 	logger := logging.LoggerFromCtx(ctx)
+	logger = logger.WithStrValue("vmss", vmScaleSetName)
 	logger.Info().Msg("Running termination function...")
 
 	response.Version = protocol.Version
@@ -191,7 +192,7 @@ func Terminate(ctx context.Context, scaleResponse protocol.ScaleResponse, subscr
 	// NOTE: we want to have deletion protection set for all instances (which are not selected for termination)
 	// in order to avoid races, this step is presented here, during "terminate" step
 	unprotectedVmIds := append(deltaInstanceIds, unhealthyInstanceIds...)
-	setDeletionProtection(ctx, vms, unprotectedVmIds, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName)
+	setDeletionProtection(ctx, vms, unprotectedVmIds, subscriptionId, resourceGroupName, vmScaleSetName, stateParams)
 
 	if len(deltaInstanceIds) == 0 {
 		logger.Info().Msgf("No delta instances ids")
@@ -229,6 +230,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	clusterName := os.Getenv("CLUSTER_NAME")
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
+	stateBlobName := os.Getenv("STATE_BLOB_NAME")
+	nfsStateContainerName := os.Getenv("NFS_STATE_CONTAINER_NAME")
+	nfsStateBlobName := os.Getenv("NFS_STATE_BLOB_NAME")
+	nfsScaleSetName := os.Getenv("NFS_VMSS_NAME")
 
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
@@ -261,11 +266,35 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	terminateResponse, err := Terminate(ctx, scaleResponse, subscriptionId, resourceGroupName, vmScaleSetName, stateContainerName, stateStorageName)
+	stateParams := common.BlobObjParams{
+		StorageName:   stateStorageName,
+		ContainerName: stateContainerName,
+		BlobName:      stateBlobName,
+	}
+	terminateResponse, err := Terminate(ctx, scaleResponse, subscriptionId, resourceGroupName, vmScaleSetName, stateParams)
 	if err != nil {
 		logger.Error().Err(err).Send()
 		common.WriteErrorResponse(w, err)
 		return
 	}
+
+	// terminate NFS instances (if NFS is configured)
+	if nfsScaleSetName != "" {
+		nfsParams := common.BlobObjParams{
+			StorageName:   stateStorageName,
+			ContainerName: nfsStateContainerName,
+			BlobName:      nfsStateBlobName,
+		}
+		nfsTerminateResponse, err := Terminate(ctx, scaleResponse, subscriptionId, resourceGroupName, nfsScaleSetName, nfsParams)
+		if err != nil {
+			logger.Error().Err(err).Send()
+			common.WriteErrorResponse(w, err)
+			return
+		}
+		// merge responses
+		terminateResponse.Instances = append(terminateResponse.Instances, nfsTerminateResponse.Instances...)
+		terminateResponse.TransientErrors = append(terminateResponse.TransientErrors, nfsTerminateResponse.TransientErrors...)
+	}
+
 	common.WriteSuccessResponse(w, terminateResponse)
 }
