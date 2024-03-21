@@ -104,7 +104,7 @@ done
 if [ $retry -gt 0 ]; then
   msg="Deploy script generation retried $retry times"
   echo "$msg"
-  curl -i "${report_url}?code=${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"debug\", \"message\": \"$msg\"}"
+  curl -i "${report_url}?code=${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"nfs\", \"type\": \"debug\", \"message\": \"$msg\"}"
 fi
 
 echo "$(date -u): running deploy script"
