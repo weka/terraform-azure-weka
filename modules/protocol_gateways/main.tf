@@ -11,7 +11,7 @@ data "azurerm_subnet" "subnet" {
 }
 
 resource "azurerm_public_ip" "this" {
-  count               = var.assign_public_ip ? var.gateways_number : 0
+  count               = var.assign_public_ip && var.protocol == "SMB" ? var.gateways_number : 0
   name                = "${var.gateways_name}-public-ip-${count.index}"
   location            = var.location
   resource_group_name = var.rg_name
@@ -19,7 +19,7 @@ resource "azurerm_public_ip" "this" {
 }
 
 resource "azurerm_network_interface" "primary_gateway_nic_public" {
-  count                         = var.assign_public_ip ? var.gateways_number : 0
+  count                         = var.assign_public_ip && var.protocol == "SMB" ? var.gateways_number : 0
   name                          = "${var.gateways_name}-primary-nic-${count.index}"
   location                      = var.location
   resource_group_name           = var.rg_name
@@ -45,13 +45,13 @@ resource "azurerm_network_interface" "primary_gateway_nic_public" {
 }
 
 resource "azurerm_network_interface_security_group_association" "primary_gateway_nic_public" {
-  count                     = var.assign_public_ip ? var.gateways_number : 0
+  count                     = var.assign_public_ip && var.protocol == "SMB" ? var.gateways_number : 0
   network_interface_id      = azurerm_network_interface.primary_gateway_nic_public[count.index].id
   network_security_group_id = var.sg_id
 }
 
 resource "azurerm_network_interface" "primary_gateway_nic_private" {
-  count                         = var.assign_public_ip ? 0 : var.gateways_number
+  count                         = var.assign_public_ip || var.protocol != "SMB" ? 0 : var.gateways_number
   name                          = "${var.gateways_name}-primary-nic-${count.index}"
   location                      = var.location
   resource_group_name           = var.rg_name
@@ -76,7 +76,7 @@ resource "azurerm_network_interface" "primary_gateway_nic_private" {
 }
 
 resource "azurerm_network_interface_security_group_association" "primary_gateway_nic_private" {
-  count                     = var.assign_public_ip ? 0 : var.gateways_number
+  count                     = var.assign_public_ip || var.protocol != "SMB" ? 0 : var.gateways_number
   network_interface_id      = azurerm_network_interface.primary_gateway_nic_private[count.index].id
   network_security_group_id = var.sg_id
 }
@@ -86,7 +86,7 @@ locals {
 }
 
 resource "azurerm_network_interface" "secondary_gateway_nic" {
-  count                         = local.secondary_nics_num
+  count                         = var.protocol == "SMB" ? local.secondary_nics_num : 0
   name                          = "${var.gateways_name}-secondary-nic-${count.index + var.gateways_number}"
   location                      = var.location
   resource_group_name           = var.rg_name
@@ -101,7 +101,7 @@ resource "azurerm_network_interface" "secondary_gateway_nic" {
 }
 
 resource "azurerm_network_interface_security_group_association" "secondary_gateway_nic" {
-  count                     = local.secondary_nics_num
+  count                     = var.protocol == "SMB" ? local.secondary_nics_num : 0
   network_interface_id      = azurerm_network_interface.secondary_gateway_nic[count.index].id
   network_security_group_id = var.sg_id
 }
@@ -111,28 +111,15 @@ locals {
   first_nic_ids         = var.assign_public_ip ? azurerm_network_interface.primary_gateway_nic_public[*].id : azurerm_network_interface.primary_gateway_nic_private[*].id
   first_nic_private_ips = var.assign_public_ip ? azurerm_network_interface.primary_gateway_nic_public[*].private_ip_address : azurerm_network_interface.primary_gateway_nic_private[*].private_ip_address
   nics_numbers          = var.frontend_container_cores_num + 1
+
   init_script = templatefile("${path.module}/init.sh", {
-    apt_repo_server  = var.apt_repo_server
-    nics_num         = local.nics_numbers
-    subnet_range     = data.azurerm_subnet.subnet.address_prefix
-    disk_size        = local.disk_size
-    install_weka_url = var.install_weka_url
-    key_vault_url    = var.key_vault_url
-  })
-
-  deploy_script = templatefile("${path.module}/deploy_protocol_gateways.sh", {
-    frontend_container_cores_num = var.frontend_container_cores_num
-    subnet_prefixes              = data.azurerm_subnet.subnet.address_prefix
-    backend_lb_ip                = var.backend_lb_ip
-    key_vault_url                = var.key_vault_url
-    vault_function_app_key_name  = var.vault_function_app_key_name
-    fetch_function_url           = format("https://%s.azurewebsites.net/api/fetch", var.function_app_name)
-  })
-
-  setup_nfs_protocol_script = templatefile("${path.module}/setup_nfs.sh", {
-    gateways_name        = var.gateways_name
-    interface_group_name = var.interface_group_name
-    client_group_name    = var.client_group_name
+    apt_repo_server          = var.apt_repo_server
+    nics_num                 = local.nics_numbers
+    subnet_range             = data.azurerm_subnet.subnet.address_prefix
+    disk_size                = local.disk_size
+    deploy_url               = var.deploy_function_url
+    report_url               = var.report_function_url
+    function_app_default_key = var.function_app_default_key
   })
 
   setup_smb_protocol_script = templatefile("${path.module}/setup_smb.sh", {
@@ -161,12 +148,12 @@ locals {
 
   smb_protocol_script = var.protocol == "SMB" ? local.setup_smb_protocol_script : ""
   s3_protocol_script  = var.protocol == "S3" ? local.setup_s3_protocol_script : ""
-  nfs_protocol_script = var.protocol == "NFS" ? local.setup_nfs_protocol_script : ""
+  nfs_protocol_script = ""
   validation_script   = var.setup_protocol && (var.protocol == "SMB" || var.protocol == "S3") ? local.setup_validation_script : ""
 
   setup_protocol_script = var.setup_protocol ? compact([local.nfs_protocol_script, local.smb_protocol_script, local.s3_protocol_script]) : []
 
-  custom_data_parts = concat([local.init_script, local.deploy_script, local.validation_script], local.setup_protocol_script)
+  custom_data_parts = concat([local.init_script, local.validation_script], local.setup_protocol_script)
 
   custom_data = join("\n", local.custom_data_parts)
 
@@ -176,7 +163,7 @@ locals {
 
 
 resource "azurerm_linux_virtual_machine" "this" {
-  count                           = var.gateways_number
+  count                           = var.protocol == "SMB" ? var.gateways_number : 0
   name                            = "${var.gateways_name}-vm-${count.index}"
   computer_name                   = "${var.gateways_name}-${count.index}"
   location                        = var.location
@@ -213,15 +200,15 @@ resource "azurerm_linux_virtual_machine" "this" {
   lifecycle {
     ignore_changes = [tags, custom_data]
     precondition {
-      condition     = var.protocol == "NFS" || var.protocol == "S3" ? var.gateways_number >= 1 : var.gateways_number >= 3 && var.gateways_number <= 8
-      error_message = "The amount of protocol gateways should be at least 1 for NFS and at least 3 and at most 8 for SMB."
+      condition     = var.protocol == "S3" ? var.gateways_number >= 1 : var.gateways_number >= 3 && var.gateways_number <= 8
+      error_message = "The amount of protocol gateways should be at least 1 for S3 and at least 3 and at most 8 for SMB."
     }
     precondition {
-      condition     = var.protocol == "SMB" && var.setup_protocol ? var.smb_domain_name != "" : true
+      condition     = var.setup_protocol ? var.smb_domain_name != "" : true
       error_message = "The SMB domain name should be set when deploying SMB protocol gateways."
     }
     precondition {
-      condition     = var.protocol == "SMB" ? var.secondary_ips_per_nic <= 3 : true
+      condition     = var.secondary_ips_per_nic <= 3
       error_message = "The number of secondary IPs per single NIC per protocol gateway virtual machine must be at most 3 for SMB."
     }
     precondition {
@@ -237,7 +224,7 @@ resource "azurerm_linux_virtual_machine" "this" {
 }
 
 resource "azurerm_managed_disk" "this" {
-  count                = var.gateways_number
+  count                = var.protocol == "SMB" ? var.gateways_number : 0
   name                 = "weka-disk-${var.gateways_name}-${count.index}"
   location             = var.location
   resource_group_name  = var.rg_name
@@ -247,22 +234,12 @@ resource "azurerm_managed_disk" "this" {
 }
 
 resource "azurerm_virtual_machine_data_disk_attachment" "this" {
-  count              = var.gateways_number
+  count              = var.protocol == "SMB" ? var.gateways_number : 0
   managed_disk_id    = azurerm_managed_disk.this[count.index].id
   virtual_machine_id = azurerm_linux_virtual_machine.this[count.index].id
   lun                = 0
   caching            = "ReadWrite"
   depends_on         = [azurerm_linux_virtual_machine.this]
-}
-
-resource "azurerm_key_vault_access_policy" "gateways_vmss_key_vault" {
-  key_vault_id = var.key_vault_id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = local.gw_identity_principal
-  secret_permissions = [
-    "Get",
-  ]
-  depends_on = [azurerm_linux_virtual_machine.this]
 }
 
 data "azurerm_user_assigned_identity" "this" {
@@ -278,6 +255,15 @@ resource "azurerm_user_assigned_identity" "this" {
   resource_group_name = data.azurerm_resource_group.rg.name
 }
 
+resource "azurerm_key_vault_access_policy" "gateways_vmss_key_vault" {
+  key_vault_id = var.key_vault_id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = local.gw_identity_principal
+  secret_permissions = [
+    "Get",
+  ]
+}
+
 resource "azurerm_role_assignment" "gateways_vm_key_vault" {
   count                = var.vm_identity_name == "" ? 1 : 0
   scope                = var.key_vault_id
@@ -286,8 +272,139 @@ resource "azurerm_role_assignment" "gateways_vm_key_vault" {
 }
 
 resource "azurerm_role_assignment" "weka_tar_data_reader" {
-  count                = var.vm_identity_name == "" && var.weka_tar_storage_account_id != "" ? var.gateways_number : 0
+  count                = var.vm_identity_name == "" && var.weka_tar_storage_account_id != "" ? 1 : 0
   scope                = var.weka_tar_storage_account_id
   role_definition_name = "Storage Blob Data Reader"
   principal_id         = azurerm_user_assigned_identity.this[0].principal_id
+}
+
+resource "azurerm_role_assignment" "reader" {
+  count                = var.vm_identity_name == "" ? 1 : 0
+  scope                = data.azurerm_resource_group.rg.id
+  role_definition_name = "Reader"
+  principal_id         = azurerm_user_assigned_identity.this[0].principal_id
+}
+
+# needed for floating-ip support
+resource "azurerm_role_assignment" "network_contributor" {
+  count                = var.vm_identity_name == "" && var.protocol == "NFS" ? 1 : 0
+  scope                = data.azurerm_resource_group.rg.id
+  role_definition_name = "Network Contributor"
+  principal_id         = azurerm_user_assigned_identity.this[0].principal_id
+}
+
+resource "azurerm_orchestrated_virtual_machine_scale_set" "nfs" {
+  count                        = var.protocol == "NFS" ? 1 : 0
+  name                         = "${var.gateways_name}-vmss"
+  location                     = var.location
+  resource_group_name          = var.rg_name
+  instances                    = 0 # will be set to var.gateways_number by scale_up workflow
+  platform_fault_domain_count  = 1
+  sku_name                     = var.instance_type
+  tags                         = merge(var.tags_map, { "weka_protocol_gateways" : var.gateways_name, "user_id" : data.azurerm_client_config.current.object_id })
+  proximity_placement_group_id = var.ppg_id
+  source_image_id              = var.source_image_id
+
+  os_profile {
+    custom_data = base64encode(local.custom_data)
+    linux_configuration {
+      computer_name_prefix            = var.gateways_name
+      disable_password_authentication = true
+      admin_username                  = var.vm_username
+
+      admin_ssh_key {
+        username   = var.vm_username
+        public_key = var.ssh_public_key
+      }
+    }
+  }
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "StandardSSD_LRS"
+  }
+
+  data_disk {
+    lun                  = 0
+    caching              = "ReadWrite"
+    create_option        = "Empty"
+    disk_size_gb         = local.disk_size
+    storage_account_type = "StandardSSD_LRS"
+  }
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [local.gw_identity_id]
+  }
+
+  network_interface {
+    name                          = "${var.gateways_name}-primary-nic-0"
+    network_security_group_id     = var.sg_id
+    primary                       = true
+    enable_accelerated_networking = true
+
+    # ipconfig with public ip
+    dynamic "ip_configuration" {
+      for_each = range(var.assign_public_ip ? 1 : 0)
+      content {
+        primary   = true
+        name      = "ipconfig0"
+        subnet_id = data.azurerm_subnet.subnet.id
+        public_ip_address {
+          name              = "${var.gateways_name}-public-ip"
+          domain_name_label = "nfs-gw-public-ip"
+        }
+      }
+    }
+
+    # ipconfig without public ip
+    dynamic "ip_configuration" {
+      for_each = range(var.assign_public_ip ? 0 : 1)
+      content {
+        primary   = true
+        name      = "ipconfig0"
+        subnet_id = data.azurerm_subnet.subnet.id
+      }
+    }
+
+    # secondary ips (floating ip)
+    dynamic "ip_configuration" {
+      for_each = range(var.secondary_ips_per_nic)
+      content {
+        name      = "ipconfig${ip_configuration.value + 1}"
+        subnet_id = data.azurerm_subnet.subnet.id
+      }
+    }
+  }
+
+
+  dynamic "network_interface" {
+    for_each = range(1, local.nics_numbers)
+    content {
+      name                          = "${var.gateways_name}-secondary-nic-${network_interface.value}"
+      network_security_group_id     = var.sg_id
+      primary                       = false
+      enable_accelerated_networking = true
+      ip_configuration {
+        primary   = true
+        name      = "ipconfig0"
+        subnet_id = data.azurerm_subnet.subnet.id
+      }
+    }
+  }
+  lifecycle {
+    ignore_changes = [tags, os_profile[0].custom_data, instances]
+    precondition {
+      condition     = var.gateways_number >= 1
+      error_message = "The amount of protocol gateways should be at least 1 for NFS."
+    }
+    precondition {
+      condition     = var.frontend_container_cores_num < local.nics_numbers
+      error_message = "The number of frontends must be less than the number of NICs."
+    }
+    precondition {
+      condition     = var.location == data.azurerm_resource_group.rg.location
+      error_message = "The location of the protocol gateways must be the same as the location of the resource group."
+    }
+  }
 }

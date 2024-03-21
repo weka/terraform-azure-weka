@@ -387,13 +387,13 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "2380b026b2b6b84b67c8e553122766ae"
+  default     = "2867365b0d8a31a0ffebb6b688867b04"
 }
 
 variable "function_app_dist" {
   type        = string
   description = "Function app code dist"
-  default     = "release"
+  default     = "dev"
 
   validation {
     condition     = contains(["dev", "release"], var.function_app_dist)
@@ -583,6 +583,12 @@ variable "protocol_gateways_identity_name" {
   default     = ""
 }
 
+variable "nfs_deployment_container_name" {
+  type        = string
+  default     = ""
+  description = "Name of exising protocol deployment container"
+}
+
 ############################################### nfs protocol gateways variables ###################################################
 variable "nfs_protocol_gateways_number" {
   type        = number
@@ -618,6 +624,23 @@ variable "nfs_setup_protocol" {
   type        = bool
   description = "Config protocol, default if false"
   default     = false
+}
+
+variable "nfs_client_group_name" {
+  type        = string
+  description = "Client access group name."
+  default     = "weka-cg"
+}
+
+variable "nfs_interface_group_name" {
+  type        = string
+  description = "Interface group name."
+  default     = "weka-ig"
+
+  validation {
+    condition     = length(var.nfs_interface_group_name) <= 11
+    error_message = "The interface group name should be up to 11 characters long."
+  }
 }
 
 ############################################### smb protocol gateways variables ###################################################

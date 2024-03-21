@@ -27,8 +27,9 @@ func itemInList(item string, list []string) bool {
 	return false
 }
 
-func addSummary(ctx context.Context, state protocol.ClusterState, stateStorageName, stateContainerName, subscriptionId, resourceGroupName, vmScaleSetName string, reports *protocol.Reports) {
+func addSummary(ctx context.Context, state protocol.ClusterState, stateParams common.BlobObjParams, vmssParams *common.ScaleSetParams, reports *protocol.Reports) {
 	logger := logging.LoggerFromCtx(ctx)
+
 	if state.Clusterized {
 		summary := protocol.ClusterizationStatusSummary{
 			ClusterizationTarget: state.ClusterizationTarget,
@@ -38,9 +39,9 @@ func addSummary(ctx context.Context, state protocol.ClusterState, stateStorageNa
 		return
 	}
 
-	vms, err := common.GetScaleSetVmsExpandedView(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	vms, err := common.GetScaleSetVmsExpandedView(ctx, vmssParams)
 	if err != nil {
-		msg := fmt.Sprintf("Failed getting vms list for vmss %s: %v", vmScaleSetName, err)
+		msg := fmt.Sprintf("Failed getting vms list for vmss %s: %v", vmssParams.ScaleSetName, err)
 		logger.Error().Msg(msg)
 		return
 	}
@@ -53,14 +54,14 @@ func addSummary(ctx context.Context, state protocol.ClusterState, stateStorageNa
 	var allVms []string
 
 	for _, instance := range state.Instances {
-		readyForClusterization = append(readyForClusterization, strings.Split(instance, ":")[1])
+		readyForClusterization = append(readyForClusterization, strings.Split(instance.Name, ":")[1])
 	}
 
 	for _, vm := range vms {
-		if vm.Properties.InstanceView.ComputerName != nil {
-			allVms = append(allVms, *vm.Properties.InstanceView.ComputerName)
-			if itemInList(common.GetScaleSetVmId(*vm.ID), toTerminate) {
-				stopped = append(stopped, *vm.Properties.InstanceView.ComputerName)
+		if vm.ComputerName != nil {
+			allVms = append(allVms, *vm.ComputerName)
+			if itemInList(common.GetScaleSetVmId(vm.ID), toTerminate) {
+				stopped = append(stopped, *vm.ComputerName)
 			}
 		}
 	}
@@ -79,7 +80,7 @@ func addSummary(ctx context.Context, state protocol.ClusterState, stateStorageNa
 
 	clusterizationInstance := ""
 	if len(state.Instances) >= state.ClusterizationTarget {
-		clusterizationInstance = strings.Split(state.Instances[state.ClusterizationTarget-1], ":")[1]
+		clusterizationInstance = strings.Split(state.Instances[state.ClusterizationTarget-1].Name, ":")[1]
 	}
 
 	summary := protocol.ClusterizationStatusSummary{
@@ -96,29 +97,35 @@ func addSummary(ctx context.Context, state protocol.ClusterState, stateStorageNa
 	reports.Summary = summary
 }
 
-func GetReports(ctx context.Context, stateStorageName, stateContainerName, subscriptionId, resourceGroupName, vmScaleSetName string) (reports protocol.Reports, err error) {
+func GetReports(ctx context.Context, stateParams common.BlobObjParams, vmssParams *common.ScaleSetParams) (reports protocol.Reports, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("fetching cluster status...")
 
-	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
+	state, err := common.ReadState(ctx, stateParams)
 	if err != nil {
 		return
 	}
-	reports.ReadyForClusterization = state.Instances
+
+	var instanceNames []string
+	for _, instance := range state.Instances {
+		instanceNames = append(instanceNames, instance.Name)
+	}
+
+	reports.ReadyForClusterization = instanceNames
 	reports.Progress = state.Progress
 	reports.Errors = state.Errors
 	reports.Debug = state.Debug
 
-	addSummary(ctx, state, stateStorageName, stateContainerName, subscriptionId, resourceGroupName, vmScaleSetName, &reports)
+	addSummary(ctx, state, stateParams, vmssParams, &reports)
 
 	return
 }
 
-func GetClusterStatus(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, keyVaultUri string) (clusterStatus protocol.ClusterStatus, err error) {
+func GetClusterStatus(ctx context.Context, vmssParams *common.ScaleSetParams, stateParams common.BlobObjParams, keyVaultUri string) (clusterStatus protocol.ClusterStatus, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("fetching cluster status...")
 
-	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
+	state, err := common.ReadState(ctx, stateParams)
 	if err != nil {
 		return
 	}
@@ -138,7 +145,7 @@ func GetClusterStatus(ctx context.Context, subscriptionId, resourceGroupName, vm
 		return connectors.NewJrpcClient(ctx, ip, weka.ManagementJrpcPort, common.WekaAdminUsername, wekaPassword)
 	}
 
-	vmIps, err := common.GetVmsPrivateIps(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	vmIps, err := common.GetVmsPrivateIps(ctx, vmssParams)
 	if err != nil {
 		return
 	}
@@ -173,21 +180,21 @@ func GetClusterStatus(ctx context.Context, subscriptionId, resourceGroupName, vm
 	return
 }
 
-func GetRefreshStatus(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName string, extended bool) (*common.VMSSStateVerbose, error) {
-	vmssConfig, err := common.ReadVmssConfig(ctx, stateStorageName, stateContainerName)
+func GetRefreshStatus(ctx context.Context, vmssParams *common.ScaleSetParams, stateParams common.BlobObjParams, extended bool) (*common.VMSSStateVerbose, error) {
+	vmssConfig, err := common.ReadVmssConfig(ctx, stateParams.StorageName, stateParams.ContainerName)
 	if err != nil {
 		return nil, err
 	}
 	vmssConfig.CustomData = "<hidden>"
 	vmssConfig.SshPublicKey = "<hidden>"
 
-	currentConfig, err := common.GetCurrentScaleSetConfiguration(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	currentConfig, err := common.GetCurrentScaleSetConfiguration(ctx, vmssParams)
 	if err != nil {
 		return nil, err
 	}
 
 	result := &common.VMSSStateVerbose{
-		VmssName:         vmScaleSetName,
+		VmssName:         vmssParams.ScaleSetName,
 		TargetConfig:     vmssConfig,
 		TargetConfigHash: vmssConfig.ConfigHash,
 	}
@@ -203,7 +210,7 @@ func GetRefreshStatus(ctx context.Context, subscriptionId, resourceGroupName, vm
 		result.CurrentConfig = currentConfig
 	}
 
-	state, err := common.ReadState(ctx, stateStorageName, stateContainerName)
+	state, err := common.ReadState(ctx, stateParams)
 	if err != nil {
 		return nil, err
 	}
@@ -221,9 +228,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
+	stateBlobName := os.Getenv("STATE_BLOB_NAME")
 	prefix := os.Getenv("PREFIX")
 	clusterName := os.Getenv("CLUSTER_NAME")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
+	nfsStateContainerName := os.Getenv("NFS_STATE_CONTAINER_NAME")
+	nfsStateBlobName := os.Getenv("NFS_STATE_BLOB_NAME")
+	nfsScaleSetName := os.Getenv("NFS_VMSS_NAME")
 
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
@@ -231,7 +242,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	var invokeRequest common.InvokeRequest
 
 	var requestBody struct {
-		Type string `json:"type"`
+		Type     string `json:"type"`
+		Protocol string `json:"protocol"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&invokeRequest); err != nil {
@@ -259,16 +271,36 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	vmScaleSetName := common.GetVmScaleSetName(prefix, clusterName)
+	stateParams := common.BlobObjParams{
+		StorageName:   stateStorageName,
+		ContainerName: stateContainerName,
+		BlobName:      stateBlobName,
+	}
+
+	vmssParams := &common.ScaleSetParams{
+		SubscriptionId:    subscriptionId,
+		ResourceGroupName: resourceGroupName,
+		ScaleSetName:      common.GetVmScaleSetName(prefix, clusterName),
+		Flexible:          false,
+	}
+
+	if requestBody.Protocol == "nfs" {
+		stateParams.ContainerName = nfsStateContainerName
+		stateParams.BlobName = nfsStateBlobName
+
+		vmssParams.ScaleSetName = nfsScaleSetName
+		vmssParams.Flexible = true
+	}
+
 	var result interface{}
 	if requestBody.Type == "" || requestBody.Type == "status" {
-		result, err = GetClusterStatus(ctx, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, keyVaultUri)
+		result, err = GetClusterStatus(ctx, vmssParams, stateParams, keyVaultUri)
 	} else if requestBody.Type == "progress" {
-		result, err = GetReports(ctx, stateStorageName, stateContainerName, subscriptionId, resourceGroupName, vmScaleSetName)
+		result, err = GetReports(ctx, stateParams, vmssParams)
 	} else if requestBody.Type == "vmss" {
-		result, err = GetRefreshStatus(ctx, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, false)
+		result, err = GetRefreshStatus(ctx, vmssParams, stateParams, false)
 	} else if requestBody.Type == "vmss-extended" {
-		result, err = GetRefreshStatus(ctx, subscriptionId, resourceGroupName, vmScaleSetName, stateStorageName, stateContainerName, true)
+		result, err = GetRefreshStatus(ctx, vmssParams, stateParams, true)
 	} else {
 		result = "Invalid status type"
 	}

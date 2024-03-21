@@ -18,6 +18,14 @@ resource "azurerm_role_assignment" "storage_blob_data_contributor" {
   principal_id         = azurerm_user_assigned_identity.function_app[0].principal_id
 }
 
+resource "azurerm_role_assignment" "nfs_storage_blob_data_contributor" {
+  count                = var.function_app_identity_name == "" && var.nfs_protocol_gateways_number > 0 ? 1 : 0
+  scope                = local.nfs_deployment_sa_scope
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.function_app[0].principal_id
+}
+
+
 resource "azurerm_role_assignment" "storage_account_contributor" {
   count                = var.function_app_identity_name == "" ? 1 : 0
   scope                = data.azurerm_resource_group.rg.id

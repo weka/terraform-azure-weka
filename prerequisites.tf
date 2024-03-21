@@ -32,6 +32,8 @@ module "iam" {
   weka_tar_storage_account_id    = var.weka_tar_storage_account_id
   deployment_storage_account_id  = local.deployment_storage_account_id
   deployment_container_name      = local.deployment_container_name
+  nfs_deployment_container_name  = local.nfs_deployment_container_name
+  nfs_protocol_gateways_number   = var.nfs_protocol_gateways_number
   tiering_enable_obs_integration = var.tiering_enable_obs_integration
   tiering_obs_name               = var.tiering_obs_name
   obs_container_name             = local.obs_container_name

@@ -79,3 +79,13 @@ variable "obs_container_name" {
   type        = string
   description = "The name of the container for the OBS."
 }
+
+variable "nfs_protocol_gateways_number" {
+  type        = number
+  description = "The number of NFS protocol gateways."
+}
+
+variable "nfs_deployment_container_name" {
+  type        = string
+  description = "The name of the container for the NFS deployment."
+}
