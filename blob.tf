@@ -148,10 +148,11 @@ resource "azurerm_storage_blob" "nfs_state" {
   storage_container_name = local.nfs_deployment_container_name
   type                   = "Block"
   source_content = jsonencode({
-    initial_size = var.nfs_protocol_gateways_number
-    desired_size = var.nfs_protocol_gateways_number
-    instances    = []
-    clusterized  = false
+    initial_size          = var.nfs_protocol_gateways_number
+    desired_size          = var.nfs_protocol_gateways_number
+    instances             = []
+    clusterized           = false
+    clusterization_target = var.nfs_protocol_gateways_number
   })
   depends_on = [azurerm_storage_container.nfs_deployment]
 

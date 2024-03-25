@@ -144,7 +144,6 @@ func handleNFSScaleUp(ctx context.Context) (message string, err error) {
 
 		handleProgressingClusterization(ctx, &nfsState, subscriptionId, resourceGroupName, nfsScaleSetName, nfsStateParams)
 		logger.Info().Msg(message)
-		return
 	}
 
 	err = common.ScaleUp(ctx, subscriptionId, resourceGroupName, nfsScaleSetName, int64(nfsState.DesiredSize))

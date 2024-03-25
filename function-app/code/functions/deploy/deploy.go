@@ -257,6 +257,7 @@ func getGateways(subnet string, nicsNum int) (gateways []string) {
 func Handler(w http.ResponseWriter, r *http.Request) {
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
+	stateBlobName := os.Getenv("STATE_BLOB_NAME")
 	clusterName := os.Getenv("CLUSTER_NAME")
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
@@ -321,7 +322,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	params := AzureDeploymentParams{
 		SubscriptionId:        subscriptionId,
 		ResourceGroupName:     resourceGroupName,
-		StateParams:           common.BlobObjParams{StorageName: stateStorageName, ContainerName: stateContainerName, BlobName: stateContainerName},
+		StateParams:           common.BlobObjParams{StorageName: stateStorageName, ContainerName: stateContainerName, BlobName: stateBlobName},
 		Prefix:                prefix,
 		ClusterName:           clusterName,
 		InstallUrl:            installUrl,

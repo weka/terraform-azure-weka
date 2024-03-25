@@ -113,10 +113,13 @@ locals {
   nics_numbers          = var.frontend_container_cores_num + 1
 
   init_script = templatefile("${path.module}/init.sh", {
-    apt_repo_server = var.apt_repo_server
-    nics_num        = local.nics_numbers
-    subnet_range    = data.azurerm_subnet.subnet.address_prefix
-    disk_size       = local.disk_size
+    apt_repo_server          = var.apt_repo_server
+    nics_num                 = local.nics_numbers
+    subnet_range             = data.azurerm_subnet.subnet.address_prefix
+    disk_size                = local.disk_size
+    deploy_url               = var.deploy_function_url
+    report_url               = var.report_function_url
+    function_app_default_key = var.function_app_default_key
   })
 
   setup_smb_protocol_script = templatefile("${path.module}/setup_smb.sh", {
@@ -179,15 +182,15 @@ resource "azurerm_linux_virtual_machine" "this" {
   lifecycle {
     ignore_changes = [tags, custom_data]
     precondition {
-      condition     = var.protocol == "NFS" ? var.gateways_number >= 1 : var.gateways_number >= 3 && var.gateways_number <= 8
-      error_message = "The amount of protocol gateways should be at least 1 for NFS and at least 3 and at most 8 for SMB."
+      condition     = var.gateways_number >= 3 && var.gateways_number <= 8
+      error_message = "The amount of protocol gateways should at least 3 and at most 8 for SMB."
     }
     precondition {
-      condition     = var.protocol == "SMB" && var.setup_protocol ? var.smb_domain_name != "" : true
+      condition     = var.setup_protocol ? var.smb_domain_name != "" : true
       error_message = "The SMB domain name should be set when deploying SMB protocol gateways."
     }
     precondition {
-      condition     = var.protocol == "SMB" ? var.secondary_ips_per_nic <= 3 : true
+      condition     = var.secondary_ips_per_nic <= 3
       error_message = "The number of secondary IPs per single NIC per protocol gateway virtual machine must be at most 3 for SMB."
     }
     precondition {
@@ -272,7 +275,6 @@ resource "azurerm_linux_virtual_machine_scale_set" "nfs" {
   }
 
   data_disk {
-    name                 = "weka-disk-${var.gateways_name}"
     lun                  = 0
     caching              = "ReadWrite"
     create_option        = "Empty"
@@ -290,7 +292,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "nfs" {
   }
 
   network_interface {
-    name                          = "${var.gateways_name}-primary-nic-${network_interface.value}"
+    name                          = "${var.gateways_name}-primary-nic-0"
     network_security_group_id     = var.sg_id
     primary                       = true
     enable_accelerated_networking = true
@@ -346,6 +348,18 @@ resource "azurerm_linux_virtual_machine_scale_set" "nfs" {
   }
   lifecycle {
     ignore_changes = [tags, custom_data, instances]
+    precondition {
+      condition     = var.gateways_number >= 1
+      error_message = "The amount of protocol gateways should be at least 1 for NFS."
+    }
+    precondition {
+      condition     = var.frontend_container_cores_num < local.nics_numbers
+      error_message = "The number of frontends must be less than the number of NICs."
+    }
+    precondition {
+      condition     = var.location == data.azurerm_resource_group.rg.location
+      error_message = "The location of the protocol gateways must be the same as the location of the resource group."
+    }
   }
 }
 
@@ -353,7 +367,7 @@ resource "azurerm_key_vault_access_policy" "nfs_backend_vmss_key_vault" {
   count        = var.protocol == "NFS" ? 1 : 0
   key_vault_id = var.key_vault_id
   tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = azurerm_linux_virtual_machine_scale_set.nfs.identity[0].principal_id
+  object_id    = azurerm_linux_virtual_machine_scale_set.nfs[0].identity[0].principal_id
   secret_permissions = [
     "Get",
   ]
@@ -364,7 +378,7 @@ resource "azurerm_role_assignment" "nfs_backend_vmss_key_vault" {
   count                = var.protocol == "NFS" ? 1 : 0
   scope                = var.key_vault_id
   role_definition_name = "Key Vault Secrets User"
-  principal_id         = azurerm_linux_virtual_machine_scale_set.nfs.identity[0].principal_id
+  principal_id         = azurerm_linux_virtual_machine_scale_set.nfs[0].identity[0].principal_id
   depends_on           = [azurerm_linux_virtual_machine_scale_set.nfs]
 }
 
@@ -372,6 +386,6 @@ resource "azurerm_role_assignment" "storage_blob_data_reader_vmss" {
   count                = var.weka_tar_storage_account_id != "" && var.protocol == "NFS" ? 1 : 0
   scope                = var.weka_tar_storage_account_id
   role_definition_name = "Storage Blob Data Reader"
-  principal_id         = azurerm_linux_virtual_machine_scale_set.nfs.identity[0].principal_id
+  principal_id         = azurerm_linux_virtual_machine_scale_set.nfs[0].identity[0].principal_id
   depends_on           = [azurerm_linux_virtual_machine_scale_set.nfs]
 }

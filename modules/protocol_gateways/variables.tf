@@ -183,3 +183,18 @@ variable "vault_function_app_key_name" {
   description = "The name of the Vault key containing the function app key."
   default     = "function-app-default-key"
 }
+
+variable "deploy_function_url" {
+  type        = string
+  description = "The URL of deploy function from function app."
+}
+
+variable "report_function_url" {
+  type        = string
+  description = "The URL of report function from function app."
+}
+
+variable "function_app_default_key" {
+  type        = string
+  description = "The default key of the function app."
+}

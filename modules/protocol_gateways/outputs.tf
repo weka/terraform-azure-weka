@@ -4,6 +4,6 @@ output "protocol_gateways_ips" {
 }
 
 output "nfs_vmss_name" {
-  value       = var.protocol == "NFS" ? azurerm_linux_virtual_machine_scale_set.nfs.name : null
+  value       = var.protocol == "NFS" ? azurerm_linux_virtual_machine_scale_set.nfs[0].name : null
   description = "The name of the NFS VMSS."
 }
