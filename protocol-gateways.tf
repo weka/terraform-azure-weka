@@ -13,8 +13,6 @@ module "nfs_protocol_gateways" {
   gateways_name                = "${var.prefix}-${var.cluster_name}-nfs-protocol-gateway"
   protocol                     = "NFS"
   secondary_ips_per_nic        = var.nfs_protocol_gateway_secondary_ips_per_nic
-  backend_lb_ip                = azurerm_lb.backend_lb.private_ip_address
-  install_weka_url             = local.install_weka_url
   instance_type                = var.nfs_protocol_gateway_instance_type
   apt_repo_server              = var.apt_repo_server
   vm_username                  = var.vm_username
@@ -27,6 +25,9 @@ module "nfs_protocol_gateways" {
   disk_size                    = var.nfs_protocol_gateway_disk_size
   frontend_container_cores_num = var.nfs_protocol_gateway_fe_cores_num
   function_app_name            = azurerm_linux_function_app.function_app.name
+  deploy_function_url          = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/deploy"
+  report_function_url          = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/report"
+  function_app_default_key     = data.azurerm_function_app_host_keys.function_keys.default_function_key
   depends_on                   = [module.network, azurerm_key_vault_secret.get_weka_io_token, azurerm_proximity_placement_group.ppg]
 }
 
@@ -112,8 +113,6 @@ module "smb_protocol_gateways" {
   gateways_name                = "${var.prefix}-${var.cluster_name}-smb-protocol-gateway"
   protocol                     = "SMB"
   secondary_ips_per_nic        = var.smb_protocol_gateway_secondary_ips_per_nic
-  backend_lb_ip                = azurerm_lb.backend_lb.private_ip_address
-  install_weka_url             = local.install_weka_url
   instance_type                = var.smb_protocol_gateway_instance_type
   apt_repo_server              = var.apt_repo_server
   vm_username                  = var.vm_username
@@ -129,5 +128,8 @@ module "smb_protocol_gateways" {
   smb_domain_name              = var.smb_domain_name
   smbw_enabled                 = var.smbw_enabled
   function_app_name            = azurerm_linux_function_app.function_app.name
+  deploy_function_url          = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/deploy"
+  report_function_url          = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/report"
+  function_app_default_key     = data.azurerm_function_app_host_keys.function_keys.default_function_key
   depends_on                   = [module.network, azurerm_key_vault_secret.get_weka_io_token, azurerm_proximity_placement_group.ppg, azurerm_private_dns_resolver_dns_forwarding_ruleset.dns_forwarding_ruleset]
 }

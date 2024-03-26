@@ -42,6 +42,12 @@ type InvokeResponse struct {
 	ReturnValue interface{}
 }
 
+type BlobObjParams struct {
+	StorageName   string
+	ContainerName string
+	BlobName      string
+}
+
 const FindDrivesScript = `
 import json
 import sys
@@ -173,7 +179,7 @@ func UnlockContainer(ctx context.Context, storageAccountName, containerName stri
 	return err
 }
 
-func ReadBlobObject(ctx context.Context, storageName, containerName, blobName string) (state []byte, err error) {
+func ReadBlobObject(ctx context.Context, bl BlobObjParams) (state []byte, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
@@ -182,13 +188,13 @@ func ReadBlobObject(ctx context.Context, storageName, containerName, blobName st
 		return
 	}
 
-	blobClient, err := azblob.NewClient(getBlobUrl(storageName), credential, nil)
+	blobClient, err := azblob.NewClient(getBlobUrl(bl.StorageName), credential, nil)
 	if err != nil {
 		logger.Error().Msgf("azblob.NewClient: %s", err)
 		return
 	}
 
-	downloadResponse, err := blobClient.DownloadStream(ctx, containerName, blobName, nil)
+	downloadResponse, err := blobClient.DownloadStream(ctx, bl.ContainerName, bl.BlobName, nil)
 	if err != nil {
 		logger.Error().Msgf("blobClient.DownloadStream: %s", err)
 		return
@@ -203,10 +209,10 @@ func ReadBlobObject(ctx context.Context, storageName, containerName, blobName st
 
 }
 
-func ReadState(ctx context.Context, stateStorageName, containerName string) (state protocol.ClusterState, err error) {
+func ReadState(ctx context.Context, stateParams BlobObjParams) (state protocol.ClusterState, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	stateAsByteArray, err := ReadBlobObject(ctx, stateStorageName, containerName, "state")
+	stateAsByteArray, err := ReadBlobObject(ctx, stateParams)
 	if err != nil {
 		return
 	}
@@ -219,7 +225,7 @@ func ReadState(ctx context.Context, stateStorageName, containerName string) (sta
 	return
 }
 
-func WriteBlobObject(ctx context.Context, storageName, containerName, blobName string, state []byte) (err error) {
+func WriteBlobObject(ctx context.Context, bl BlobObjParams, state []byte) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
@@ -228,19 +234,19 @@ func WriteBlobObject(ctx context.Context, storageName, containerName, blobName s
 		return
 	}
 
-	blobClient, err := azblob.NewClient(getBlobUrl(storageName), credential, nil)
+	blobClient, err := azblob.NewClient(getBlobUrl(bl.StorageName), credential, nil)
 	if err != nil {
 		logger.Error().Err(err).Send()
 		return
 	}
 
-	_, err = blobClient.UploadBuffer(ctx, containerName, blobName, state, &azblob.UploadBufferOptions{})
+	_, err = blobClient.UploadBuffer(ctx, bl.ContainerName, bl.BlobName, state, &azblob.UploadBufferOptions{})
 
 	return
 
 }
 
-func WriteState(ctx context.Context, stateStorageName, containerName string, state protocol.ClusterState) (err error) {
+func WriteState(ctx context.Context, stateParams BlobObjParams, state protocol.ClusterState) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	stateAsByteArray, err := json.Marshal(state)
@@ -249,7 +255,7 @@ func WriteState(ctx context.Context, stateStorageName, containerName string, sta
 		return
 	}
 
-	err = WriteBlobObject(ctx, stateStorageName, containerName, "state", stateAsByteArray)
+	err = WriteBlobObject(ctx, stateParams, stateAsByteArray)
 	return
 }
 
@@ -269,16 +275,16 @@ func (e *ShutdownRequired) Error() string {
 	return e.Message
 }
 
-func AddInstanceToState(ctx context.Context, subscriptionId, resourceGroupName, stateStorageName, stateContainerName, newInstance string) (state protocol.ClusterState, err error) {
+func AddInstanceToState(ctx context.Context, subscriptionId, resourceGroupName string, stateParams BlobObjParams, newInstance protocol.Vm) (state protocol.ClusterState, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	leaseId, err := LockContainer(ctx, stateStorageName, stateContainerName)
+	leaseId, err := LockContainer(ctx, stateParams.StorageName, stateParams.ContainerName)
 	if err != nil {
 		return
 	}
-	defer UnlockContainer(ctx, stateStorageName, stateContainerName, leaseId)
+	defer UnlockContainer(ctx, stateParams.StorageName, stateParams.ContainerName, leaseId)
 
-	state, err = ReadState(ctx, stateStorageName, stateContainerName)
+	state, err = ReadState(ctx, stateParams)
 	if err != nil {
 		return
 	}
@@ -296,29 +302,29 @@ func AddInstanceToState(ctx context.Context, subscriptionId, resourceGroupName, 
 		logger.Error().Err(err).Send()
 	} else {
 		state.Instances = append(state.Instances, newInstance)
-		err = WriteState(ctx, stateStorageName, stateContainerName, state)
+		err = WriteState(ctx, stateParams, state)
 	}
 	return
 }
 
-func UpdateClusterized(ctx context.Context, subscriptionId, resourceGroupName, stateStorageName, stateContainerName string) (state protocol.ClusterState, err error) {
+func UpdateClusterized(ctx context.Context, subscriptionId, resourceGroupName string, stateParams BlobObjParams) (state protocol.ClusterState, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	leaseId, err := LockContainer(ctx, stateStorageName, stateContainerName)
+	leaseId, err := LockContainer(ctx, stateParams.StorageName, stateParams.ContainerName)
 	if err != nil {
 		return
 	}
-	defer UnlockContainer(ctx, stateStorageName, stateContainerName, leaseId)
+	defer UnlockContainer(ctx, stateParams.StorageName, stateParams.ContainerName, leaseId)
 
-	state, err = ReadState(ctx, stateStorageName, stateContainerName)
+	state, err = ReadState(ctx, stateParams)
 	if err != nil {
 		return
 	}
 
-	state.Instances = []string{}
+	state.Instances = []protocol.Vm{}
 	state.Clusterized = true
 
-	err = WriteState(ctx, stateStorageName, stateContainerName, state)
+	err = WriteState(ctx, stateParams, state)
 
 	logger.Info().Msg("State updated to 'clusterized'")
 	return
@@ -517,6 +523,27 @@ func GetScaleSetVmsNetworkPrimaryNICs(ctx context.Context, subscriptionId, resou
 	return
 }
 
+func GetScaleSetSecondaryIps(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (secondaryIps []string, err error) {
+	nics, err := getScaleSetVmsNetworkInterfaces(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
+	if err != nil {
+		err = fmt.Errorf("cannot get scale set vms network interfaces: %v", err)
+		return
+	}
+
+	for _, nic := range nics {
+		if nic.Properties == nil || nic.Properties.VirtualMachine == nil || len(nic.Properties.IPConfigurations) < 1 {
+			continue
+		}
+		for _, ipConfig := range nic.Properties.IPConfigurations {
+			isPrimary := ipConfig.Properties.Primary != nil && *ipConfig.Properties.Primary
+			if !isPrimary && ipConfig.Properties.PrivateIPAddress != nil {
+				secondaryIps = append(secondaryIps, *ipConfig.Properties.PrivateIPAddress)
+			}
+		}
+	}
+	return
+}
+
 func GetPublicIp(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, prefix, clusterName, instanceIndex string) (publicIp string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
@@ -531,8 +558,8 @@ func GetPublicIp(ctx context.Context, subscriptionId, resourceGroupName, vmScale
 		logger.Error().Err(err).Send()
 		return
 	}
-	interfaceName := fmt.Sprintf("%s-%s-backend-nic", prefix, clusterName)
-	pager := client.NewListVirtualMachineScaleSetVMPublicIPAddressesPager(resourceGroupName, vmScaleSetName, instanceIndex, interfaceName, "ipconfig1", nil)
+	interfaceName := fmt.Sprintf("%s-%s-backend-nic-0", prefix, clusterName)
+	pager := client.NewListVirtualMachineScaleSetVMPublicIPAddressesPager(resourceGroupName, vmScaleSetName, instanceIndex, interfaceName, "ipconfig0", nil)
 
 	for pager.More() {
 		nextResult, err1 := pager.NextPage(ctx)
@@ -850,11 +877,6 @@ func GetScaleSetInstances(ctx context.Context, subscriptionId, resourceGroupName
 	return
 }
 
-type ScaleSetInstanceInfo struct {
-	Id        string
-	PrivateIp string
-}
-
 func GetScaleSetVmId(resourceId string) string {
 	vmNameParts := strings.Split(resourceId, "/")
 	vmNamePartsLen := len(vmNameParts)
@@ -862,7 +884,7 @@ func GetScaleSetVmId(resourceId string) string {
 	return vmId
 }
 
-func GetScaleSetInstancesInfo(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (instances []ScaleSetInstanceInfo, err error) {
+func GetScaleSetInstancesInfo(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (instances []protocol.HgInstance, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("Getting scale set instances %s info", vmScaleSetName)
 
@@ -889,7 +911,7 @@ func GetScaleSetInstancesInfo(ctx context.Context, subscriptionId, resourceGroup
 		if val, ok := instanceIdPrivateIp[id]; ok {
 			privateIp = val
 		}
-		instanceInfo := ScaleSetInstanceInfo{
+		instanceInfo := protocol.HgInstance{
 			Id:        id,
 			PrivateIp: privateIp,
 		}
@@ -937,7 +959,7 @@ func SetDeletionProtection(ctx context.Context, subscriptionId, resourceGroupNam
 }
 
 func RetrySetDeletionProtectionAndReport(
-	ctx context.Context, subscriptionId, resourceGroupName, stateContainerName, stateStorageName, vmScaleSetName, instanceId, hostName string,
+	ctx context.Context, subscriptionId, resourceGroupName string, stateParams BlobObjParams, vmScaleSetName, instanceId, hostName string,
 	maxAttempts int, sleepInterval time.Duration,
 ) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
@@ -948,7 +970,7 @@ func RetrySetDeletionProtectionAndReport(
 		if err == nil {
 			msg := "Deletion protection was set successfully"
 			logger.Info().Msg(msg)
-			ReportMsg(ctx, hostName, stateContainerName, stateStorageName, "progress", msg)
+			ReportMsg(ctx, hostName, stateParams, "progress", msg)
 			break
 		}
 
@@ -957,7 +979,7 @@ func RetrySetDeletionProtectionAndReport(
 			// deletion protection invoked by terminate function
 			if maxAttempts == 0 {
 				msg := "Deletion protection set authorization isn't ready, will retry on next scale down workflow"
-				ReportMsg(ctx, hostName, stateContainerName, stateStorageName, "debug", msg)
+				ReportMsg(ctx, hostName, stateParams, "debug", msg)
 				return
 			}
 
@@ -966,7 +988,7 @@ func RetrySetDeletionProtectionAndReport(
 			}
 			msg := fmt.Sprintf("Deletion protection set authorization isn't ready, going to sleep for %s", sleepInterval)
 			logger.Info().Msg(msg)
-			ReportMsg(ctx, hostName, stateContainerName, stateStorageName, "debug", msg)
+			ReportMsg(ctx, hostName, stateParams, "debug", msg)
 			time.Sleep(sleepInterval)
 		} else {
 			break
@@ -974,14 +996,14 @@ func RetrySetDeletionProtectionAndReport(
 	}
 	if err != nil {
 		logger.Error().Err(err).Send()
-		ReportMsg(ctx, hostName, stateContainerName, stateStorageName, "error", err.Error())
+		ReportMsg(ctx, hostName, stateParams, "error", err.Error())
 	}
 	return
 }
 
-func ReportMsg(ctx context.Context, hostName, stateContainerName, stateStorageName, reportType, message string) {
+func ReportMsg(ctx context.Context, hostName string, stateParams BlobObjParams, reportType, message string) {
 	reportObj := protocol.Report{Type: reportType, Hostname: hostName, Message: message}
-	_ = UpdateStateReporting(ctx, stateContainerName, stateStorageName, reportObj)
+	_ = UpdateStateReporting(ctx, stateParams, reportObj)
 }
 
 func GetWekaClusterPassword(ctx context.Context, keyVaultUri string) (password string, err error) {
@@ -1070,31 +1092,31 @@ func TerminateScaleSetInstances(ctx context.Context, subscriptionId, resourceGro
 	return
 }
 
-func UpdateStateReporting(ctx context.Context, stateContainerName, stateStorageName string, report protocol.Report) (err error) {
-	leaseId, err := LockContainer(ctx, stateStorageName, stateContainerName)
+func UpdateStateReporting(ctx context.Context, stateParams BlobObjParams, report protocol.Report) (err error) {
+	leaseId, err := LockContainer(ctx, stateParams.StorageName, stateParams.ContainerName)
 	if err != nil {
 		return
 	}
-	defer UnlockContainer(ctx, stateStorageName, stateContainerName, leaseId)
+	defer UnlockContainer(ctx, stateParams.StorageName, stateParams.ContainerName, leaseId)
 
-	return UpdateStateReportingWithoutLocking(ctx, stateContainerName, stateStorageName, report)
+	return UpdateStateReportingWithoutLocking(ctx, stateParams, report)
 }
 
-func AddClusterUpdate(ctx context.Context, stateContainerName, stateStorageName string, update protocol.Update) (err error) {
-	leaseId, err := LockContainer(ctx, stateStorageName, stateContainerName)
+func AddClusterUpdate(ctx context.Context, stateParams BlobObjParams, update protocol.Update) (err error) {
+	leaseId, err := LockContainer(ctx, stateParams.StorageName, stateParams.ContainerName)
 	if err != nil {
 		return
 	}
-	defer UnlockContainer(ctx, stateStorageName, stateContainerName, leaseId)
+	defer UnlockContainer(ctx, stateParams.StorageName, stateParams.ContainerName, leaseId)
 
-	state, err := ReadState(ctx, stateStorageName, stateContainerName)
+	state, err := ReadState(ctx, stateParams)
 	if err != nil {
 		return
 	}
 
 	reportLib.AddClusterUpdate(update, &state)
 
-	err = WriteState(ctx, stateStorageName, stateContainerName, state)
+	err = WriteState(ctx, stateParams, state)
 	if err != nil {
 		err = fmt.Errorf("failed addind cluster update to state")
 		return
@@ -1102,8 +1124,8 @@ func AddClusterUpdate(ctx context.Context, stateContainerName, stateStorageName 
 	return
 }
 
-func UpdateStateReportingWithoutLocking(ctx context.Context, stateContainerName, stateStorageName string, report protocol.Report) (err error) {
-	state, err := ReadState(ctx, stateStorageName, stateContainerName)
+func UpdateStateReportingWithoutLocking(ctx context.Context, stateParams BlobObjParams, report protocol.Report) (err error) {
+	state, err := ReadState(ctx, stateParams)
 	if err != nil {
 		return
 	}
@@ -1112,7 +1134,7 @@ func UpdateStateReportingWithoutLocking(ctx context.Context, stateContainerName,
 		err = fmt.Errorf("failed updating state report")
 		return
 	}
-	err = WriteState(ctx, stateStorageName, stateContainerName, state)
+	err = WriteState(ctx, stateParams, state)
 	if err != nil {
 		err = fmt.Errorf("failed updating state report")
 		return
@@ -1173,7 +1195,12 @@ func GetAzureInstanceNameCmd() string {
 func ReadVmssConfig(ctx context.Context, storageName, containerName string) (vmssConfig VMSSConfig, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	asByteArray, err := ReadBlobObject(ctx, storageName, containerName, "vmss-config")
+	params := BlobObjParams{
+		StorageName:   storageName,
+		ContainerName: containerName,
+		BlobName:      "vmss-config",
+	}
+	asByteArray, err := ReadBlobObject(ctx, params)
 	if err != nil {
 		return
 	}

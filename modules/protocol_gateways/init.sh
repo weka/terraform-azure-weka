@@ -8,6 +8,7 @@ if [[ "${apt_repo_server}" != "" ]]; then
   mv /etc/apt/sources.list /etc/apt/sources.list.bak
   echo "deb ${apt_repo_server} focal main restricted universe" > /etc/apt/sources.list
   echo "deb ${apt_repo_server} focal-updates main restricted" >> /etc/apt/sources.list
+  apt update -y
 fi
 
 for(( i=0; i<${nics_num}; i++ )); do
@@ -41,19 +42,31 @@ EOF
 
 netplan apply
 
+are_routes_ready='ip route | grep eth1'
+for(( i=2; i<${nics_num}; i++ )); do
+  are_routes_ready=$are_routes_ready' && ip route | grep eth'"$i"
+done
 cat >>/usr/sbin/remove-routes.sh <<EOF
 #!/bin/bash
 set -ex
-EOF
-for(( i=1; i<${nics_num}; i++ )); do
-  cat >>/usr/sbin/remove-routes.sh <<EOF
-while ! ip route | grep eth$i; do
+retry_max=24
+for(( i=0; i<\$retry_max; i++ )); do
+  if eval "$are_routes_ready"; then
+    for(( j=1; j<${nics_num}; j++ )); do
+      /usr/sbin/ip route del ${subnet_range} dev eth\$j
+    done
+    break
+  fi
   ip route
   sleep 5
 done
-/usr/sbin/ip route del ${subnet_range} dev eth$i
+if [ \$i -eq \$retry_max ]; then
+  echo "Routes are not ready on time"
+  shutdown -h now
+  exit 1
+fi
+echo "Routes were removed successfully"
 EOF
-done
 
 chmod +x /usr/sbin/remove-routes.sh
 
@@ -80,112 +93,32 @@ ip route # show routes after removing
 
 echo "$(date -u): routes configured"
 
-
-# getNetStrForDpdk bash function definitiion
-function getNetStrForDpdk() {
-  i=$1
-  j=$2
-  gateways=$3
-  net_option_name=$4
-
-  if [ "$#" -lt 4 ]; then
-      echo "'net_option_name' argument is not provided. Using default value: --net"
-      net_option_name="--net "
-  fi
-
-  if [ -n "$gateways" ]; then #azure and gcp
-    gateways=($gateways)
-  fi
-
-  net=" "
-  for ((i; i<$j; i++)); do
-    eth=eth$i
-    subnet_inet=$(ifconfig $eth | grep 'inet ' | awk '{print $2}')
-    if [ -z "$subnet_inet" ];then
-      net=""
-      break
-    fi
-    enp=$(ls -l /sys/class/net/$eth/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}') #for azure
-    bits=$(ip -o -f inet addr show $eth | awk '{print $4}')
-    IFS='/' read -ra netmask <<< "$bits"
-
-    if [ -n "$gateways" ]; then
-      gateway=$${gateways[0]}
-      net="$net $net_option_name$enp/$subnet_inet/$${netmask[1]}/$gateway"
-    fi
-	done
-}
-
-# https://gist.github.com/fungusakafungus/1026804
-function retry {
-  local retry_max=$1
-  local retry_sleep=$2
-  shift 2
-  local count=$retry_max
-  while [ $count -gt 0 ]; do
-      "$@" && break
-      count=$(($count - 1))
-      echo "Retrying $* in $retry_sleep seconds..."
-      sleep $retry_sleep
-  done
-  [ $count -eq 0 ] && {
-      echo "Retry failed [$retry_max]: $*"
-      echo "$(date -u): retry failed"
-      return 1
-  }
-  return 0
-}
-
-# attach disk
-sleep 30s
-
 while ! [ "$(lsblk | grep ${disk_size}G | awk '{print $1}')" ] ; do
   echo "waiting for disk to be ready"
   sleep 5
 done
 
-wekaiosw_device=/dev/"$(lsblk | grep ${disk_size}G | awk '{print $1}')"
-
-status=0
-mkfs.ext4 -L wekaiosw $wekaiosw_device
-mkdir -p /opt/weka 2>&1
-mount $wekaiosw_device /opt/weka
-
-echo "LABEL=wekaiosw /opt/weka ext4 defaults 0 2" >>/etc/fstab
-
-# install weka
-INSTALLATION_PATH="/tmp/weka"
-mkdir -p $INSTALLATION_PATH
-cd $INSTALLATION_PATH
-
-echo "$(date -u): before weka agent installation"
-
-# get token for key vault access
-access_token=$(curl 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fvault.azure.net' -H Metadata:true | jq -r '.access_token')
-# get key vault secret (get-weka-io-token)
-max_retries=12 # 12 * 10 = 2 minutes
-for ((i=0; i<max_retries; i++)); do
-  TOKEN=$(curl "${key_vault_url}secrets/get-weka-io-token?api-version=2016-10-01" -H "Authorization: Bearer $access_token" | jq -r '.value')
-  if [ "$TOKEN" != "null" ]; then
-    break
-  fi
-  sleep 10
-  echo "$(date -u): waiting for token secret to be available"
+compute_name=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" | jq '.compute.name')
+compute_name=$(echo "$compute_name" | cut -c2- | rev | cut -c2- | rev)
+retry=0
+while ! curl ${deploy_url}?code="${function_app_default_key}" --fail -H "Content-Type:application/json" -d "{\"name\": \"$compute_name:$HOSTNAME\", \"protocol\": \"nfs\"}" > /tmp/deploy.sh 2>/tmp/deploy_err.log || [ ! -s /tmp/deploy.sh ]; do
+  echo "Retry $retry: waiting for deploy script generation success"
+  cat /tmp/deploy_err.log
+  retry=$((retry + 1))
+  sleep 5
 done
 
-# install weka
-if [[ "${install_weka_url}" == *.tar || "${install_weka_url}" == *".tar?"* ]]; then
-    tar_url=$(echo "${install_weka_url}" | awk -F'?' '{print $1}')
-    IFS='/' read -ra tar_name <<< "$tar_url"
-    pkg_name=$(cut -d'/' -f"$${#tar_name[@]}" <<< "$tar_url")
-    wget -P $INSTALLATION_PATH "${install_weka_url}" -O "$INSTALLATION_PATH/$pkg_name"
-    cd $INSTALLATION_PATH
-    tar -xvf $pkg_name
-    tar_folder=$(echo $pkg_name | sed 's/.tar//')
-    cd $INSTALLATION_PATH/$tar_folder
-    ./install.sh
-  else
-    retry 300 2 curl --fail --max-time 10 "${install_weka_url}" | sh
+weka_dir="/opt/weka/data"
+mkdir -p $weka_dir
+mv /root/weka-prepackaged $weka_dir
+
+if [ $retry -gt 0 ]; then
+  msg="Deploy script generation retried $retry times"
+  echo "$msg"
+  curl -i "${report_url}?code=${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"nfs\", \"type\": \"debug\", \"message\": \"$msg\"}"
 fi
 
-echo "$(date -u): weka agent installation complete"
+echo "$(date -u): running deploy script"
+
+chmod +x /tmp/deploy.sh
+/tmp/deploy.sh 2>&1 | tee /tmp/weka_deploy.log
