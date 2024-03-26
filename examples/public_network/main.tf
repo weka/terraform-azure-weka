@@ -16,4 +16,5 @@ module "weka_deployment" {
   cluster_size                   = 6
   allow_ssh_cidrs                = ["0.0.0.0/0"]
   allow_weka_api_cidrs           = ["0.0.0.0/0"]
+  assign_public_ip               = true
 }
