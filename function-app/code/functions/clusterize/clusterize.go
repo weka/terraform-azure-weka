@@ -211,10 +211,9 @@ func doNFSClusterize(ctx context.Context, p ClusterizationParams, funcDef functi
 		return
 	}
 
-	initialSize := p.NFSParams.HostsNum
-	msg := fmt.Sprintf("This (%s) is nfs instance %d/%d that is ready for joining the interface group", p.Vm.Name, len(state.Instances), initialSize)
+	msg := fmt.Sprintf("This (%s) is nfs instance %d/%d that is ready for joining the interface group", p.Vm.Name, len(state.Instances), nfsProtocolgwsNum)
 	log.Info().Msgf(msg)
-	if len(state.Instances) != initialSize {
+	if len(state.Instances) != nfsProtocolgwsNum {
 		clusterizeScript = cloudCommon.GetScriptWithReport(msg, funcDef.GetFunctionCmdDefinition(functions_def.Report), p.Vm.Protocol)
 		return
 	}

@@ -240,8 +240,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	var invokeRequest common.InvokeRequest
 
 	var requestBody struct {
-		Type     string  `json:"type"`
-		Protocol *string `json:"protocol"`
+		Type     string `json:"type"`
+		Protocol string `json:"protocol"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&invokeRequest); err != nil {
@@ -276,7 +276,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		BlobName:      stateBlobName,
 	}
 
-	if requestBody.Protocol != nil && *requestBody.Protocol == "nfs" {
+	if requestBody.Protocol == "nfs" {
 		stateParams.ContainerName = nfsStateContainerName
 		stateParams.BlobName = nfsStateBlobName
 

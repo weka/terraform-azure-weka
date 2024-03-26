@@ -69,7 +69,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		ContainerName: stateContainerName,
 		BlobName:      stateBlobName,
 	}
-	if resizeReq.Protocol != nil && *resizeReq.Protocol == "nfs" {
+	isNFSProtocol := resizeReq.Protocol != nil && *resizeReq.Protocol == "nfs"
+	if isNFSProtocol {
 		stateParams.ContainerName = nfsStateContainerName
 		stateParams.BlobName = nfsStateBlobName
 
@@ -81,7 +82,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	logger.Info().Msgf("The requested new size is %d", *resizeReq.Value)
 
 	minCusterSize := 6
-	if *resizeReq.Value < minCusterSize {
+	if *resizeReq.Value < minCusterSize && !isNFSProtocol {
 		err = fmt.Errorf("invalid size, minimal cluster size is %d", minCusterSize)
 		logger.Error().Err(err).Send()
 		common.WriteErrorResponse(w, err)

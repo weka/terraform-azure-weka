@@ -8,6 +8,7 @@ if [[ "${apt_repo_server}" != "" ]]; then
   mv /etc/apt/sources.list /etc/apt/sources.list.bak
   echo "deb ${apt_repo_server} focal main restricted universe" > /etc/apt/sources.list
   echo "deb ${apt_repo_server} focal-updates main restricted" >> /etc/apt/sources.list
+  apt update -y
 fi
 
 for(( i=0; i<${nics_num}; i++ )); do
@@ -41,19 +42,31 @@ EOF
 
 netplan apply
 
+are_routes_ready='ip route | grep eth1'
+for(( i=2; i<${nics_num}; i++ )); do
+  are_routes_ready=$are_routes_ready' && ip route | grep eth'"$i"
+done
 cat >>/usr/sbin/remove-routes.sh <<EOF
 #!/bin/bash
 set -ex
-EOF
-for(( i=1; i<${nics_num}; i++ )); do
-  cat >>/usr/sbin/remove-routes.sh <<EOF
-while ! ip route | grep eth$i; do
+retry_max=24
+for(( i=0; i<\$retry_max; i++ )); do
+  if eval "$are_routes_ready"; then
+    for(( j=1; j<${nics_num}; j++ )); do
+      /usr/sbin/ip route del ${subnet_range} dev eth\$j
+    done
+    break
+  fi
   ip route
   sleep 5
 done
-/usr/sbin/ip route del ${subnet_range} dev eth$i
+if [ \$i -eq \$retry_max ]; then
+  echo "Routes are not ready on time"
+  shutdown -h now
+  exit 1
+fi
+echo "Routes were removed successfully"
 EOF
-done
 
 chmod +x /usr/sbin/remove-routes.sh
 
@@ -80,10 +93,6 @@ ip route # show routes after removing
 
 echo "$(date -u): routes configured"
 
-
-# attach disk
-sleep 30s
-
 while ! [ "$(lsblk | grep ${disk_size}G | awk '{print $1}')" ] ; do
   echo "waiting for disk to be ready"
   sleep 5
@@ -98,6 +107,10 @@ while ! curl ${deploy_url}?code="${function_app_default_key}" --fail -H "Content
   retry=$((retry + 1))
   sleep 5
 done
+
+weka_dir="/opt/weka/data"
+mkdir -p $weka_dir
+mv /root/weka-prepackaged $weka_dir
 
 if [ $retry -gt 0 ]; then
   msg="Deploy script generation retried $retry times"

@@ -531,6 +531,9 @@ func GetScaleSetSecondaryIps(ctx context.Context, subscriptionId, resourceGroupN
 	}
 
 	for _, nic := range nics {
+		if nic.Properties == nil || nic.Properties.VirtualMachine == nil || len(nic.Properties.IPConfigurations) < 1 {
+			continue
+		}
 		for _, ipConfig := range nic.Properties.IPConfigurations {
 			isPrimary := ipConfig.Properties.Primary != nil && *ipConfig.Properties.Primary
 			if !isPrimary && ipConfig.Properties.PrivateIPAddress != nil {
@@ -556,7 +559,7 @@ func GetPublicIp(ctx context.Context, subscriptionId, resourceGroupName, vmScale
 		return
 	}
 	interfaceName := fmt.Sprintf("%s-%s-backend-nic-0", prefix, clusterName)
-	pager := client.NewListVirtualMachineScaleSetVMPublicIPAddressesPager(resourceGroupName, vmScaleSetName, instanceIndex, interfaceName, "ipconfig1", nil)
+	pager := client.NewListVirtualMachineScaleSetVMPublicIPAddressesPager(resourceGroupName, vmScaleSetName, instanceIndex, interfaceName, "ipconfig0", nil)
 
 	for pager.More() {
 		nextResult, err1 := pager.NextPage(ctx)

@@ -20,6 +20,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
 	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
 	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
+	stateBlobName := os.Getenv("STATE_BLOB_NAME")
+	nfsStateContainerName := os.Getenv("NFS_STATE_CONTAINER_NAME")
+	nfsStateBlobName := os.Getenv("NFS_STATE_BLOB_NAME")
 
 	var invokeRequest common.InvokeRequest
 
@@ -52,18 +55,17 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var stateBlobName string
-	if vmProtocol.Protocol == protocol.NFS {
-		stateBlobName = os.Getenv("NFS_STATE_BLOB_NAME")
-	} else {
-		stateBlobName = os.Getenv("STATE_BLOB_NAME")
-	}
-
 	stateParams := common.BlobObjParams{
 		StorageName:   stateStorageName,
 		ContainerName: stateContainerName,
 		BlobName:      stateBlobName,
 	}
+
+	if vmProtocol.Protocol == protocol.NFS {
+		stateParams.ContainerName = nfsStateContainerName
+		stateParams.BlobName = nfsStateBlobName
+	}
+
 	state, err := common.UpdateClusterized(ctx, subscriptionId, resourceGroupName, stateParams)
 	if err != nil {
 		common.WriteErrorResponse(w, err)

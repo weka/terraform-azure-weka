@@ -15,7 +15,7 @@ require (
 	github.com/google/uuid v1.3.1
 	github.com/lithammer/dedent v1.1.0
 	github.com/rs/zerolog v1.29.0
-	github.com/weka/go-cloud-lib v0.0.0-20240321202850-07f564537c98
+	github.com/weka/go-cloud-lib v0.0.0-20240326081709-4b8da99f3250
 )
 
 require (

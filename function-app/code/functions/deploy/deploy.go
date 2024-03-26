@@ -57,6 +57,10 @@ func GetDeviceName(diskSize int) string {
 	return fmt.Sprintf(template, diskSize)
 }
 
+func GetAzurePrimaryIpCmd() string {
+	return "curl -s -H Metadata:true --noproxy '*' http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0?api-version=2023-07-01 | jq -r '.privateIpAddress'"
+}
+
 func getWekaIoToken(ctx context.Context, keyVaultUri string) (token string, err error) {
 	token, err = common.GetKeyVaultValue(ctx, keyVaultUri, "get-weka-io-token")
 	return
@@ -103,6 +107,7 @@ func GetNfsDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, 
 		NicsNum:                      p.NicsNum,
 		InstallDpdk:                  p.InstallDpdk,
 		ProxyUrl:                     p.ProxyUrl,
+		Gateways:                     p.Gateways,
 		Protocol:                     protocol.NFS,
 		WekaUsername:                 common.WekaAdminUsername,
 		WekaPassword:                 wekaPassword,
@@ -111,6 +116,7 @@ func GetNfsDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, 
 		NFSSecondaryIpsNum:           p.NFSSecondaryIpsNum,
 		NFSProtocolGatewayFeCoresNum: p.NFSGWFeCoresNum,
 		LoadBalancerIP:               p.BackendLbIp,
+		GetPrimaryIpCmd:              GetAzurePrimaryIpCmd(),
 	}
 
 	if !state.Clusterized {

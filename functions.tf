@@ -185,10 +185,10 @@ resource "azurerm_linux_function_app" "function_app" {
     NFS_CLIENT_GROUP_NAME             = var.nfs_client_group_name
     NFS_SECONDARY_IPS_NUM             = var.nfs_protocol_gateway_secondary_ips_per_nic
     NFS_PROTOCOL_GATEWAY_FE_CORES_NUM = var.nfs_protocol_gateway_fe_cores_num
-    NFS_PROTOCOL_GATEWAYS_NUMBER      = var.nfs_protocol_gateways_number
+    NFS_PROTOCOL_GATEWAYS_NUM         = var.nfs_protocol_gateways_number
     NFS_VMSS_NAME                     = var.nfs_protocol_gateways_number > 0 ? "${var.prefix}-${var.cluster_name}-nfs-protocol-gateway-vmss" : ""
     # TODO: do not use disk size for getting device name
-    NFS_DISK_SIZE = var.nfs_protocol_gateway_disk_size * 10 * var.nfs_protocol_gateway_fe_cores_num
+    NFS_DISK_SIZE = var.nfs_protocol_gateway_disk_size + 10 * var.nfs_protocol_gateway_fe_cores_num
     BACKEND_LB_IP = azurerm_lb.backend_lb.private_ip_address
   }
 

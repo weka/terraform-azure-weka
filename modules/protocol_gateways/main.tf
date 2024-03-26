@@ -333,7 +333,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "nfs" {
 
 
   dynamic "network_interface" {
-    for_each = range(1, local.nics_numbers - 1)
+    for_each = range(1, local.nics_numbers)
     content {
       name                          = "${var.gateways_name}-secondary-nic-${network_interface.value}"
       network_security_group_id     = var.sg_id
@@ -388,4 +388,20 @@ resource "azurerm_role_assignment" "storage_blob_data_reader_vmss" {
   role_definition_name = "Storage Blob Data Reader"
   principal_id         = azurerm_linux_virtual_machine_scale_set.nfs[0].identity[0].principal_id
   depends_on           = [azurerm_linux_virtual_machine_scale_set.nfs]
+}
+
+# needed for floating-ip support
+resource "azurerm_role_assignment" "network_contributor" {
+  count                = var.protocol == "NFS" ? 1 : 0
+  scope                = data.azurerm_resource_group.rg.id
+  role_definition_name = "Network Contributor"
+  principal_id         = azurerm_linux_virtual_machine_scale_set.nfs[0].identity[0].principal_id
+}
+
+# needed for floating-ip support
+resource "azurerm_role_assignment" "vm_contributor" {
+  count                = var.protocol == "NFS" ? 1 : 0
+  scope                = data.azurerm_resource_group.rg.id
+  role_definition_name = "Virtual Machine Contributor"
+  principal_id         = azurerm_linux_virtual_machine_scale_set.nfs[0].identity[0].principal_id
 }
