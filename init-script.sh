@@ -73,10 +73,11 @@ EOF
 
 netplan apply
 
-are_routes_ready='ip route | grep eth1'
-for(( i=2; i<${nics_num}; i++ )); do
-  are_routes_ready=$are_routes_ready' && ip route | grep eth'"$i"
-done
+if [ "$nics_num" -gt 1 ]; then
+  are_routes_ready='ip route | grep eth1'
+  for(( i=2; i<${nics_num}; i++ )); do
+    are_routes_ready=$are_routes_ready' && ip route | grep eth'"$i"
+  done
 cat >>/usr/sbin/remove-routes.sh <<EOF
 #!/bin/bash
 set -ex
@@ -99,7 +100,7 @@ fi
 echo "Routes were removed successfully"
 EOF
 
-chmod +x /usr/sbin/remove-routes.sh
+  chmod +x /usr/sbin/remove-routes.sh
 
 cat >/etc/systemd/system/remove-routes.service <<EOF
 [Unit]
@@ -115,12 +116,13 @@ ExecStart=/bin/bash /usr/sbin/remove-routes.sh
 WantedBy=multi-user.target
 EOF
 
-ip route # show routes before removing
-systemctl daemon-reload
-systemctl enable remove-routes.service
-systemctl start remove-routes.service
-systemctl status remove-routes.service || true # show status of remove-routes.service
-ip route # show routes after removing
+  ip route # show routes before removing
+  systemctl daemon-reload
+  systemctl enable remove-routes.service
+  systemctl start remove-routes.service
+  systemctl status remove-routes.service || true # show status of remove-routes.service
+  ip route # show routes after removing
+fi
 
 # attach disk
 while ! [ "$(lsblk | grep ${disk_size}G | awk '{print $1}')" ] ; do
