@@ -779,7 +779,7 @@ func GetScaleSetOrNil(ctx context.Context, subscriptionId, resourceGroupName, vm
 	scaleSet, err := getScaleSet(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
 		var responseErr *azcore.ResponseError
-		if errors.As(err, &responseErr) && responseErr.ErrorCode == "ResourceNotFound" {
+		if errors.As(err, &responseErr) && (responseErr.ErrorCode == "ResourceNotFound" || responseErr.ErrorCode == "NotFound") {
 			// scale set is not found
 			return nil, nil
 		}
