@@ -26,7 +26,7 @@ locals {
   sg_id                 = var.sg_id == "" ? module.network.sg_id : var.sg_id
   private_dns_zone_name = var.private_dns_zone_name == "" ? module.network.private_dns_zone_name : var.private_dns_zone_name
   private_dns_rg_name   = var.private_dns_rg_name == "" ? module.network.private_dns_rg_name : var.private_dns_rg_name
-  assign_public_ip      = var.assign_public_ip != "auto" ? var.assign_public_ip : var.subnet_name == ""
+  assign_public_ip      = var.assign_public_ip != "auto" ? var.assign_public_ip == "true" : var.subnet_name == ""
 }
 
 module "peering" {
