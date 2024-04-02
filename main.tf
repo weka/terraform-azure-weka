@@ -12,7 +12,6 @@ locals {
   init_script = templatefile("${path.module}/init-script.sh", {
     apt_repo_server          = var.apt_repo_server
     user                     = var.vm_username
-    install_cluster_dpdk     = var.install_cluster_dpdk
     subnet_range             = local.subnet_range
     nics_num                 = local.nics_numbers
     deploy_url               = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/deploy"
