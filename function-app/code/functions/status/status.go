@@ -28,6 +28,7 @@ func itemInList(item string, list []string) bool {
 }
 
 func addSummary(ctx context.Context, state protocol.ClusterState, stateStorageName, stateContainerName, subscriptionId, resourceGroupName, vmScaleSetName string, reports *protocol.Reports) {
+	logger := logging.LoggerFromCtx(ctx)
 	if state.Clusterized {
 		summary := protocol.ClusterizationStatusSummary{
 			ClusterizationTarget: state.ClusterizationTarget,
@@ -40,7 +41,7 @@ func addSummary(ctx context.Context, state protocol.ClusterState, stateStorageNa
 	vms, err := common.GetScaleSetVmsExpandedView(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
 	if err != nil {
 		msg := fmt.Sprintf("Failed getting vms list for vmss %s: %v", vmScaleSetName, err)
-		common.ReportMsg(ctx, "vmss", stateContainerName, stateStorageName, "error", msg)
+		logger.Error().Msg(msg)
 		return
 	}
 	toTerminate := common.GetUnhealthyInstancesToTerminate(ctx, vms)
