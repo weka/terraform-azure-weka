@@ -73,7 +73,7 @@ EOF
 
 netplan apply
 
-if [ "$nics_num" -gt 1 ]; then
+if [[ ${nics_num} -gt 1 ]]; then
   are_routes_ready='ip route | grep eth1'
   for(( i=2; i<${nics_num}; i++ )); do
     are_routes_ready=$are_routes_ready' && ip route | grep eth'"$i"
