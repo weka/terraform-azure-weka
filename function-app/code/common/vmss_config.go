@@ -78,10 +78,10 @@ type VMSSConfig struct {
 	DisablePasswordAuthentication bool    `json:"disable_password_authentication"`
 	ProximityPlacementGroupID     *string `json:"proximity_placement_group_id,omitempty"`
 
-	OSDisk        OSDisk        `json:"os_disk"`
-	DataDisk      DataDisk      `json:"data_disk"`
-	PrimaryNIC    PrimaryNIC    `json:"primary_nic"`
-	SecondaryNICs SecondaryNICs `json:"secondary_nics"`
+	OSDisk        OSDisk         `json:"os_disk"`
+	DataDisk      DataDisk       `json:"data_disk"`
+	PrimaryNIC    PrimaryNIC     `json:"primary_nic"`
+	SecondaryNICs *SecondaryNICs `json:"secondary_nics"`
 
 	// ignore the following fields when marshaling to json
 	ConfigHash string `json:"-"`

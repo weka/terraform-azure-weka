@@ -1322,7 +1322,7 @@ func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armc
 			StorageAccountType: string(*scaleSet.Properties.VirtualMachineProfile.StorageProfile.DataDisks[0].ManagedDisk.StorageAccountType),
 		},
 		PrimaryNIC:    *primaryNic,
-		SecondaryNICs: *secondaryNics,
+		SecondaryNICs: secondaryNics,
 		ConfigHash:    configHash,
 	}
 	return vmssConfig
@@ -1429,8 +1429,10 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 	primaryNicConfig := getPrimaryNicConfig(&config.PrimaryNIC)
 	nics = append(nics, primaryNicConfig)
 
-	secondaryNicsConfig := getSecondaryNicsConfig(&config.SecondaryNICs)
-	nics = append(nics, secondaryNicsConfig...)
+	if config.SecondaryNICs != nil {
+		secondaryNicsConfig := getSecondaryNicsConfig(config.SecondaryNICs)
+		nics = append(nics, secondaryNicsConfig...)
+	}
 
 	vmss := armcompute.VirtualMachineScaleSet{
 		Location: &config.Location,
