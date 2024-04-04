@@ -100,7 +100,7 @@ resource "azurerm_storage_blob" "vmss_config" {
     primary_nic = {
       name                          = "${var.prefix}-${var.cluster_name}-backend-nic-0"
       network_security_group_id     = local.sg_id
-      enable_accelerated_networking = var.install_cluster_dpdk
+      enable_accelerated_networking = true
 
       ip_configurations = [{
         primary                                = true
@@ -118,7 +118,7 @@ resource "azurerm_storage_blob" "vmss_config" {
       number                        = local.nics_numbers - 1
       name_prefix                   = "${var.prefix}-${var.cluster_name}-backend-nic"
       network_security_group_id     = local.sg_id
-      enable_accelerated_networking = var.install_cluster_dpdk
+      enable_accelerated_networking = true
       ip_configurations = [{
         primary                                = true
         subnet_id                              = data.azurerm_subnet.subnet.id
