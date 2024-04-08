@@ -69,7 +69,7 @@ resource "azurerm_storage_blob" "vmss_config" {
     computer_name_prefix            = "${var.prefix}-${var.cluster_name}-backend"
     custom_data                     = base64encode(local.custom_data_script)
     disable_password_authentication = true
-    proximity_placement_group_id    = var.vmss_single_placement_group ? local.placement_group_id : null
+    proximity_placement_group_id    = local.placement_group_id
     single_placement_group          = var.vmss_single_placement_group
     source_image_id                 = var.source_image_id
     overprovision                   = false

@@ -107,6 +107,7 @@ variable "assign_public_ip" {
 
 variable "ppg_id" {
   type        = string
+  default     = null
   description = "Placement proximity group id."
 }
 
