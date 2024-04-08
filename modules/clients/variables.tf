@@ -70,6 +70,7 @@ variable "clients_use_dpdk" {
 
 variable "ppg_id" {
   type        = string
+  default     = null
   description = "Placement proximity group id."
 }
 

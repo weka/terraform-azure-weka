@@ -23,7 +23,7 @@ locals {
     user_data   = var.user_data
     init_script = local.init_script
   })
-  placement_group_id = var.placement_group_id != "" ? var.placement_group_id : azurerm_proximity_placement_group.ppg[0].id
+  placement_group_id = var.placement_group_id != "" ? var.placement_group_id : var.vmss_single_placement_group ? azurerm_proximity_placement_group.ppg[0].id : null
 }
 
 # ===================== SSH key ++++++++++++++++++++++++= #
@@ -48,7 +48,7 @@ resource "local_file" "private_key" {
 }
 
 resource "azurerm_proximity_placement_group" "ppg" {
-  count               = var.placement_group_id == "" ? 1 : 0
+  count               = var.placement_group_id == "" && var.vmss_single_placement_group ? 1 : 0
   name                = "${var.prefix}-${var.cluster_name}-backend-ppg"
   location            = data.azurerm_resource_group.rg.location
   zone                = var.zone
