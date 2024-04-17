@@ -22,11 +22,6 @@ locals {
   }
 }
 
-output "backend_lb_private_ip" {
-  value       = azurerm_lb.backend_lb.private_ip_address
-  description = "Backend load balancer ip address"
-}
-
 output "functions_url" {
   value       = local.functions_url
   description = "Functions url and body for api request"

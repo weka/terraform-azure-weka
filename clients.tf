@@ -18,7 +18,7 @@ module "clients" {
   vnet_name                    = local.vnet_name
   frontend_container_cores_num = var.clients_use_dpdk ? var.client_frontend_cores : 1
   instance_type                = var.client_instance_type != "" ? var.client_instance_type : local.default_client_instance_type[var.client_arch]
-  backend_lb_ip                = azurerm_lb.backend_lb.private_ip_address
+  backend_lb_ip                = ""
   ssh_public_key               = var.ssh_public_key == null ? tls_private_key.ssh_key[0].public_key_openssh : var.ssh_public_key
   ppg_id                       = var.client_placement_group_id == "" ? local.placement_group_id : var.client_placement_group_id
   assign_public_ip             = local.assign_public_ip

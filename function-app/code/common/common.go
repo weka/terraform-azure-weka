@@ -1293,7 +1293,6 @@ func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armc
 
 		UpgradeMode:          string(*scaleSet.Properties.UpgradePolicy.Mode),
 		OrchestrationMode:    string(*scaleSet.Properties.OrchestrationMode),
-		HealthProbeID:        *scaleSet.Properties.VirtualMachineProfile.NetworkProfile.HealthProbe.ID,
 		Overprovision:        *scaleSet.Properties.Overprovision,
 		SinglePlacementGroup: *scaleSet.Properties.SinglePlacementGroup,
 
@@ -1497,9 +1496,6 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 					},
 				},
 				NetworkProfile: &armcompute.VirtualMachineScaleSetNetworkProfile{
-					HealthProbe: &armcompute.APIEntityReference{
-						ID: &config.HealthProbeID,
-					},
 					NetworkInterfaceConfigurations: nics,
 				},
 			},

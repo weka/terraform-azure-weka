@@ -63,7 +63,6 @@ resource "azurerm_storage_blob" "vmss_config" {
     resource_group_name             = var.rg_name
     sku                             = var.instance_type
     upgrade_mode                    = "Manual"
-    health_probe_id                 = azurerm_lb_probe.backend_lb_probe.id
     admin_username                  = var.vm_username
     ssh_public_key                  = local.public_ssh_key
     computer_name_prefix            = "${var.prefix}-${var.cluster_name}-backend"
@@ -105,7 +104,6 @@ resource "azurerm_storage_blob" "vmss_config" {
       ip_configurations = [{
         primary                                = true
         subnet_id                              = data.azurerm_subnet.subnet.id
-        load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
         public_ip_address = {
           assign            = local.assign_public_ip
           name              = "${var.prefix}-${var.cluster_name}-public-ip"
@@ -122,12 +120,10 @@ resource "azurerm_storage_blob" "vmss_config" {
       ip_configurations = [{
         primary                                = true
         subnet_id                              = data.azurerm_subnet.subnet.id
-        load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
       }]
     }
   })
   depends_on = [
-    azurerm_storage_container.deployment, azurerm_lb_backend_address_pool.lb_backend_pool, azurerm_lb_probe.backend_lb_probe,
-    azurerm_proximity_placement_group.ppg, azurerm_lb_rule.backend_lb_rule, azurerm_lb_rule.ui_lb_rule
+    azurerm_storage_container.deployment
   ]
 }

@@ -13,7 +13,7 @@ module "nfs_protocol_gateways" {
   gateways_name                = "${var.prefix}-${var.cluster_name}-nfs-protocol-gateway"
   protocol                     = "NFS"
   secondary_ips_per_nic        = var.nfs_protocol_gateway_secondary_ips_per_nic
-  backend_lb_ip                = azurerm_lb.backend_lb.private_ip_address
+  backend_lb_ip                = ""
   install_weka_url             = local.install_weka_url
   instance_type                = var.nfs_protocol_gateway_instance_type
   apt_repo_server              = var.apt_repo_server
@@ -112,7 +112,7 @@ module "smb_protocol_gateways" {
   gateways_name                = "${var.prefix}-${var.cluster_name}-smb-protocol-gateway"
   protocol                     = "SMB"
   secondary_ips_per_nic        = var.smb_protocol_gateway_secondary_ips_per_nic
-  backend_lb_ip                = azurerm_lb.backend_lb.private_ip_address
+  backend_lb_ip                = ""
   install_weka_url             = local.install_weka_url
   instance_type                = var.smb_protocol_gateway_instance_type
   apt_repo_server              = var.apt_repo_server
