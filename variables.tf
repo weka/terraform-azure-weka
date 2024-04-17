@@ -249,6 +249,14 @@ variable "containers_config_map" {
       nics     = 8
       memory   = ["357GB", "384GB"]
     },
+    Standard_L80s_v3 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 8
+      nics     = 8
+      memory   = ["384GB", "384GB"]
+    },
     Standard_L8as_v3 = {
       compute  = 1
       drive    = 1
@@ -282,6 +290,14 @@ variable "containers_config_map" {
       memory   = ["308GB", "308GB"]
     },
     Standard_L64as_v3 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 8
+      nics     = 8
+      memory   = ["384GB", "384GB"]
+    },
+    Standard_L80sa_v3 = {
       compute  = 4
       drive    = 2
       frontend = 1
