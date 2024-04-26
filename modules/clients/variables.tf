@@ -1,6 +1,7 @@
 variable "backend_lb_ip" {
   type        = string
   description = "The backend load balancer ip address."
+  default     = ""
 }
 
 variable "frontend_container_cores_num" {
@@ -100,4 +101,9 @@ variable "custom_data" {
   type        = string
   description = "Custom data to pass to the instances"
   default     = ""
+}
+
+variable "vmss_name" {
+  type        = string
+  description = "The name of the backends virtual machine scale set."
 }

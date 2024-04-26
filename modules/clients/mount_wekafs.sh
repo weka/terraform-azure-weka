@@ -4,7 +4,29 @@ INSTALLATION_PATH="/tmp/weka"
 mkdir -p $INSTALLATION_PATH
 cd $INSTALLATION_PATH
 
-backend_ip="${backend_lb_ip}"
+
+# if there is a load balancer, use its ip as backend_ips element
+backend_ips=()
+if [ -n "${backend_lb_ip}" ]; then
+  backend_ips=("${backend_lb_ip}")
+else
+  az login --identity
+  backend_ips=($(az vmss nic list -g ${rg_name} --vmss-name ${vmss_name} --query "[].ipConfigurations[]" | jq -r '.[] | select(.name=="ipconfig0")'.privateIPAddress))
+  # retry getting backend_ips until ips number is at least 5
+  max_retries=60
+  while [ $${#backend_ips[@]} -lt 5 ]; do
+    max_retries=$((max_retries - 1))
+    if [ $max_retries -eq 0 ]; then
+      echo "$(date -u): failed to get backend ips"
+      exit 1
+    fi
+    sleep 10
+    echo "$(date -u): retrying getting backend ips, current ips number: $${#backend_ips[@]}"
+    backend_ips=($(az vmss nic list -g ${rg_name} --vmss-name ${vmss_name} --query "[].ipConfigurations[]" | jq -r '.[] | select(.name=="ipconfig0")'.privateIPAddress))
+  done
+fi
+
+
 # install weka using random backend ip from ips list
 function retry_weka_install {
   retry_max=60
@@ -12,6 +34,8 @@ function retry_weka_install {
   count=$retry_max
 
   while [ $count -gt 0 ]; do
+      backend_ip="$${backend_ips[RANDOM % $${#backend_ips[@]}]}"
+      echo "Trying to install weka from backend_ip: $backend_ip"
       curl --fail -o install_script.sh $backend_ip:14000/dist/v1/install && break
       count=$(($count - 1))
       echo "Retrying weka install from $backend_ip in $retry_sleep seconds..."

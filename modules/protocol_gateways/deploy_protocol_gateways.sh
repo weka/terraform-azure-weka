@@ -55,13 +55,44 @@ function retry_command {
   return 0
 }
 
+# if there is a load balancer, use its ip as join_ips
+join_ips=""
+if [ -n "${backend_lb_ip}" ]; then
+  join_ips="${backend_lb_ip}"
+else
+  # get token for key vault access
+  access_token=$(curl 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fvault.azure.net' -H Metadata:true | jq -r '.access_token')
+  # get key vault secret
+  function_app_key=$(curl "${key_vault_url}secrets/${vault_function_app_key_name}?api-version=2016-10-01" -H "Authorization: Bearer $access_token" | jq -r '.value')
+
+  function fetch {
+    curl ${fetch_function_url}?code="$function_app_key" -H 'Content-Type:application/json'
+  }
+
+  backend_ips=($(fetch | jq -r '.backend_ips[]'))
+  # retry getting backend_ips until ips number is at least 6
+  max_retries=60
+  while [ $${#backend_ips[@]} -lt 6 ]; do
+    max_retries=$((max_retries - 1))
+    if [ $max_retries -eq 0 ]; then
+      echo "$(date -u): failed to get backend ips"
+      exit 1
+    fi
+    sleep 10
+    echo "$(date -u): retrying getting backend ips, current ips number: $${#backend_ips[@]}"
+    backend_ips=($(fetch | jq -r '.backend_ips[]'))
+  done
+  backend_ips_str=$(IFS=, ; echo "$${backend_ips[*]}")
+  join_ips="$backend_ips_str"
+fi
+
 # changed standart frontend port to 14000 as it should be used locally for protocol setup:
 # weka@ev-test-NFS-0:~$ weka nfs interface-group add test NFS
 # error: Error: Failed connecting to http://127.0.0.1:14000/api/v1. Make sure weka is running on this host by running
 # 	 weka local status | start
 echo "$(date -u): setting up weka frontend"
 
-run_container_cmd="weka local setup container --name frontend0 --base-port 14000 --cores $FRONTEND_CONTAINER_CORES_NUM --frontend-dedicated-cores $FRONTEND_CONTAINER_CORES_NUM --allow-protocols true --failure-domain $FAILURE_DOMAIN --core-ids $frontend_core_ids $net --dedicate --join-ips ${backend_lb_ip}"
+run_container_cmd="weka local setup container --name frontend0 --base-port 14000 --cores $FRONTEND_CONTAINER_CORES_NUM --frontend-dedicated-cores $FRONTEND_CONTAINER_CORES_NUM --allow-protocols true --failure-domain $FAILURE_DOMAIN --core-ids $frontend_core_ids $net --dedicate --join-ips $join_ips"
 
 retry_command "$run_container_cmd"  "setting up weka frontend"
 

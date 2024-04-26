@@ -381,7 +381,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "a692280522eea481a17021a3dc2ce770"
+  default     = "209f056591be12d1eca6462342c2484e"
 }
 
 variable "function_app_dist" {
@@ -417,6 +417,12 @@ variable "application_insights_name" {
   type        = string
   description = "The Application Insights name."
   default     = ""
+}
+
+variable "create_lb" {
+  type        = bool
+  default     = true
+  description = "Create backend and UI load balancers for weka cluster."
 }
 
 ################################################## obs variables ###################################################
