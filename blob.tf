@@ -1,5 +1,8 @@
 locals {
   clusterization_target = var.clusterization_target != null ? var.clusterization_target : min(var.cluster_size, max(20, ceil(var.cluster_size * 0.8)))
+  # fields that depend on LB creation
+  vmss_health_probe_id = var.create_lb ? azurerm_lb_probe.backend_lb_probe[0].id : null
+  lb_backend_pool_ids  = var.create_lb ? [azurerm_lb_backend_address_pool.lb_backend_pool[0].id] : []
 }
 
 
@@ -63,7 +66,7 @@ resource "azurerm_storage_blob" "vmss_config" {
     resource_group_name             = var.rg_name
     sku                             = var.instance_type
     upgrade_mode                    = "Manual"
-    health_probe_id                 = azurerm_lb_probe.backend_lb_probe.id
+    health_probe_id                 = local.vmss_health_probe_id
     admin_username                  = var.vm_username
     ssh_public_key                  = local.public_ssh_key
     computer_name_prefix            = "${var.prefix}-${var.cluster_name}-backend"
@@ -105,7 +108,7 @@ resource "azurerm_storage_blob" "vmss_config" {
       ip_configurations = [{
         primary                                = true
         subnet_id                              = data.azurerm_subnet.subnet.id
-        load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
+        load_balancer_backend_address_pool_ids = local.lb_backend_pool_ids
         public_ip_address = {
           assign            = local.assign_public_ip
           name              = "${var.prefix}-${var.cluster_name}-public-ip"
@@ -122,7 +125,7 @@ resource "azurerm_storage_blob" "vmss_config" {
       ip_configurations = [{
         primary                                = true
         subnet_id                              = data.azurerm_subnet.subnet.id
-        load_balancer_backend_address_pool_ids = [azurerm_lb_backend_address_pool.lb_backend_pool.id]
+        load_balancer_backend_address_pool_ids = local.lb_backend_pool_ids
       }]
     }
   })

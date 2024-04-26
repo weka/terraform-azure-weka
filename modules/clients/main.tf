@@ -22,6 +22,8 @@ locals {
     frontend_container_cores_num = var.frontend_container_cores_num
     backend_lb_ip                = var.backend_lb_ip
     clients_use_dpdk             = var.clients_use_dpdk
+    rg_name                      = var.rg_name
+    vmss_name                    = var.vmss_name
   })
 
   custom_data_parts = [local.preparation_script, local.mount_wekafs_script, "${var.custom_data}\n"]
@@ -102,6 +104,18 @@ resource "azurerm_network_interface_security_group_association" "private" {
   network_security_group_id = var.sg_id
 }
 
+resource "azurerm_user_assigned_identity" "this" {
+  location            = data.azurerm_resource_group.rg.location
+  name                = "${var.clients_name}-identity"
+  resource_group_name = data.azurerm_resource_group.rg.name
+}
+
+resource "azurerm_role_assignment" "reader" {
+  scope                = data.azurerm_resource_group.rg.id
+  role_definition_name = "Reader"
+  principal_id         = azurerm_user_assigned_identity.this.principal_id
+}
+
 resource "azurerm_linux_virtual_machine" "this" {
   count               = var.clients_number
   name                = "${var.clients_name}-vm-${count.index}"
@@ -118,6 +132,11 @@ resource "azurerm_linux_virtual_machine" "this" {
 
   proximity_placement_group_id    = var.ppg_id
   disable_password_authentication = true
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.this.id]
+  }
 
   os_disk {
     caching              = "ReadWrite"
