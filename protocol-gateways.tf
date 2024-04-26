@@ -27,6 +27,7 @@ module "nfs_protocol_gateways" {
   disk_size                    = var.nfs_protocol_gateway_disk_size
   frontend_container_cores_num = var.nfs_protocol_gateway_fe_cores_num
   function_app_name            = azurerm_linux_function_app.function_app.name
+  vm_identity_name             = var.protocol_gateways_identity_name
   depends_on                   = [module.network, azurerm_key_vault_secret.get_weka_io_token, azurerm_proximity_placement_group.ppg]
 }
 

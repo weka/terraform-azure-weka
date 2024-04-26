@@ -97,7 +97,7 @@ resource "azurerm_storage_blob" "vmss_config" {
 
     identity = {
       type         = "UserAssigned"
-      identity_ids = [azurerm_user_assigned_identity.vmss.id]
+      identity_ids = [local.vmss_identity_id]
     }
 
     primary_nic = {

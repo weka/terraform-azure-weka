@@ -19,9 +19,14 @@ locals {
   function_app_name                = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-function-app"
   install_weka_url                 = var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.weka.io/dist/v1/install/${var.weka_version}/${var.weka_version}"
   supported_regions                = split("\n", replace(chomp(file("${path.module}/supported_regions/${var.function_app_dist}.txt")), "\r", ""))
-  log_analytics_workspace_id       = var.enable_application_insights ? var.log_analytics_workspace_id == "" ? azurerm_log_analytics_workspace.la_workspace[0].id : var.log_analytics_workspace_id : ""
-  application_insights_id          = var.enable_application_insights ? var.application_insights_name == "" ? azurerm_application_insights.application_insights[0].id : data.azurerm_application_insights.application_insights[0].id : ""
-  insights_instrumenation_key      = var.enable_application_insights ? var.application_insights_name == "" ? azurerm_application_insights.application_insights[0].instrumentation_key : data.azurerm_application_insights.application_insights[0].instrumentation_key : ""
+  # log analytics for function app
+  log_analytics_workspace_id  = var.enable_application_insights ? var.log_analytics_workspace_id == "" ? azurerm_log_analytics_workspace.la_workspace[0].id : var.log_analytics_workspace_id : ""
+  application_insights_id     = var.enable_application_insights ? var.application_insights_name == "" ? azurerm_application_insights.application_insights[0].id : data.azurerm_application_insights.application_insights[0].id : ""
+  insights_instrumenation_key = var.enable_application_insights ? var.application_insights_name == "" ? azurerm_application_insights.application_insights[0].instrumentation_key : data.azurerm_application_insights.application_insights[0].instrumentation_key : ""
+  # managed identity for function app
+  function_app_identity_id        = var.function_app_identity_name == "" ? azurerm_user_assigned_identity.function_app[0].id : data.azurerm_user_assigned_identity.function_app[0].id
+  function_app_identity_principal = var.function_app_identity_name == "" ? azurerm_user_assigned_identity.function_app[0].principal_id : data.azurerm_user_assigned_identity.function_app[0].principal_id
+  function_app_identity_client_id = var.function_app_identity_name == "" ? azurerm_user_assigned_identity.function_app[0].client_id : data.azurerm_user_assigned_identity.function_app[0].client_id
 }
 
 resource "azurerm_log_analytics_workspace" "la_workspace" {
@@ -111,6 +116,19 @@ resource "azurerm_subnet" "subnet_delegation" {
   }
 }
 
+data "azurerm_user_assigned_identity" "function_app" {
+  count               = var.function_app_identity_name != "" ? 1 : 0
+  name                = var.function_app_identity_name
+  resource_group_name = data.azurerm_resource_group.rg.name
+}
+
+resource "azurerm_user_assigned_identity" "function_app" {
+  count               = var.function_app_identity_name == "" ? 1 : 0
+  location            = data.azurerm_resource_group.rg.location
+  name                = "${var.prefix}-${var.cluster_name}-function-app-identity"
+  resource_group_name = data.azurerm_resource_group.rg.name
+}
+
 resource "azurerm_linux_function_app" "function_app" {
   name                       = local.function_app_name
   resource_group_name        = data.azurerm_resource_group.rg.name
@@ -143,6 +161,7 @@ resource "azurerm_linux_function_app" "function_app" {
   }
 
   app_settings = {
+    "USER_ASSIGNED_CLIENT_ID"        = local.function_app_identity_client_id
     "APPINSIGHTS_INSTRUMENTATIONKEY" = local.insights_instrumenation_key
     "STATE_STORAGE_NAME"             = local.deployment_storage_account_name
     "STATE_CONTAINER_NAME"           = local.deployment_container_name
@@ -189,7 +208,8 @@ resource "azurerm_linux_function_app" "function_app" {
   }
 
   identity {
-    type = "SystemAssigned"
+    type         = "UserAssigned"
+    identity_ids = [local.function_app_identity_id]
   }
 
   lifecycle {
@@ -211,58 +231,52 @@ resource "azurerm_linux_function_app" "function_app" {
 data "azurerm_subscription" "primary" {}
 
 resource "azurerm_role_assignment" "storage_blob_data_contributor" {
+  count                = var.function_app_identity_name == "" ? 1 : 0
   scope                = local.deployment_storage_account_scope
   role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
-  depends_on           = [azurerm_linux_function_app.function_app, azurerm_storage_account.deployment_sa]
+  principal_id         = azurerm_user_assigned_identity.function_app[0].principal_id
+  depends_on           = [azurerm_storage_account.deployment_sa]
 }
 
 resource "azurerm_role_assignment" "storage_account_contributor" {
+  count                = var.function_app_identity_name == "" ? 1 : 0
   scope                = data.azurerm_resource_group.rg.id
   role_definition_name = "Storage Account Contributor"
-  principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
-  depends_on           = [azurerm_linux_function_app.function_app]
+  principal_id         = azurerm_user_assigned_identity.function_app[0].principal_id
 }
 
 resource "azurerm_role_assignment" "obs_storage_blob_data_contributor" {
-  count                = var.tiering_obs_name != "" ? 1 : 0
+  count                = var.tiering_obs_name != "" && var.function_app_identity_name == "" ? 1 : 0
   scope                = local.obs_scope
   role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
-  depends_on           = [azurerm_linux_function_app.function_app, azurerm_storage_account.deployment_sa]
+  principal_id         = azurerm_user_assigned_identity.function_app[0].principal_id
+  depends_on           = [azurerm_storage_account.deployment_sa]
 }
 
 resource "azurerm_role_assignment" "function_app_key_vault_secrets_user" {
+  count                = var.function_app_identity_name == "" ? 1 : 0
   scope                = data.azurerm_resource_group.rg.id
   role_definition_name = "Key Vault Secrets User"
-  principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
-  depends_on           = [azurerm_linux_function_app.function_app]
-}
-
-resource "azurerm_role_assignment" "function_app_key_user_access_admin" {
-  scope                = data.azurerm_resource_group.rg.id
-  role_definition_name = "User Access Administrator"
-  principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
-  depends_on           = [azurerm_linux_function_app.function_app]
+  principal_id         = azurerm_user_assigned_identity.function_app[0].principal_id
 }
 
 resource "azurerm_role_assignment" "function_app_reader" {
+  count                = var.function_app_identity_name == "" ? 1 : 0
   scope                = data.azurerm_resource_group.rg.id
   role_definition_name = "Reader"
-  principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
-  depends_on           = [azurerm_linux_function_app.function_app]
+  principal_id         = azurerm_user_assigned_identity.function_app[0].principal_id
 }
 
 resource "azurerm_role_assignment" "function_app_scale_set_machine_owner" {
+  count                = var.function_app_identity_name == "" ? 1 : 0
   scope                = data.azurerm_resource_group.rg.id
   role_definition_name = "Virtual Machine Contributor"
-  principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
-  depends_on           = [azurerm_linux_function_app.function_app]
+  principal_id         = azurerm_user_assigned_identity.function_app[0].principal_id
 }
 
 resource "azurerm_role_assignment" "managed_identity_operator" {
+  count                = var.function_app_identity_name == "" ? 1 : 0
   scope                = data.azurerm_resource_group.rg.id
   role_definition_name = "Managed Identity Operator"
-  principal_id         = azurerm_linux_function_app.function_app.identity[0].principal_id
-  depends_on           = [azurerm_linux_function_app.function_app]
+  principal_id         = azurerm_user_assigned_identity.function_app[0].principal_id
 }
