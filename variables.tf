@@ -407,6 +407,18 @@ variable "set_dedicated_fe_container" {
   description = "Create cluster with FE containers"
 }
 
+variable "log_analytics_workspace_id" {
+  type        = string
+  description = "The Log Analytics workspace id."
+  default     = ""
+}
+
+variable "application_insights_name" {
+  type        = string
+  description = "The Application Insights name."
+  default     = ""
+}
+
 ################################################## obs variables ###################################################
 variable "tiering_obs_name" {
   type        = string
