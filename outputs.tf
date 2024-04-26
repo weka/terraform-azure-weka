@@ -23,7 +23,7 @@ locals {
 }
 
 output "backend_lb_private_ip" {
-  value       = azurerm_lb.backend_lb.private_ip_address
+  value       = var.create_lb ? azurerm_lb.backend_lb[0].private_ip_address : null
   description = "Backend load balancer ip address"
 }
 

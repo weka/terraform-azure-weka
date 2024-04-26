@@ -125,6 +125,8 @@ locals {
     subnet_prefixes              = data.azurerm_subnet.subnet.address_prefix
     backend_lb_ip                = var.backend_lb_ip
     key_vault_url                = var.key_vault_url
+    vault_function_app_key_name  = var.vault_function_app_key_name
+    fetch_function_url           = format("https://%s.azurewebsites.net/api/fetch", var.function_app_name)
   })
 
   setup_nfs_protocol_script = templatefile("${path.module}/setup_nfs.sh", {

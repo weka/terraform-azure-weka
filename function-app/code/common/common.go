@@ -64,7 +64,8 @@ func WriteResponse(w http.ResponseWriter, resData map[string]any, statusCode *in
 
 func WriteErrorResponse(w http.ResponseWriter, err error) {
 	resData := make(map[string]any)
-	resData["body"] = err.Error()
+	errMsg := map[string]string{"error": err.Error()}
+	resData["body"] = errMsg
 
 	badReqStatus := http.StatusBadRequest
 	WriteResponse(w, resData, &badReqStatus)
@@ -1282,6 +1283,11 @@ func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armc
 		configHash = val
 	}
 
+	var healthProbeId string
+	if scaleSet.Properties.VirtualMachineProfile.NetworkProfile.HealthProbe != nil {
+		healthProbeId = *scaleSet.Properties.VirtualMachineProfile.NetworkProfile.HealthProbe.ID
+	}
+
 	vmssConfig := &VMSSConfig{
 		Name:              *scaleSet.Name,
 		Location:          *scaleSet.Location,
@@ -1293,7 +1299,7 @@ func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armc
 
 		UpgradeMode:          string(*scaleSet.Properties.UpgradePolicy.Mode),
 		OrchestrationMode:    string(*scaleSet.Properties.OrchestrationMode),
-		HealthProbeID:        *scaleSet.Properties.VirtualMachineProfile.NetworkProfile.HealthProbe.ID,
+		HealthProbeID:        healthProbeId,
 		Overprovision:        *scaleSet.Properties.Overprovision,
 		SinglePlacementGroup: *scaleSet.Properties.SinglePlacementGroup,
 
@@ -1434,6 +1440,13 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 		nics = append(nics, secondaryNicsConfig...)
 	}
 
+	var healthProbe *armcompute.APIEntityReference
+	if config.HealthProbeID != "" {
+		healthProbe = &armcompute.APIEntityReference{
+			ID: &config.HealthProbeID,
+		}
+	}
+
 	vmss := armcompute.VirtualMachineScaleSet{
 		Location: &config.Location,
 		Identity: &armcompute.VirtualMachineScaleSetIdentity{
@@ -1497,9 +1510,7 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 					},
 				},
 				NetworkProfile: &armcompute.VirtualMachineScaleSetNetworkProfile{
-					HealthProbe: &armcompute.APIEntityReference{
-						ID: &config.HealthProbeID,
-					},
+					HealthProbe:                    healthProbe,
 					NetworkInterfaceConfigurations: nics,
 				},
 			},

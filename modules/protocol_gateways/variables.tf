@@ -86,6 +86,7 @@ variable "client_group_name" {
 variable "backend_lb_ip" {
   type        = string
   description = "The backend load balancer ip address."
+  default     = ""
 }
 
 variable "vm_username" {
