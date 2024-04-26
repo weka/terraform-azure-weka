@@ -19,13 +19,13 @@ locals {
   function_app_name                = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-function-app"
   install_weka_url                 = var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.weka.io/dist/v1/install/${var.weka_version}/${var.weka_version}"
   supported_regions                = split("\n", replace(chomp(file("${path.module}/supported_regions/${var.function_app_dist}.txt")), "\r", ""))
-  log_analytics_workspace_id       = var.log_analytics_workspace_id == "" ? azurerm_log_analytics_workspace.la_workspace[0].id : var.log_analytics_workspace_id
-  application_insights_id          = var.application_insights_name == "" ? azurerm_application_insights.application_insights[0].id : data.azurerm_application_insights.application_insights[0].id
-  insights_instrumenation_key      = var.application_insights_name == "" ? azurerm_application_insights.application_insights[0].instrumentation_key : data.azurerm_application_insights.application_insights[0].instrumentation_key
+  log_analytics_workspace_id       = var.enable_application_insights ? var.log_analytics_workspace_id == "" ? azurerm_log_analytics_workspace.la_workspace[0].id : var.log_analytics_workspace_id : ""
+  application_insights_id          = var.enable_application_insights ? var.application_insights_name == "" ? azurerm_application_insights.application_insights[0].id : data.azurerm_application_insights.application_insights[0].id : ""
+  insights_instrumenation_key      = var.enable_application_insights ? var.application_insights_name == "" ? azurerm_application_insights.application_insights[0].instrumentation_key : data.azurerm_application_insights.application_insights[0].instrumentation_key : ""
 }
 
 resource "azurerm_log_analytics_workspace" "la_workspace" {
-  count               = var.log_analytics_workspace_id == "" ? 1 : 0
+  count               = var.log_analytics_workspace_id == "" && var.enable_application_insights ? 1 : 0
   name                = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-workspace"
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = data.azurerm_resource_group.rg.name
@@ -37,13 +37,13 @@ resource "azurerm_log_analytics_workspace" "la_workspace" {
 }
 
 data "azurerm_application_insights" "application_insights" {
-  count               = var.application_insights_name != "" ? 1 : 0
+  count               = var.application_insights_name != "" && var.enable_application_insights ? 1 : 0
   name                = var.application_insights_name
   resource_group_name = data.azurerm_resource_group.rg.name
 }
 
 resource "azurerm_application_insights" "application_insights" {
-  count               = var.application_insights_name == "" ? 1 : 0
+  count               = var.application_insights_name == "" && var.enable_application_insights ? 1 : 0
   name                = "${var.prefix}-${var.cluster_name}-application-insights"
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = data.azurerm_resource_group.rg.name
@@ -55,6 +55,7 @@ resource "azurerm_application_insights" "application_insights" {
 }
 
 resource "azurerm_monitor_diagnostic_setting" "insights_diagnostic_setting" {
+  count                      = var.enable_application_insights ? 1 : 0
   name                       = "${var.prefix}-${var.cluster_name}-insights-diagnostic-setting"
   target_resource_id         = local.application_insights_id
   storage_account_id         = local.deployment_storage_account_id
@@ -69,6 +70,7 @@ resource "azurerm_monitor_diagnostic_setting" "insights_diagnostic_setting" {
 }
 
 resource "azurerm_monitor_diagnostic_setting" "function_diagnostic_setting" {
+  count                      = var.enable_application_insights ? 1 : 0
   name                       = "${var.prefix}-${var.cluster_name}-function-diagnostic-setting"
   target_resource_id         = azurerm_linux_function_app.function_app.id
   storage_account_id         = local.deployment_storage_account_id

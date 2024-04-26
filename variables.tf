@@ -419,6 +419,12 @@ variable "application_insights_name" {
   default     = ""
 }
 
+variable "enable_application_insights" {
+  type        = bool
+  default     = true
+  description = "Enable Application Insights."
+}
+
 variable "create_lb" {
   type        = bool
   default     = true
