@@ -217,3 +217,9 @@ variable "vault_function_app_key_name" {
   description = "The name of the Vault key containing the function app key."
   default     = "function-app-default-key"
 }
+
+variable "vm_identity_name" {
+  type        = string
+  description = "The name of the user assigned identity for the protocol gateway VMs."
+  default     = ""
+}

@@ -120,6 +120,12 @@ variable "logic_app_subnet_delegation_cidr" {
   description = "Subnet delegation enables you to designate a specific subnet for an Azure PaaS service."
 }
 
+variable "logic_app_identity_name" {
+  type        = string
+  description = "The user assigned identity name for the logic app (if empty - new one is created)."
+  default     = ""
+}
+
 variable "weka_version" {
   type        = string
   description = "The Weka version to deploy."
@@ -381,7 +387,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "209f056591be12d1eca6462342c2484e"
+  default     = "9a10da700d19e0619815c0a3d6f5e6a0"
 }
 
 variable "function_app_dist" {
@@ -393,6 +399,18 @@ variable "function_app_dist" {
     condition     = contains(["dev", "release"], var.function_app_dist)
     error_message = "Valid value is one of the following: dev, release."
   }
+}
+
+variable "function_app_identity_name" {
+  type        = string
+  description = "The user assigned identity name for the function app (if empty - new one is created)."
+  default     = ""
+}
+
+variable "vmss_identity_name" {
+  type        = string
+  description = "The user assigned identity name for the vmss instances (if empty - new one is created)."
+  default     = ""
 }
 
 variable "install_cluster_dpdk" {
@@ -504,6 +522,12 @@ variable "clients_use_dpdk" {
   description = "Mount weka clients in DPDK mode"
 }
 
+variable "client_identity_name" {
+  type        = string
+  description = "The user assigned identity name for the client instances (if empty - new one is created)."
+  default     = ""
+}
+
 variable "client_placement_group_id" {
   type        = string
   description = "The client instances placement group id. Backend placement group can be reused. If not specified placement group will be created automatically"
@@ -557,6 +581,12 @@ variable "zone" {
   type        = string
   description = "The zone in which the resources should be created."
   default     = "1"
+}
+
+variable "protocol_gateways_identity_name" {
+  type        = string
+  description = "The user assigned identity name for the protocol gateways instances (if empty - new one is created)."
+  default     = ""
 }
 
 ############################################### nfs protocol gateways variables ###################################################

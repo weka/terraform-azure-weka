@@ -110,15 +110,6 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 				return
 			}
 		}
-
-		_, err = common.AssignStorageBlobDataContributorRoleToScaleSet(
-			ctx, p.SubscriptionId, p.ResourceGroupName, vmScaleSetName, p.Obs.Name, p.Obs.ContainerName,
-		)
-		if err != nil {
-			err = fmt.Errorf("failed to assign storage blob data contributor role to scale set: %w", err)
-			logger.Error().Err(err).Send()
-			return
-		}
 	}
 
 	wekaPassword, err := common.GetWekaClusterPassword(ctx, p.KeyVaultUri)

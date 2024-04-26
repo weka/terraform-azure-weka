@@ -107,3 +107,9 @@ variable "vmss_name" {
   type        = string
   description = "The name of the backends virtual machine scale set."
 }
+
+variable "vm_identity_name" {
+  type        = string
+  description = "The name of the user assigned identity for the client VMs."
+  default     = ""
+}

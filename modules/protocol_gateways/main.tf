@@ -155,6 +155,9 @@ locals {
     local.init_script, local.deploy_script, local.setup_protocol_script
   ]
   custom_data = join("\n", local.custom_data_parts)
+
+  gw_identity_id        = var.vm_identity_name == "" ? azurerm_user_assigned_identity.this[0].id : data.azurerm_user_assigned_identity.this[0].id
+  gw_identity_principal = var.vm_identity_name == "" ? azurerm_user_assigned_identity.this[0].principal_id : data.azurerm_user_assigned_identity.this[0].principal_id
 }
 
 
@@ -189,7 +192,8 @@ resource "azurerm_linux_virtual_machine" "this" {
   }
 
   identity {
-    type = "SystemAssigned"
+    type         = "UserAssigned"
+    identity_ids = [local.gw_identity_id]
   }
 
   lifecycle {
@@ -241,25 +245,36 @@ resource "azurerm_key_vault_access_policy" "gateways_vmss_key_vault" {
   count        = var.gateways_number
   key_vault_id = var.key_vault_id
   tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = azurerm_linux_virtual_machine.this[count.index].identity[0].principal_id
+  object_id    = local.gw_identity_principal
   secret_permissions = [
     "Get",
   ]
   depends_on = [azurerm_linux_virtual_machine.this]
 }
 
-resource "azurerm_role_assignment" "gateways_vmss_key_vault" {
-  count                = var.gateways_number
-  scope                = var.key_vault_id
-  role_definition_name = "Key Vault Secrets User"
-  principal_id         = azurerm_linux_virtual_machine.this[count.index].identity[0].principal_id
-  depends_on           = [azurerm_linux_virtual_machine.this]
+data "azurerm_user_assigned_identity" "this" {
+  count               = var.vm_identity_name != "" ? 1 : 0
+  name                = var.vm_identity_name
+  resource_group_name = data.azurerm_resource_group.rg.name
 }
 
-resource "azurerm_role_assignment" "storage_blob_data_reader" {
-  count                = var.weka_tar_storage_account_id != "" ? var.gateways_number : 0
+resource "azurerm_user_assigned_identity" "this" {
+  count               = var.vm_identity_name == "" ? 1 : 0
+  location            = data.azurerm_resource_group.rg.location
+  name                = "${var.gateways_name}-identity"
+  resource_group_name = data.azurerm_resource_group.rg.name
+}
+
+resource "azurerm_role_assignment" "gateways_vm_key_vault" {
+  count                = var.vm_identity_name == "" ? 1 : 0
+  scope                = var.key_vault_id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = azurerm_user_assigned_identity.this[0].principal_id
+}
+
+resource "azurerm_role_assignment" "weka_tar_data_reader" {
+  count                = var.vm_identity_name == "" && var.weka_tar_storage_account_id != "" ? var.gateways_number : 0
   scope                = var.weka_tar_storage_account_id
   role_definition_name = "Storage Blob Data Reader"
-  principal_id         = azurerm_linux_virtual_machine.this[count.index].identity[0].principal_id
-  depends_on           = [azurerm_linux_virtual_machine.this]
+  principal_id         = azurerm_user_assigned_identity.this[0].principal_id
 }
