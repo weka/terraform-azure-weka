@@ -17,13 +17,13 @@ resource "azurerm_key_vault" "key_vault" {
 resource "azurerm_key_vault_access_policy" "function_app_get_secret_permission" {
   key_vault_id = azurerm_key_vault.key_vault.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = azurerm_linux_function_app.function_app.identity[0].principal_id
+  object_id    = local.function_app_identity_principal
 
   secret_permissions = [
     "Get",
   ]
 
-  depends_on = [azurerm_key_vault.key_vault, azurerm_linux_function_app.function_app]
+  depends_on = [azurerm_key_vault.key_vault]
 }
 
 resource "azurerm_key_vault_access_policy" "key_vault_access_policy" {

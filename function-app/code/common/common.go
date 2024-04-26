@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -31,6 +32,10 @@ import (
 
 const WekaAdminUsername = "admin"
 
+var (
+	userAssignedClientId = os.Getenv("USER_ASSIGNED_CLIENT_ID")
+)
+
 type InvokeRequest struct {
 	Data     map[string]json.RawMessage
 	Metadata map[string]interface{}
@@ -49,6 +54,13 @@ for d in json.load(sys.stdin)['disks']:
 	if d['isRotational'] or 'nvme' not in d['devPath']: continue
 	print(d['devPath'])
 `
+
+func getCredential(ctx context.Context) (*azidentity.ManagedIdentityCredential, error) {
+	credOpt := &azidentity.ManagedIdentityCredentialOptions{
+		ID: azidentity.ClientID(userAssignedClientId),
+	}
+	return azidentity.NewManagedIdentityCredential(credOpt)
+}
 
 func WriteResponse(w http.ResponseWriter, resData map[string]any, statusCode *int) {
 	outputs := make(map[string]any)
@@ -82,9 +94,9 @@ func WriteSuccessResponse(w http.ResponseWriter, data any) {
 func leaseContainerAcquire(ctx context.Context, storageAccountName, containerName string, leaseIdIn *string) (leaseIdOut *string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Msgf("azidentity.NewDefaultAzureCredential: %s", err)
+		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -127,9 +139,9 @@ func leaseContainerAcquire(ctx context.Context, storageAccountName, containerNam
 func leaseContainerRelease(ctx context.Context, storageAccountName, containerName string, leaseId *string) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Msgf("azidentity.NewDefaultAzureCredential: %s", err)
+		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -177,9 +189,9 @@ func UnlockContainer(ctx context.Context, storageAccountName, containerName stri
 func ReadBlobObject(ctx context.Context, storageName, containerName, blobName string) (state []byte, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Msgf("azidentity.NewDefaultAzureCredential: %s", err)
+		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -223,9 +235,9 @@ func ReadState(ctx context.Context, stateStorageName, containerName string) (sta
 func WriteBlobObject(ctx context.Context, storageName, containerName, blobName string, state []byte) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Send()
+		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -329,9 +341,9 @@ func CreateStorageAccount(ctx context.Context, subscriptionId, resourceGroupName
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("creating storage account: %s", obsName)
 
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Send()
+		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -393,9 +405,9 @@ func CreateStorageAccount(ctx context.Context, subscriptionId, resourceGroupName
 func getStorageAccountAccessKey(ctx context.Context, subscriptionId, resourceGroupName, obsName string) (accessKey string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Send()
+		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -417,9 +429,9 @@ func CreateContainer(ctx context.Context, storageAccountName, containerName stri
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("creating obs container %s in storage account %s", containerName, storageAccountName)
 
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Send()
+		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -447,9 +459,9 @@ func GetKeyVaultValue(ctx context.Context, keyVaultUri, secretName string) (secr
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("fetching key vault secret: %s", secretName)
 
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Send()
+		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -474,9 +486,9 @@ func GetKeyVaultValue(ctx context.Context, keyVaultUri, secretName string) (secr
 func getScaleSetVmsNetworkInterfaces(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (networkInterfaces []*armnetwork.Interface, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Send()
+		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -521,9 +533,9 @@ func GetScaleSetVmsNetworkPrimaryNICs(ctx context.Context, subscriptionId, resou
 func GetPublicIp(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, prefix, clusterName, instanceIndex string) (publicIp string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Send()
+		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -574,11 +586,12 @@ func ScaleUp(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetN
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("updating scale set vms num")
 
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Send()
+		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
+
 	client, err := armcompute.NewVirtualMachineScaleSetsClient(subscriptionId, credential, nil)
 	if err != nil {
 		logger.Error().Err(err).Send()
@@ -612,13 +625,13 @@ func ScaleUp(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetN
 func GetRoleDefinitionByRoleName(ctx context.Context, roleName, scope string) (*armauthorization.RoleDefinition, error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	cred, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Send()
+		logger.Error().Err(err).Msg("failed to get credential")
 		return nil, err
 	}
 
-	client, err := armauthorization.NewRoleDefinitionsClient(cred, nil)
+	client, err := armauthorization.NewRoleDefinitionsClient(credential, nil)
 	if err != nil {
 		logger.Error().Err(err).Send()
 		return nil, err
@@ -663,13 +676,13 @@ func AssignStorageBlobDataContributorRoleToScaleSet(
 ) (*armauthorization.RoleAssignment, error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	cred, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Send()
+		logger.Error().Err(err).Msg("failed to get credential")
 		return nil, err
 	}
 
-	client, err := armauthorization.NewRoleAssignmentsClient(subscriptionId, cred, nil)
+	client, err := armauthorization.NewRoleAssignmentsClient(subscriptionId, credential, nil)
 	if err != nil {
 		logger.Error().Err(err).Send()
 		return nil, err
@@ -755,9 +768,9 @@ func getScaleSet(ctx context.Context, subscriptionId, resourceGroupName, vmScale
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("Getting scale set %s info", vmScaleSetName)
 
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Send()
+		logger.Error().Err(err).Msg("failed to get credential")
 		return nil, err
 	}
 
@@ -822,9 +835,9 @@ func GetScaleSetInfo(ctx context.Context, subscriptionId, resourceGroupName, vmS
 func GetScaleSetInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, expand *string) (vms []*armcompute.VirtualMachineScaleSetVM, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Send()
+		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -908,9 +921,9 @@ func SetDeletionProtection(ctx context.Context, subscriptionId, resourceGroupNam
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("Setting deletion protection: %t on instanceId %s", protect, instanceId)
 
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Send()
+		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -1034,9 +1047,9 @@ func FilterSpecificScaleSetInstances(ctx context.Context, allVms []*armcompute.V
 func TerminateScaleSetInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, terminateInstanceIds []string) (terminatedInstances []string, errs []error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Send()
+		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -1337,9 +1350,9 @@ func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armc
 func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, configHash string, config VMSSConfig, vmssSize int) (id *string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Send()
+		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 

@@ -16,6 +16,7 @@ module "clients" {
   subnet_name                  = local.subnet_name
   apt_repo_server              = var.apt_repo_server
   vnet_name                    = local.vnet_name
+  vm_identity_name             = var.client_identity_name
   frontend_container_cores_num = var.clients_use_dpdk ? var.client_frontend_cores : 1
   instance_type                = var.client_instance_type != "" ? var.client_instance_type : local.default_client_instance_type[var.client_arch]
   backend_lb_ip                = var.create_lb ? azurerm_lb.backend_lb[0].private_ip_address : ""
