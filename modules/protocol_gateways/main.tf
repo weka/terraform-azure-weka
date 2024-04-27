@@ -125,10 +125,10 @@ locals {
     subnet_prefixes              = data.azurerm_subnet.subnet.address_prefix
     backend_lb_ip                = var.backend_lb_ip
     key_vault_url                = var.key_vault_url
+    gateways_name                = var.gateways_name
   })
 
   setup_nfs_protocol_script = templatefile("${path.module}/setup_nfs.sh", {
-    gateways_name        = var.gateways_name
     interface_group_name = var.interface_group_name
     client_group_name    = var.client_group_name
   })
@@ -260,4 +260,21 @@ resource "azurerm_role_assignment" "storage_blob_data_reader" {
   role_definition_name = "Storage Blob Data Reader"
   principal_id         = azurerm_linux_virtual_machine.this[count.index].identity[0].principal_id
   depends_on           = [azurerm_linux_virtual_machine.this]
+}
+
+
+# needed for floating-ip support
+resource "azurerm_role_assignment" "network_contributor" {
+  count                = var.protocol == "NFS" ? var.gateways_number : 0
+  scope                = data.azurerm_resource_group.rg.id
+  role_definition_name = "Network Contributor"
+  principal_id         = azurerm_linux_virtual_machine.this[count.index].identity[0].principal_id
+}
+
+# needed for floating-ip support
+resource "azurerm_role_assignment" "vm_contributor" {
+  count                = var.protocol == "NFS" ? var.gateways_number : 0
+  scope                = data.azurerm_resource_group.rg.id
+  role_definition_name = "Virtual Machine Contributor"
+  principal_id         = azurerm_linux_virtual_machine.this[count.index].identity[0].principal_id
 }
