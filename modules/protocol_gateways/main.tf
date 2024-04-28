@@ -242,7 +242,6 @@ resource "azurerm_virtual_machine_data_disk_attachment" "this" {
 }
 
 resource "azurerm_key_vault_access_policy" "gateways_vmss_key_vault" {
-  count        = var.gateways_number
   key_vault_id = var.key_vault_id
   tenant_id    = data.azurerm_client_config.current.tenant_id
   object_id    = local.gw_identity_principal
