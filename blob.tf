@@ -47,12 +47,6 @@ data "azurerm_storage_account" "deployment_blob" {
   resource_group_name = var.rg_name
 }
 
-data "azurerm_storage_account" "obs_sa" {
-  count               = var.tiering_obs_name != "" ? 1 : 0
-  name                = var.tiering_obs_name
-  resource_group_name = var.rg_name
-}
-
 resource "azurerm_storage_blob" "vmss_config" {
   name                   = "vmss-config"
   storage_account_name   = local.deployment_storage_account_name
