@@ -56,10 +56,17 @@ for d in json.load(sys.stdin)['disks']:
 `
 
 func getCredential(ctx context.Context) (*azidentity.ManagedIdentityCredential, error) {
+	logger := logging.LoggerFromCtx(ctx)
+
 	credOpt := &azidentity.ManagedIdentityCredentialOptions{
 		ID: azidentity.ClientID(userAssignedClientId),
 	}
-	return azidentity.NewManagedIdentityCredential(credOpt)
+	credential, err := azidentity.NewManagedIdentityCredential(credOpt)
+	if err != nil {
+		logger.Error().CallerSkipFrame(1).Err(err).Msg("failed to get credential")
+		return nil, err
+	}
+	return credential, nil
 }
 
 func WriteResponse(w http.ResponseWriter, resData map[string]any, statusCode *int) {
@@ -96,7 +103,6 @@ func leaseContainerAcquire(ctx context.Context, storageAccountName, containerNam
 
 	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -141,7 +147,6 @@ func leaseContainerRelease(ctx context.Context, storageAccountName, containerNam
 
 	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -191,7 +196,6 @@ func ReadBlobObject(ctx context.Context, storageName, containerName, blobName st
 
 	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -237,7 +241,6 @@ func WriteBlobObject(ctx context.Context, storageName, containerName, blobName s
 
 	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -343,7 +346,6 @@ func CreateStorageAccount(ctx context.Context, subscriptionId, resourceGroupName
 
 	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -407,7 +409,6 @@ func getStorageAccountAccessKey(ctx context.Context, subscriptionId, resourceGro
 
 	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -431,7 +432,6 @@ func CreateContainer(ctx context.Context, storageAccountName, containerName stri
 
 	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -461,7 +461,6 @@ func GetKeyVaultValue(ctx context.Context, keyVaultUri, secretName string) (secr
 
 	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -488,7 +487,6 @@ func getScaleSetVmsNetworkInterfaces(ctx context.Context, subscriptionId, resour
 
 	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -535,7 +533,6 @@ func GetPublicIp(ctx context.Context, subscriptionId, resourceGroupName, vmScale
 
 	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -588,7 +585,6 @@ func ScaleUp(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetN
 
 	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -627,7 +623,6 @@ func GetRoleDefinitionByRoleName(ctx context.Context, roleName, scope string) (*
 
 	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to get credential")
 		return nil, err
 	}
 
@@ -678,7 +673,6 @@ func AssignStorageBlobDataContributorRoleToScaleSet(
 
 	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to get credential")
 		return nil, err
 	}
 
@@ -770,7 +764,6 @@ func getScaleSet(ctx context.Context, subscriptionId, resourceGroupName, vmScale
 
 	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to get credential")
 		return nil, err
 	}
 
@@ -837,7 +830,6 @@ func GetScaleSetInstances(ctx context.Context, subscriptionId, resourceGroupName
 
 	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -923,7 +915,6 @@ func SetDeletionProtection(ctx context.Context, subscriptionId, resourceGroupNam
 
 	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -1049,7 +1040,6 @@ func TerminateScaleSetInstances(ctx context.Context, subscriptionId, resourceGro
 
 	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
@@ -1352,7 +1342,6 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 
 	credential, err := getCredential(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to get credential")
 		return
 	}
 
