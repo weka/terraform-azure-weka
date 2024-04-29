@@ -33,20 +33,6 @@ resource "azurerm_service_plan" "logicapp_service_plan" {
   }
 }
 
-
-data "azurerm_user_assigned_identity" "logic_app" {
-  count               = var.logic_app_identity_name != "" ? 1 : 0
-  name                = var.logic_app_identity_name
-  resource_group_name = data.azurerm_resource_group.rg.name
-}
-
-resource "azurerm_user_assigned_identity" "logic_app" {
-  count               = var.logic_app_identity_name == "" ? 1 : 0
-  location            = data.azurerm_resource_group.rg.location
-  name                = "${var.prefix}-${var.cluster_name}-logic-app-identity"
-  resource_group_name = data.azurerm_resource_group.rg.name
-}
-
 resource "azurerm_logic_app_standard" "logic_app_standard" {
   name                       = "${var.prefix}-${var.cluster_name}-logic-app"
   location                   = local.location
@@ -126,9 +112,6 @@ locals {
   scale_down_workflow_path      = "${path.module}/logic_app/scale_down.json"
   scale_down_workflow_hash      = md5(join("", [for f in fileset(local.scale_down_workflow_path, "**") : filemd5("${local.scale_down_workflow_path}/${f}")]))
   scale_down_workflow_filename  = "/tmp/${var.prefix}_${var.cluster_name}_scale_down_workflow_${local.scale_down_workflow_hash}"
-  # managed identity for the logic app
-  logic_app_identity_id        = var.logic_app_identity_name == "" ? azurerm_user_assigned_identity.logic_app[0].id : data.azurerm_user_assigned_identity.logic_app[0].id
-  logic_app_identity_principal = var.logic_app_identity_name == "" ? azurerm_user_assigned_identity.logic_app[0].principal_id : data.azurerm_user_assigned_identity.logic_app[0].principal_id
 }
 
 resource "local_file" "connections_workflow_file" {
@@ -168,27 +151,4 @@ resource "azurerm_storage_share_file" "connections_share_file" {
   storage_share_id = data.azurerm_storage_share.storage_share.id
   source           = local_file.connections_workflow_file.filename
   depends_on       = [azurerm_storage_share_directory.share_directory_scale_down, data.azurerm_storage_share.storage_share, local_file.connections_workflow_file]
-}
-
-resource "azurerm_role_assignment" "logic_app_standard_reader" {
-  count                = var.logic_app_identity_name == "" ? 1 : 0
-  scope                = data.azurerm_resource_group.rg.id
-  role_definition_name = "Reader"
-  principal_id         = azurerm_user_assigned_identity.logic_app[0].principal_id
-}
-
-resource "azurerm_role_assignment" "logic_app_standard_reader_secret" {
-  count                = var.logic_app_identity_name == "" ? 1 : 0
-  scope                = azurerm_key_vault.key_vault.id
-  role_definition_name = "Key Vault Secrets User"
-  principal_id         = azurerm_user_assigned_identity.logic_app[0].principal_id
-  depends_on           = [azurerm_key_vault.key_vault]
-}
-
-resource "azurerm_role_assignment" "logic_app_standard_reader_smb_data" {
-  count                = var.logic_app_identity_name == "" ? 1 : 0
-  scope                = azurerm_storage_account.logicapp.id
-  role_definition_name = "Storage File Data SMB Share Contributor"
-  principal_id         = azurerm_user_assigned_identity.logic_app[0].principal_id
-  depends_on           = [azurerm_storage_account.logicapp]
 }

@@ -1,32 +1,26 @@
 locals {
-  create_private_function          = var.function_access_restriction_enabled ? 1 : 0
-  stripe_width_calculated          = var.cluster_size - var.protection_level - 1
-  stripe_width                     = local.stripe_width_calculated < 16 ? local.stripe_width_calculated : 16
-  location                         = data.azurerm_resource_group.rg.location
-  function_app_zip_name            = "${var.function_app_dist}/${var.function_app_version}.zip"
-  weka_sa                          = "${var.function_app_storage_account_prefix}${local.location}"
-  weka_sa_container                = "${var.function_app_storage_account_container_prefix}${local.location}"
-  function_code_path               = "${path.module}/function-app/code"
-  function_app_code_hash           = md5(join("", [for f in fileset(local.function_code_path, "**") : filemd5("${local.function_code_path}/${f}")]))
-  get_compute_memory_index         = var.set_dedicated_fe_container ? 1 : 0
-  deployment_storage_account_id    = var.deployment_storage_account_name == "" ? azurerm_storage_account.deployment_sa[0].id : data.azurerm_storage_account.deployment_blob[0].id
-  deployment_storage_account_name  = var.deployment_storage_account_name == "" ? azurerm_storage_account.deployment_sa[0].name : var.deployment_storage_account_name
-  deployment_container_name        = var.deployment_container_name == "" ? azurerm_storage_container.deployment[0].name : var.deployment_container_name
-  deployment_storage_account_scope = "${local.deployment_storage_account_id}/blobServices/default/containers/${local.deployment_container_name}"
-  obs_storage_account_name         = var.tiering_obs_name == "" ? "${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}obs" : var.tiering_obs_name
-  obs_container_name               = var.tiering_obs_container_name == "" ? "${var.prefix}-${var.cluster_name}-obs" : var.tiering_obs_container_name
-  obs_scope                        = var.tiering_obs_name != "" ? "${data.azurerm_storage_account.obs_sa[0].id}/blobServices/default/containers/${local.obs_container_name}" : ""
-  function_app_name                = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-function-app"
-  install_weka_url                 = var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.weka.io/dist/v1/install/${var.weka_version}/${var.weka_version}"
-  supported_regions                = split("\n", replace(chomp(file("${path.module}/supported_regions/${var.function_app_dist}.txt")), "\r", ""))
+  create_private_function         = var.function_access_restriction_enabled ? 1 : 0
+  stripe_width_calculated         = var.cluster_size - var.protection_level - 1
+  stripe_width                    = local.stripe_width_calculated < 16 ? local.stripe_width_calculated : 16
+  location                        = data.azurerm_resource_group.rg.location
+  function_app_zip_name           = "${var.function_app_dist}/${var.function_app_version}.zip"
+  weka_sa                         = "${var.function_app_storage_account_prefix}${local.location}"
+  weka_sa_container               = "${var.function_app_storage_account_container_prefix}${local.location}"
+  function_code_path              = "${path.module}/function-app/code"
+  function_app_code_hash          = md5(join("", [for f in fileset(local.function_code_path, "**") : filemd5("${local.function_code_path}/${f}")]))
+  get_compute_memory_index        = var.set_dedicated_fe_container ? 1 : 0
+  deployment_storage_account_id   = var.deployment_storage_account_name == "" ? azurerm_storage_account.deployment_sa[0].id : data.azurerm_storage_account.deployment_blob[0].id
+  deployment_storage_account_name = var.deployment_storage_account_name == "" ? azurerm_storage_account.deployment_sa[0].name : var.deployment_storage_account_name
+  deployment_container_name       = var.deployment_container_name == "" ? azurerm_storage_container.deployment[0].name : var.deployment_container_name
+  obs_storage_account_name        = var.tiering_obs_name == "" ? "${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}obs" : var.tiering_obs_name
+  obs_container_name              = var.tiering_obs_container_name == "" ? "${var.prefix}-${var.cluster_name}-obs" : var.tiering_obs_container_name
+  function_app_name               = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-function-app"
+  install_weka_url                = var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.weka.io/dist/v1/install/${var.weka_version}/${var.weka_version}"
+  supported_regions               = split("\n", replace(chomp(file("${path.module}/supported_regions/${var.function_app_dist}.txt")), "\r", ""))
   # log analytics for function app
   log_analytics_workspace_id  = var.enable_application_insights ? var.log_analytics_workspace_id == "" ? azurerm_log_analytics_workspace.la_workspace[0].id : var.log_analytics_workspace_id : ""
   application_insights_id     = var.enable_application_insights ? var.application_insights_name == "" ? azurerm_application_insights.application_insights[0].id : data.azurerm_application_insights.application_insights[0].id : ""
   insights_instrumenation_key = var.enable_application_insights ? var.application_insights_name == "" ? azurerm_application_insights.application_insights[0].instrumentation_key : data.azurerm_application_insights.application_insights[0].instrumentation_key : ""
-  # managed identity for function app
-  function_app_identity_id        = var.function_app_identity_name == "" ? azurerm_user_assigned_identity.function_app[0].id : data.azurerm_user_assigned_identity.function_app[0].id
-  function_app_identity_principal = var.function_app_identity_name == "" ? azurerm_user_assigned_identity.function_app[0].principal_id : data.azurerm_user_assigned_identity.function_app[0].principal_id
-  function_app_identity_client_id = var.function_app_identity_name == "" ? azurerm_user_assigned_identity.function_app[0].client_id : data.azurerm_user_assigned_identity.function_app[0].client_id
 }
 
 resource "azurerm_log_analytics_workspace" "la_workspace" {
@@ -116,19 +110,6 @@ resource "azurerm_subnet" "subnet_delegation" {
   }
 }
 
-data "azurerm_user_assigned_identity" "function_app" {
-  count               = var.function_app_identity_name != "" ? 1 : 0
-  name                = var.function_app_identity_name
-  resource_group_name = data.azurerm_resource_group.rg.name
-}
-
-resource "azurerm_user_assigned_identity" "function_app" {
-  count               = var.function_app_identity_name == "" ? 1 : 0
-  location            = data.azurerm_resource_group.rg.location
-  name                = "${var.prefix}-${var.cluster_name}-function-app-identity"
-  resource_group_name = data.azurerm_resource_group.rg.name
-}
-
 resource "azurerm_linux_function_app" "function_app" {
   name                       = local.function_app_name
   resource_group_name        = data.azurerm_resource_group.rg.name
@@ -171,7 +152,7 @@ resource "azurerm_linux_function_app" "function_app" {
     "STRIPE_WIDTH"                   = var.stripe_width != -1 ? var.stripe_width : local.stripe_width
     "HOTSPARE"                       = var.hotspare
     "VM_USERNAME"                    = var.vm_username
-    "SUBSCRIPTION_ID"                = data.azurerm_subscription.primary.subscription_id
+    "SUBSCRIPTION_ID"                = var.subscription_id
     "RESOURCE_GROUP_NAME"            = data.azurerm_resource_group.rg.name
     "LOCATION"                       = data.azurerm_resource_group.rg.location
     "SET_OBS"                        = var.tiering_enable_obs_integration
@@ -226,57 +207,4 @@ resource "azurerm_linux_function_app" "function_app" {
   }
 
   depends_on = [module.network, azurerm_storage_account.deployment_sa, azurerm_subnet.logicapp_subnet_delegation]
-}
-
-data "azurerm_subscription" "primary" {}
-
-resource "azurerm_role_assignment" "storage_blob_data_contributor" {
-  count                = var.function_app_identity_name == "" ? 1 : 0
-  scope                = local.deployment_storage_account_scope
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azurerm_user_assigned_identity.function_app[0].principal_id
-  depends_on           = [azurerm_storage_account.deployment_sa]
-}
-
-resource "azurerm_role_assignment" "storage_account_contributor" {
-  count                = var.function_app_identity_name == "" ? 1 : 0
-  scope                = data.azurerm_resource_group.rg.id
-  role_definition_name = "Storage Account Contributor"
-  principal_id         = azurerm_user_assigned_identity.function_app[0].principal_id
-}
-
-resource "azurerm_role_assignment" "obs_storage_blob_data_contributor" {
-  count                = var.tiering_obs_name != "" && var.function_app_identity_name == "" ? 1 : 0
-  scope                = local.obs_scope
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azurerm_user_assigned_identity.function_app[0].principal_id
-  depends_on           = [azurerm_storage_account.deployment_sa]
-}
-
-resource "azurerm_role_assignment" "function_app_key_vault_secrets_user" {
-  count                = var.function_app_identity_name == "" ? 1 : 0
-  scope                = data.azurerm_resource_group.rg.id
-  role_definition_name = "Key Vault Secrets User"
-  principal_id         = azurerm_user_assigned_identity.function_app[0].principal_id
-}
-
-resource "azurerm_role_assignment" "function_app_reader" {
-  count                = var.function_app_identity_name == "" ? 1 : 0
-  scope                = data.azurerm_resource_group.rg.id
-  role_definition_name = "Reader"
-  principal_id         = azurerm_user_assigned_identity.function_app[0].principal_id
-}
-
-resource "azurerm_role_assignment" "function_app_scale_set_machine_owner" {
-  count                = var.function_app_identity_name == "" ? 1 : 0
-  scope                = data.azurerm_resource_group.rg.id
-  role_definition_name = "Virtual Machine Contributor"
-  principal_id         = azurerm_user_assigned_identity.function_app[0].principal_id
-}
-
-resource "azurerm_role_assignment" "managed_identity_operator" {
-  count                = var.function_app_identity_name == "" ? 1 : 0
-  scope                = data.azurerm_resource_group.rg.id
-  role_definition_name = "Managed Identity Operator"
-  principal_id         = azurerm_user_assigned_identity.function_app[0].principal_id
 }

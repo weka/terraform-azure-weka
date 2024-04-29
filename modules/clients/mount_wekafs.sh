@@ -13,7 +13,7 @@ else
   az login --identity
   backend_ips=($(az vmss nic list -g ${rg_name} --vmss-name ${vmss_name} --query "[].ipConfigurations[]" | jq -r '.[] | select(.name=="ipconfig0")'.privateIPAddress))
   # retry getting backend_ips until ips number is at least 5
-  max_retries=60
+  max_retries=90
   while [ $${#backend_ips[@]} -lt 5 ]; do
     max_retries=$((max_retries - 1))
     if [ $max_retries -eq 0 ]; then
