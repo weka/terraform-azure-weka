@@ -33,6 +33,15 @@ for file_path in "${file_paths[@]}"; do
 done
 
 git commit -m "chore: update weka default version: $new_weka_version"
+
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  sed -i '' 's/= "dev"/= "release"/' variables.tf
+else
+  sed -i 's/= "dev"/= "release"/' variables.tf
+fi
+git add variables.tf
+git commit -m "chore: update function app distribution to release" || true
+
 git push --set-upstream origin "dev-$new_weka_version"
 gh pr create --base main --title "Dev $new_weka_version" --body ""
 gh pr view --web
