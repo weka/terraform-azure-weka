@@ -1205,6 +1205,11 @@ func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armc
 		}
 	}
 
+	var identityType string
+	if scaleSet.Identity != nil {
+		identityType = string(*scaleSet.Identity.Type)
+	}
+
 	var sshPublicKey string
 	if scaleSet.Properties.VirtualMachineProfile.OSProfile.LinuxConfiguration.SSH.PublicKeys != nil {
 		sshPublicKey = *scaleSet.Properties.VirtualMachineProfile.OSProfile.LinuxConfiguration.SSH.PublicKeys[0].KeyData
@@ -1308,7 +1313,7 @@ func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armc
 
 		Identity: Identity{
 			IdentityIDs: identityIds,
-			Type:        string(*scaleSet.Identity.Type),
+			Type:        identityType,
 		},
 		AdminUsername:      *scaleSet.Properties.VirtualMachineProfile.OSProfile.AdminUsername,
 		SshPublicKey:       sshPublicKey,
