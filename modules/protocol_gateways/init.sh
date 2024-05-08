@@ -12,7 +12,7 @@ fi
 
 for(( i=0; i<${nics_num}; i++ )); do
     cat <<-EOF | sed -i "/        eth$i/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
-            mtu: 1500
+            mtu: 4038
 EOF
 done
 
