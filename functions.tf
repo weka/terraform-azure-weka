@@ -12,7 +12,7 @@ locals {
   deployment_storage_account_id   = var.deployment_storage_account_name == "" ? azurerm_storage_account.deployment_sa[0].id : data.azurerm_storage_account.deployment_blob[0].id
   deployment_storage_account_name = var.deployment_storage_account_name == "" ? azurerm_storage_account.deployment_sa[0].name : var.deployment_storage_account_name
   deployment_container_name       = var.deployment_container_name == "" ? azurerm_storage_container.deployment[0].name : var.deployment_container_name
-  obs_storage_account_name        = var.tiering_obs_name == "" ? "${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}obs" : var.tiering_obs_name
+  obs_storage_account_name        = var.tiering_obs_name == "" ? "${substr("${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}", 0, 21)}obs" : var.tiering_obs_name
   obs_container_name              = var.tiering_obs_container_name == "" ? "${var.prefix}-${var.cluster_name}-obs" : var.tiering_obs_container_name
   function_app_name               = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-function-app"
   install_weka_url                = var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.weka.io/dist/v1/install/${var.weka_version}/${var.weka_version}"
