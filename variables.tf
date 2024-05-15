@@ -508,11 +508,11 @@ variable "client_source_image_id" {
 
 variable "client_arch" {
   type        = string
-  default     = "x86_64"
-  description = "Use arch for ami id, value can be arm64/x86_64, the default value is x86_64."
+  default     = null
+  description = "Use arch for ami id, value can be arm64/x86_64."
   validation {
-    condition     = var.client_arch == "arm64" || var.client_arch == "x86_64"
-    error_message = "Allowed client_arch values: [\"arm64\", \"x86_64\"]."
+    condition     = var.client_arch == "arm64" || var.client_arch == "x86_64" || var.client_arch == null
+    error_message = "Allowed client_arch values: [\"arm64\", \"x86_64\", null]."
   }
 }
 
