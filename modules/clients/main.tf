@@ -30,6 +30,16 @@ locals {
   vms_custom_data   = base64encode(join("\n", local.custom_data_parts))
 
   client_identity_id = var.vm_identity_name == "" ? azurerm_user_assigned_identity.this[0].id : data.azurerm_user_assigned_identity.this[0].id
+
+  arm_instances = ["Standard_D4ps_v5", "Standard_D8ps_v5", "Standard_D16ps_v5", "Standard_D32ps_v5", "Standard_D48ps_v5", "Standard_D64ps_v5", "Standard_D8plds_v5", "Standard_D32plds_v5", "Standard_D64plds_v5"]
+  default_arch  = contains(local.arm_instances, var.instance_type) ? "arm64" : "x86_64"
+  arch          = var.arch == null ? local.default_arch : var.arch
+  default_client_instance_type = {
+    x86_64 = "Standard_D8_v5"
+    arm64  = "Standard_E2ps_v5"
+  }
+  instance_type   = var.instance_type != "" ? var.instance_type : local.default_client_instance_type[local.arch]
+  source_image_id = var.source_image_id[local.arch]
 }
 
 resource "azurerm_public_ip" "public_ip" {
@@ -114,8 +124,8 @@ resource "azurerm_linux_virtual_machine" "this" {
   admin_username      = var.vm_username
   tags                = merge({ "weka_cluster_client" : var.clients_name }, var.tags_map)
   custom_data         = local.vms_custom_data
-  source_image_id     = var.source_image_id
-  size                = var.instance_type
+  source_image_id     = local.source_image_id
+  size                = local.instance_type
   network_interface_ids = concat([
     local.first_nic_ids[count.index]
   ], slice(azurerm_network_interface.private_nics[*].id, (local.nics_num - 1) * count.index, (local.nics_num - 1) * (count.index + 1)))
