@@ -495,15 +495,9 @@ variable "client_instance_type" {
 }
 
 variable "client_source_image_id" {
-  type = object({
-    x86_64 = string
-    arm64  = string
-  })
-  default = {
-    x86_64 = "/communityGalleries/WekaIO-d7d3f308-d5a1-4c45-8e8a-818aed57375a/images/ubuntu20.04/versions/latest"
-    arm64  = "/communityGalleries/WekaIO-d7d3f308-d5a1-4c45-8e8a-818aed57375a/images/arm20.04/versions/latest"
-  }
+  type        = string
   description = "Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1 / ubuntu arm 20.04 with kernel 5.4 and ofed 5.9-0.5.6.0"
+  default     = ""
 }
 
 variable "client_arch" {

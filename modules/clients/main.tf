@@ -38,8 +38,12 @@ locals {
     x86_64 = "Standard_D8_v5"
     arm64  = "Standard_E2ps_v5"
   }
-  instance_type   = var.instance_type != "" ? var.instance_type : local.default_client_instance_type[local.arch]
-  source_image_id = var.source_image_id[local.arch]
+  instance_type = var.instance_type != "" ? var.instance_type : local.default_client_instance_type[local.arch]
+  default_source_image_id = {
+    x86_64 = "/communityGalleries/WekaIO-d7d3f308-d5a1-4c45-8e8a-818aed57375a/images/ubuntu20.04/versions/latest"
+    arm64  = "/communityGalleries/WekaIO-d7d3f308-d5a1-4c45-8e8a-818aed57375a/images/arm20.04/versions/latest"
+  }
+  source_image_id = var.source_image_id != "" ? var.source_image_id : local.default_source_image_id[local.arch]
 }
 
 resource "azurerm_public_ip" "public_ip" {
