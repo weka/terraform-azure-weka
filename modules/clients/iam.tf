@@ -32,4 +32,6 @@ resource "azurerm_role_assignment" "reader" {
   scope                = data.azurerm_resource_group.rg.id
   role_definition_name = azurerm_role_definition.nics_reader[0].name
   principal_id         = azurerm_user_assigned_identity.this[0].principal_id
+
+  depends_on = [azurerm_role_definition.nics_reader]
 }
