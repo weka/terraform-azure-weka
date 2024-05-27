@@ -31,7 +31,7 @@ func (d *AzureFuncDef) GetFunctionCmdDefinition(name functions_def.FunctionName)
 		`
 		funcDef = fmt.Sprintf(funcDefTemplate, name, name)
 	} else if name == functions_def.JoinNfsFinalization {
-		name = functions_def.JoinFinalization
+		functionUrl := d.baseFunctionUrl + string(functions_def.JoinFinalization)
 		// edit json_data to add the missing "protocol":"nfs" field
 		funcDefTemplate := `
 		function %s {

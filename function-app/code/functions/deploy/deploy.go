@@ -100,23 +100,23 @@ func GetNfsDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, 
 	}
 
 	deploymentParams := deploy.DeploymentParams{
-		VMName:                       p.VmName,
-		InstanceParams:               instanceParams,
-		WekaInstallUrl:               p.InstallUrl,
-		WekaToken:                    token,
-		NicsNum:                      p.NicsNum,
-		InstallDpdk:                  p.InstallDpdk,
-		ProxyUrl:                     p.ProxyUrl,
-		Gateways:                     p.Gateways,
-		Protocol:                     protocol.NFS,
-		WekaUsername:                 common.WekaAdminUsername,
-		WekaPassword:                 wekaPassword,
-		NFSInterfaceGroupName:        p.NFSInterfaceGroupName,
-		NFSClientGroupName:           p.NFSClientGroupName,
-		NFSSecondaryIpsNum:           p.NFSSecondaryIpsNum,
-		NFSProtocolGatewayFeCoresNum: p.NFSGWFeCoresNum,
-		LoadBalancerIP:               p.BackendLbIp,
-		GetPrimaryIpCmd:              GetAzurePrimaryIpCmd(),
+		VMName:                    p.VmName,
+		InstanceParams:            instanceParams,
+		WekaInstallUrl:            p.InstallUrl,
+		WekaToken:                 token,
+		NicsNum:                   p.NicsNum,
+		InstallDpdk:               p.InstallDpdk,
+		ProxyUrl:                  p.ProxyUrl,
+		Gateways:                  p.Gateways,
+		Protocol:                  protocol.NFS,
+		WekaUsername:              common.WekaAdminUsername,
+		WekaPassword:              wekaPassword,
+		NFSInterfaceGroupName:     p.NFSInterfaceGroupName,
+		NFSClientGroupName:        p.NFSClientGroupName,
+		NFSSecondaryIpsNum:        p.NFSSecondaryIpsNum,
+		ProtocolGatewayFeCoresNum: p.NFSGWFeCoresNum,
+		LoadBalancerIP:            p.BackendLbIp,
+		GetPrimaryIpCmd:           GetAzurePrimaryIpCmd(),
 	}
 
 	if !state.Clusterized {
@@ -132,6 +132,7 @@ func GetNfsDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, 
 			DeploymentParams:   deploymentParams,
 			InterfaceGroupName: p.NFSInterfaceGroupName,
 			FuncDef:            funcDef,
+			Name:               strings.Split(p.VmName, ":")[0],
 		}
 		bashScript = joinScriptGenerator.GetJoinNFSHostScript()
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"weka-deployment/common"
 
 	"github.com/weka/go-cloud-lib/logging"
@@ -64,6 +65,31 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if vmProtocol.Protocol == protocol.NFS {
 		stateParams.ContainerName = nfsStateContainerName
 		stateParams.BlobName = nfsStateBlobName
+
+		// Add tag to all clusterized NFS instances
+		state, err := common.ReadState(ctx, stateParams)
+		if err != nil {
+			logger.Error().Err(err).Msg("cannot read state")
+			common.WriteErrorResponse(w, err)
+			return
+		}
+
+		instanceNames := common.GetStateInstancesNames(state.Instances)
+		logger.Info().Msgf("Adding tag %s to %d NFS instances %v", common.NfsInterfaceGroupPortKey, len(instanceNames), instanceNames)
+
+		tags := map[string]string{
+			common.NfsInterfaceGroupPortKey: common.NfsInterfaceGroupPortValue,
+		}
+		for _, instanceName := range instanceNames {
+			name := strings.Split(instanceName, ":")[0]
+			err := common.UpdateTagsOnVm(ctx, subscriptionId, resourceGroupName, name, tags)
+			if err != nil {
+				msg := fmt.Sprintf("cannot update tags on VM %v", err)
+				common.ReportMsg(ctx, instanceName, stateParams, "error", msg)
+				logger.Error().Err(err).Str("instance", instanceName).Msg("cannot update tags")
+				continue
+			}
+		}
 	}
 
 	state, err := common.UpdateClusterized(ctx, subscriptionId, resourceGroupName, stateParams)

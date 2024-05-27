@@ -182,6 +182,7 @@ resource "azurerm_linux_function_app" "function_app" {
     WEKA_HOME_URL                    = var.weka_home_url
     POST_CLUSTER_CREATION_SCRIPT     = var.script_post_cluster_creation
     PRE_START_IO_SCRIPT              = var.script_pre_start_io
+    DOWN_BACKENDS_REMOVAL_TIMEOUT    = var.debug_down_backends_removal_timeout
 
     https_only                  = true
     FUNCTIONS_EXTENSION_VERSION = "~4"
