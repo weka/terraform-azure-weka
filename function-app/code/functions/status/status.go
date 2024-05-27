@@ -149,7 +149,7 @@ func GetClusterStatus(ctx context.Context, vmssParams *common.ScaleSetParams, st
 	if err != nil {
 		return
 	}
-	ips := make([]string, len(vmIps))
+	ips := make([]string, 0, len(vmIps))
 	for _, ip := range vmIps {
 		ips = append(ips, ip)
 	}

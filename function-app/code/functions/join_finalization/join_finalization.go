@@ -8,11 +8,12 @@ import (
 	"weka-deployment/common"
 
 	"github.com/weka/go-cloud-lib/logging"
+	"github.com/weka/go-cloud-lib/protocol"
 )
 
 type RequestBody struct {
-	Name     string `json:"name"`
-	Protocol string `json:"protocol"`
+	Name     string              `json:"name"`
+	Protocol protocol.ProtocolGW `json:"protocol"`
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -50,6 +51,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	prefix := os.Getenv("PREFIX")
 	clusterName := os.Getenv("CLUSTER_NAME")
 	nfsScaleSetName := os.Getenv("NFS_VMSS_NAME")
+	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
+	nfsStateContainerName := os.Getenv("NFS_STATE_CONTAINER_NAME")
+	nfsStateBlobName := os.Getenv("NFS_STATE_BLOB_NAME")
 
 	vmssParams := &common.ScaleSetParams{
 		SubscriptionId:    subscriptionId,
@@ -57,9 +61,27 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		ScaleSetName:      common.GetVmScaleSetName(prefix, clusterName),
 		Flexible:          false,
 	}
-	if data.Protocol == "nfs" {
+	if data.Protocol == protocol.NFS {
 		vmssParams.ScaleSetName = nfsScaleSetName
 		vmssParams.Flexible = true
+
+		// Add tag on newly joined NFS VM
+		tags := map[string]string{
+			common.NfsInterfaceGroupPortKey: common.NfsInterfaceGroupPortValue,
+		}
+		logger.Info().Str("instance", data.Name).Msgf("Adding tag %s to the VM %s", common.NfsInterfaceGroupPortKey, data.Name)
+		err = common.UpdateTagsOnVm(ctx, vmssParams.SubscriptionId, vmssParams.ResourceGroupName, data.Name, tags)
+		if err != nil {
+			err := fmt.Errorf("cannot update tags on VM %w", err)
+			logger.Error().Err(err).Str("instance", data.Name).Send()
+
+			stateParams := common.BlobObjParams{
+				StorageName:   stateStorageName,
+				ContainerName: nfsStateContainerName,
+				BlobName:      nfsStateBlobName,
+			}
+			common.ReportMsg(ctx, data.Name, stateParams, "error", err.Error())
+		}
 	}
 
 	instanceId := common.GetScaleSetVmIndex(data.Name, vmssParams.Flexible)

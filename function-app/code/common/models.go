@@ -22,6 +22,7 @@ type VMInfoSummary struct {
 	VMHealth             *armcompute.VirtualMachineHealthStatus
 	InstanceViewStatuses []*armcompute.InstanceViewStatus
 	ProtectionPolicy     *armcompute.VirtualMachineScaleSetVMProtectionPolicy
+	Tags                 map[string]*string
 }
 
 func UniformVmssVMsToVmInfoSummary(vms []*armcompute.VirtualMachineScaleSetVM) []*VMInfoSummary {
@@ -34,13 +35,13 @@ func UniformVmssVMsToVmInfoSummary(vms []*armcompute.VirtualMachineScaleSetVM) [
 			ProvisioningState: vm.Properties.ProvisioningState,
 			NetworkProfile:    vm.Properties.NetworkProfile,
 			ProtectionPolicy:  vm.Properties.ProtectionPolicy,
+			Tags:              vm.Tags,
 		}
 		if vm.Properties.InstanceView != nil {
 			res[i].ComputerName = vm.Properties.InstanceView.ComputerName
 			res[i].VMHealth = vm.Properties.InstanceView.VMHealth
 			res[i].InstanceViewStatuses = vm.Properties.InstanceView.Statuses
 		}
-
 	}
 	return res
 }
@@ -54,6 +55,7 @@ func VMsToVmInfoSummary(vms []*armcompute.VirtualMachine) []*VMInfoSummary {
 			Name:              *vm.Name,
 			ProvisioningState: vm.Properties.ProvisioningState,
 			NetworkProfile:    vm.Properties.NetworkProfile,
+			Tags:              vm.Tags,
 		}
 		if vm.Properties.InstanceView != nil {
 			res[i].ComputerName = vm.Properties.InstanceView.ComputerName

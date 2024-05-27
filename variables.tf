@@ -387,7 +387,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "2867365b0d8a31a0ffebb6b688867b04"
+  default     = "8a6ff7da31b0b64628c9eb1963ea0217"
 }
 
 variable "function_app_dist" {
@@ -600,6 +600,11 @@ variable "nfs_protocol_gateway_secondary_ips_per_nic" {
   type        = number
   description = "Number of secondary IPs per single NIC per protocol gateway virtual machine."
   default     = 0
+
+  validation {
+    condition     = var.nfs_protocol_gateway_secondary_ips_per_nic == 0
+    error_message = "Secondary (floating) IPs are currently not supported for Azure NFS protocol gateways."
+  }
 }
 
 variable "nfs_protocol_gateway_instance_type" {
@@ -804,4 +809,10 @@ variable "user_data" {
   type        = string
   description = "User data to pass to vms."
   default     = ""
+}
+
+variable "debug_down_backends_removal_timeout" {
+  type        = string
+  default     = "3h"
+  description = "Don't change this value without consulting weka support team. Timeout for removing down backends. Valid time units are ns, us (or µs), ms, s, m, h."
 }
