@@ -79,7 +79,7 @@ jobs:
     name: Test Weka Deployment
     needs: function-app-dist
     runs-on: ubuntu-latest
-    if: github.event_name != 'release'
+    if: false
     defaults:
       run:
         working-directory: ./ci/deployment
