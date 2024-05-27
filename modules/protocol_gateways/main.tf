@@ -11,7 +11,7 @@ data "azurerm_subnet" "subnet" {
 }
 
 resource "azurerm_public_ip" "this" {
-  count               = var.assign_public_ip && var.protocol == "SMB" ? var.gateways_number : 0
+  count               = var.assign_public_ip && var.protocol != "NFS" ? var.gateways_number : 0
   name                = "${var.gateways_name}-public-ip-${count.index}"
   location            = var.location
   resource_group_name = var.rg_name
@@ -19,7 +19,7 @@ resource "azurerm_public_ip" "this" {
 }
 
 resource "azurerm_network_interface" "primary_gateway_nic_public" {
-  count                         = var.assign_public_ip && var.protocol == "SMB" ? var.gateways_number : 0
+  count                         = var.assign_public_ip && var.protocol != "NFS" ? var.gateways_number : 0
   name                          = "${var.gateways_name}-primary-nic-${count.index}"
   location                      = var.location
   resource_group_name           = var.rg_name
@@ -45,13 +45,13 @@ resource "azurerm_network_interface" "primary_gateway_nic_public" {
 }
 
 resource "azurerm_network_interface_security_group_association" "primary_gateway_nic_public" {
-  count                     = var.assign_public_ip && var.protocol == "SMB" ? var.gateways_number : 0
+  count                     = var.assign_public_ip && var.protocol != "NFS" ? var.gateways_number : 0
   network_interface_id      = azurerm_network_interface.primary_gateway_nic_public[count.index].id
   network_security_group_id = var.sg_id
 }
 
 resource "azurerm_network_interface" "primary_gateway_nic_private" {
-  count                         = var.assign_public_ip || var.protocol != "SMB" ? 0 : var.gateways_number
+  count                         = var.assign_public_ip || var.protocol == "NFS" ? 0 : var.gateways_number
   name                          = "${var.gateways_name}-primary-nic-${count.index}"
   location                      = var.location
   resource_group_name           = var.rg_name
@@ -76,7 +76,7 @@ resource "azurerm_network_interface" "primary_gateway_nic_private" {
 }
 
 resource "azurerm_network_interface_security_group_association" "primary_gateway_nic_private" {
-  count                     = var.assign_public_ip || var.protocol != "SMB" ? 0 : var.gateways_number
+  count                     = var.assign_public_ip || var.protocol == "NFS" ? 0 : var.gateways_number
   network_interface_id      = azurerm_network_interface.primary_gateway_nic_private[count.index].id
   network_security_group_id = var.sg_id
 }
@@ -86,7 +86,7 @@ locals {
 }
 
 resource "azurerm_network_interface" "secondary_gateway_nic" {
-  count                         = var.protocol == "SMB" ? local.secondary_nics_num : 0
+  count                         = var.protocol != "NFS" ? local.secondary_nics_num : 0
   name                          = "${var.gateways_name}-secondary-nic-${count.index + var.gateways_number}"
   location                      = var.location
   resource_group_name           = var.rg_name
@@ -101,7 +101,7 @@ resource "azurerm_network_interface" "secondary_gateway_nic" {
 }
 
 resource "azurerm_network_interface_security_group_association" "secondary_gateway_nic" {
-  count                     = var.protocol == "SMB" ? local.secondary_nics_num : 0
+  count                     = var.protocol != "NFS" ? local.secondary_nics_num : 0
   network_interface_id      = azurerm_network_interface.secondary_gateway_nic[count.index].id
   network_security_group_id = var.sg_id
 }
@@ -163,7 +163,7 @@ locals {
 
 
 resource "azurerm_linux_virtual_machine" "this" {
-  count                           = var.protocol == "SMB" ? var.gateways_number : 0
+  count                           = var.protocol != "NFS" ? var.gateways_number : 0
   name                            = "${var.gateways_name}-vm-${count.index}"
   computer_name                   = "${var.gateways_name}-${count.index}"
   location                        = var.location
@@ -224,7 +224,7 @@ resource "azurerm_linux_virtual_machine" "this" {
 }
 
 resource "azurerm_managed_disk" "this" {
-  count                = var.protocol == "SMB" ? var.gateways_number : 0
+  count                = var.protocol != "NFS" ? var.gateways_number : 0
   name                 = "weka-disk-${var.gateways_name}-${count.index}"
   location             = var.location
   resource_group_name  = var.rg_name
@@ -234,7 +234,7 @@ resource "azurerm_managed_disk" "this" {
 }
 
 resource "azurerm_virtual_machine_data_disk_attachment" "this" {
-  count              = var.protocol == "SMB" ? var.gateways_number : 0
+  count              = var.protocol != "NFS" ? var.gateways_number : 0
   managed_disk_id    = azurerm_managed_disk.this[count.index].id
   virtual_machine_id = azurerm_linux_virtual_machine.this[count.index].id
   lun                = 0

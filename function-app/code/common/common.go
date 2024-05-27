@@ -30,7 +30,12 @@ import (
 	reportLib "github.com/weka/go-cloud-lib/report"
 )
 
-const WekaAdminUsername = "admin"
+const (
+	WekaAdminUsername = "admin"
+	// NFS VMs tag
+	NfsInterfaceGroupPortKey   = "nfs_interface_group_port"
+	NfsInterfaceGroupPortValue = "ready"
+)
 
 var (
 	userAssignedClientId = os.Getenv("USER_ASSIGNED_CLIENT_ID")
@@ -319,6 +324,13 @@ func AddInstanceToState(ctx context.Context, subscriptionId, resourceGroupName s
 	} else {
 		state.Instances = append(state.Instances, newInstance)
 		err = WriteState(ctx, stateParams, state)
+	}
+	return
+}
+
+func GetStateInstancesNames(vms []protocol.Vm) (instanceNames []string) {
+	for _, vm := range vms {
+		instanceNames = append(instanceNames, vm.Name)
 	}
 	return
 }
@@ -1059,15 +1071,7 @@ func GetScaleSetVmId(resourceId string) string {
 	return vmId
 }
 
-func GetScaleSetInstancesInfo(ctx context.Context, vmssParams *ScaleSetParams) (instances []protocol.HgInstance, err error) {
-	logger := logging.LoggerFromCtx(ctx)
-	logger.Info().Msgf("Getting scale set instances %s info", vmssParams.ScaleSetName)
-
-	vms, err := GetScaleSetInstances(ctx, vmssParams)
-	if err != nil {
-		return
-	}
-
+func GetScaleSetInstancesInfoFromVms(ctx context.Context, vmssParams *ScaleSetParams, vms []*VMInfoSummary) (instances []protocol.HgInstance, err error) {
 	netInterfaces, err := GetScaleSetVmsNetworkPrimaryNICs(ctx, vmssParams, vms)
 	if err != nil {
 		return
@@ -1092,6 +1096,23 @@ func GetScaleSetInstancesInfo(ctx context.Context, vmssParams *ScaleSetParams) (
 			PrivateIp: privateIp,
 		}
 		instances = append(instances, instanceInfo)
+	}
+	return
+}
+
+func GetScaleSetInstancesInfo(ctx context.Context, vmssParams *ScaleSetParams) (instances []protocol.HgInstance, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msgf("Getting scale set instances %s info", vmssParams.ScaleSetName)
+
+	vms, err := GetScaleSetInstances(ctx, vmssParams)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	instances, err = GetScaleSetInstancesInfoFromVms(ctx, vmssParams, vms)
+	if err != nil {
+		logger.Error().Err(err).Send()
 	}
 	return
 }
@@ -1877,4 +1898,45 @@ func GetCurrentScaleSetConfiguration(ctx context.Context, vmssParams *ScaleSetPa
 
 	config = GetVmssConfig(ctx, vmssParams.ResourceGroupName, scaleSet)
 	return
+}
+
+func UpdateTagsOnVm(ctx context.Context, subscriptionId, resourceGroupName, vmName string, tags map[string]string) error {
+	logger := logging.LoggerFromCtx(ctx)
+
+	credential, err := getCredential(ctx)
+	if err != nil {
+		return err
+	}
+
+	client, err := armcompute.NewVirtualMachinesClient(subscriptionId, credential, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return err
+	}
+
+	// get current tags
+	vm, err := client.Get(ctx, resourceGroupName, vmName, nil)
+	if err != nil {
+		err = fmt.Errorf("cannot get vm %s: %v", vmName, err)
+		logger.Error().Err(err).Send()
+		return err
+	}
+
+	vmTags := PtrMapToStrMap(vm.Tags)
+	// merge current tags with new tags
+	for k, v := range tags {
+		vmTags[k] = v
+	}
+
+	params := &armcompute.VirtualMachineUpdate{
+		Tags: StrMapToPtrMap(vmTags),
+	}
+
+	_, err = client.BeginUpdate(ctx, resourceGroupName, vmName, *params, nil)
+	if err != nil {
+		err = fmt.Errorf("cannot update tags on vm %s: %v", vmName, err)
+		logger.Error().Err(err).Send()
+		return err
+	}
+	return nil
 }
