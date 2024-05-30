@@ -27,11 +27,11 @@ resource "azurerm_role_definition" "nics_reader" {
   assignable_scopes = [data.azurerm_resource_group.rg.id]
 }
 
-resource "azurerm_role_assignment" "reader" {
-  count                = var.vm_identity_name == "" ? 1 : 0
-  scope                = data.azurerm_resource_group.rg.id
-  role_definition_name = azurerm_role_definition.nics_reader[0].name
-  principal_id         = azurerm_user_assigned_identity.this[0].principal_id
+resource "azurerm_role_assignment" "nics_reader" {
+  count              = var.vm_identity_name == "" ? 1 : 0
+  scope              = data.azurerm_resource_group.rg.id
+  role_definition_id = azurerm_role_definition.nics_reader[0].role_definition_resource_id
+  principal_id       = azurerm_user_assigned_identity.this[0].principal_id
 
   depends_on = [azurerm_role_definition.nics_reader]
 }
