@@ -147,13 +147,27 @@ locals {
     key_vault_url                = var.key_vault_url
   })
 
-  protocol_script = var.protocol == "NFS" ? local.setup_nfs_protocol_script : local.setup_smb_protocol_script
+  setup_s3_protocol_script = file("${path.module}/setup_s3.sh")
 
-  setup_protocol_script = var.setup_protocol ? local.protocol_script : ""
+  setup_validation_script = templatefile("${path.module}/setup_validation.sh", {
+    gateways_number             = var.gateways_number
+    gateways_name               = var.gateways_name
+    report_function_url         = format("https://%s.azurewebsites.net/api/report", var.function_app_name)
+    vault_function_app_key_name = var.vault_function_app_key_name
+    key_vault_url               = var.key_vault_url
+    protocol                    = var.protocol
+    smbw_enabled                = var.smbw_enabled
+  })
 
-  custom_data_parts = [
-    local.init_script, local.deploy_script, local.setup_protocol_script
-  ]
+  smb_protocol_script = var.protocol == "SMB" ? local.setup_smb_protocol_script : ""
+  s3_protocol_script  = var.protocol == "S3" ? local.setup_s3_protocol_script : ""
+  nfs_protocol_script = var.protocol == "NFS" ? local.setup_nfs_protocol_script : ""
+  validation_script   = var.setup_protocol && (var.protocol == "SMB" || var.protocol == "S3") ? local.setup_validation_script : ""
+
+  setup_protocol_script = var.setup_protocol ? compact([local.nfs_protocol_script, local.smb_protocol_script, local.s3_protocol_script]) : []
+
+  custom_data_parts = concat([local.init_script, local.deploy_script, local.validation_script], local.setup_protocol_script)
+
   custom_data = join("\n", local.custom_data_parts)
 
   gw_identity_id        = var.vm_identity_name == "" ? azurerm_user_assigned_identity.this[0].id : data.azurerm_user_assigned_identity.this[0].id
@@ -199,7 +213,7 @@ resource "azurerm_linux_virtual_machine" "this" {
   lifecycle {
     ignore_changes = [tags, custom_data]
     precondition {
-      condition     = var.protocol == "NFS" ? var.gateways_number >= 1 : var.gateways_number >= 3 && var.gateways_number <= 8
+      condition     = var.protocol == "NFS" || var.protocol == "S3" ? var.gateways_number >= 1 : var.gateways_number >= 3 && var.gateways_number <= 8
       error_message = "The amount of protocol gateways should be at least 1 for NFS and at least 3 and at most 8 for SMB."
     }
     precondition {
