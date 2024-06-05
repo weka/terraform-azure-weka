@@ -72,6 +72,11 @@ output "smb_protocol_gateway_ips" {
   description = "If 'private_network' is set to false, it will output smb protocol gateway public ips, otherwise private ips."
 }
 
+output "s3_protocol_gateway_ips" {
+  value       = var.s3_protocol_gateways_number > 0 ? module.s3_protocol_gateways[0].protocol_gateways_ips : null
+  description = "If 'private_network' is set to false, it will output smb protocol gateway public ips, otherwise private ips."
+}
+
 output "private_ssh_key" {
   value       = local.private_ssh_key_path
   description = "If 'ssh_public_key' is set to null and no file provided, it will output the private ssh key location."
