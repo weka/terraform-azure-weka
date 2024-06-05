@@ -19,8 +19,8 @@ variable "protocol" {
   default     = "NFS"
 
   validation {
-    condition     = contains(["NFS", "SMB"], var.protocol)
-    error_message = "Allowed values for protocol: NFS, SMB."
+    condition     = contains(["NFS", "SMB", "S3"], var.protocol)
+    error_message = "Allowed values for protocol: NFS, SMB. S3"
   }
 }
 

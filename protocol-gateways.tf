@@ -132,3 +132,35 @@ module "smb_protocol_gateways" {
   function_app_name            = azurerm_linux_function_app.function_app.name
   depends_on                   = [module.network, azurerm_key_vault_secret.get_weka_io_token, azurerm_proximity_placement_group.ppg, azurerm_private_dns_resolver_dns_forwarding_ruleset.dns_forwarding_ruleset]
 }
+
+module "s3_protocol_gateways" {
+  count                        = var.s3_protocol_gateways_number > 0 ? 1 : 0
+  source                       = "./modules/protocol_gateways"
+  rg_name                      = var.rg_name
+  location                     = data.azurerm_resource_group.rg.location
+  subnet_name                  = data.azurerm_subnet.subnet.name
+  source_image_id              = var.source_image_id
+  vnet_name                    = local.vnet_name
+  vnet_rg_name                 = local.vnet_rg_name
+  setup_protocol               = var.s3_setup_protocol
+  tags_map                     = var.tags_map
+  gateways_number              = var.s3_protocol_gateways_number
+  gateways_name                = "${var.prefix}-${var.cluster_name}-s3-protocol-gateway"
+  protocol                     = "S3"
+  secondary_ips_per_nic        = 0
+  backend_lb_ip                = var.create_lb ? azurerm_lb.backend_lb[0].private_ip_address : ""
+  install_weka_url             = local.install_weka_url
+  instance_type                = var.s3_protocol_gateway_instance_type
+  apt_repo_server              = var.apt_repo_server
+  vm_username                  = var.vm_username
+  ssh_public_key               = var.ssh_public_key == null ? tls_private_key.ssh_key[0].public_key_openssh : var.ssh_public_key
+  ppg_id                       = local.placement_group_id
+  sg_id                        = local.sg_id
+  key_vault_url                = azurerm_key_vault.key_vault.vault_uri
+  key_vault_id                 = azurerm_key_vault.key_vault.id
+  assign_public_ip             = local.assign_public_ip
+  disk_size                    = var.s3_protocol_gateway_disk_size
+  frontend_container_cores_num = var.s3_protocol_gateway_fe_cores_num
+  function_app_name            = azurerm_linux_function_app.function_app.name
+  depends_on                   = [module.network, azurerm_key_vault_secret.get_weka_io_token, azurerm_proximity_placement_group.ppg, azurerm_private_dns_resolver_dns_forwarding_ruleset.dns_forwarding_ruleset]
+}
