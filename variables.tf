@@ -716,6 +716,37 @@ variable "weka_home_url" {
   default     = ""
 }
 
+############################################### S3 protocol gateways variables ###################################################
+variable "s3_protocol_gateways_number" {
+  type        = number
+  description = "The number of protocol gateway virtual machines to deploy."
+  default     = 0
+}
+
+variable "s3_protocol_gateway_instance_type" {
+  type        = string
+  description = "The protocol gateways' virtual machine type (sku) to deploy."
+  default     = "Standard_D8_v5"
+}
+
+variable "s3_protocol_gateway_disk_size" {
+  type        = number
+  default     = 48
+  description = "The protocol gateways' default disk size."
+}
+
+variable "s3_protocol_gateway_fe_cores_num" {
+  type        = number
+  default     = 1
+  description = "The number of frontend cores on single protocol gateway machine."
+}
+
+variable "s3_setup_protocol" {
+  type        = bool
+  description = "Config protocol, default if false"
+  default     = false
+}
+
 #### private blob
 variable "weka_tar_storage_account_id" {
   type    = string
