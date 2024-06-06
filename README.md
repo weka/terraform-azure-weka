@@ -318,6 +318,7 @@ proxy_url = VALUE
 | <a name="module_network"></a> [network](#module\_network) | ./modules/network | n/a |
 | <a name="module_nfs_protocol_gateways"></a> [nfs\_protocol\_gateways](#module\_nfs\_protocol\_gateways) | ./modules/protocol_gateways | n/a |
 | <a name="module_peering"></a> [peering](#module\_peering) | ./modules/peering_vnets | n/a |
+| <a name="module_s3_protocol_gateways"></a> [s3\_protocol\_gateways](#module\_s3\_protocol\_gateways) | ./modules/protocol_gateways | n/a |
 | <a name="module_smb_protocol_gateways"></a> [smb\_protocol\_gateways](#module\_smb\_protocol\_gateways) | ./modules/protocol_gateways | n/a |
 
 ## Resources
@@ -447,6 +448,11 @@ proxy_url = VALUE
 | <a name="input_protocol_gateways_identity_name"></a> [protocol\_gateways\_identity\_name](#input\_protocol\_gateways\_identity\_name) | The user assigned identity name for the protocol gateways instances (if empty - new one is created). | `string` | `""` | no |
 | <a name="input_proxy_url"></a> [proxy\_url](#input\_proxy\_url) | Weka home proxy url | `string` | `""` | no |
 | <a name="input_rg_name"></a> [rg\_name](#input\_rg\_name) | A predefined resource group in the Azure subscription. | `string` | n/a | yes |
+| <a name="input_s3_protocol_gateway_disk_size"></a> [s3\_protocol\_gateway\_disk\_size](#input\_s3\_protocol\_gateway\_disk\_size) | The protocol gateways' default disk size. | `number` | `48` | no |
+| <a name="input_s3_protocol_gateway_fe_cores_num"></a> [s3\_protocol\_gateway\_fe\_cores\_num](#input\_s3\_protocol\_gateway\_fe\_cores\_num) | The number of frontend cores on single protocol gateway machine. | `number` | `1` | no |
+| <a name="input_s3_protocol_gateway_instance_type"></a> [s3\_protocol\_gateway\_instance\_type](#input\_s3\_protocol\_gateway\_instance\_type) | The protocol gateways' virtual machine type (sku) to deploy. | `string` | `"Standard_D8_v5"` | no |
+| <a name="input_s3_protocol_gateways_number"></a> [s3\_protocol\_gateways\_number](#input\_s3\_protocol\_gateways\_number) | The number of protocol gateway virtual machines to deploy. | `number` | `0` | no |
+| <a name="input_s3_setup_protocol"></a> [s3\_setup\_protocol](#input\_s3\_setup\_protocol) | Config protocol, default if false | `bool` | `false` | no |
 | <a name="input_script_post_cluster_creation"></a> [script\_post\_cluster\_creation](#input\_script\_post\_cluster\_creation) | Script to run after cluster creation | `string` | `""` | no |
 | <a name="input_script_pre_start_io"></a> [script\_pre\_start\_io](#input\_script\_pre\_start\_io) | Script to run before starting IO | `string` | `""` | no |
 | <a name="input_set_dedicated_fe_container"></a> [set\_dedicated\_fe\_container](#input\_set\_dedicated\_fe\_container) | Create cluster with FE containers | `bool` | `true` | no |
@@ -504,6 +510,7 @@ proxy_url = VALUE
 | <a name="output_nfs_protocol_gateway_ips"></a> [nfs\_protocol\_gateway\_ips](#output\_nfs\_protocol\_gateway\_ips) | If 'private\_network' is set to false, it will output nfs protocol gateway public ips, otherwise private ips. |
 | <a name="output_ppg_id"></a> [ppg\_id](#output\_ppg\_id) | Placement proximity group id |
 | <a name="output_private_ssh_key"></a> [private\_ssh\_key](#output\_private\_ssh\_key) | If 'ssh\_public\_key' is set to null and no file provided, it will output the private ssh key location. |
+| <a name="output_s3_protocol_gateway_ips"></a> [s3\_protocol\_gateway\_ips](#output\_s3\_protocol\_gateway\_ips) | If 'private\_network' is set to false, it will output smb protocol gateway public ips, otherwise private ips. |
 | <a name="output_sg_id"></a> [sg\_id](#output\_sg\_id) | Security group id |
 | <a name="output_smb_protocol_gateway_ips"></a> [smb\_protocol\_gateway\_ips](#output\_smb\_protocol\_gateway\_ips) | If 'private\_network' is set to false, it will output smb protocol gateway public ips, otherwise private ips. |
 | <a name="output_subnet_name"></a> [subnet\_name](#output\_subnet\_name) | Subnet name |
