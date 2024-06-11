@@ -101,7 +101,7 @@ done
 compute_name=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" | jq '.compute.name')
 compute_name=$(echo "$compute_name" | cut -c2- | rev | cut -c2- | rev)
 retry=0
-while ! curl ${deploy_url}?code="${function_app_default_key}" --fail -H "Content-Type:application/json" -d "{\"name\": \"$compute_name:$HOSTNAME\", \"protocol\": \"nfs\"}" > /tmp/deploy.sh 2>/tmp/deploy_err.log || [ ! -s /tmp/deploy.sh ]; do
+while ! curl ${deploy_url}?code="${function_app_default_key}" --fail -H "Content-Type:application/json" -d "{\"name\": \"$compute_name:$HOSTNAME\", \"protocol\": \"${protocol}\"}" > /tmp/deploy.sh 2>/tmp/deploy_err.log || [ ! -s /tmp/deploy.sh ]; do
   echo "Retry $retry: waiting for deploy script generation success"
   cat /tmp/deploy_err.log
   retry=$((retry + 1))
@@ -115,7 +115,7 @@ mv /root/weka-prepackaged $weka_dir
 if [ $retry -gt 0 ]; then
   msg="Deploy script generation retried $retry times"
   echo "$msg"
-  curl -i "${report_url}?code=${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"nfs\", \"type\": \"debug\", \"message\": \"$msg\"}"
+  curl -i "${report_url}?code=${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"protocol\": \"${protocol}\", \"type\": \"debug\", \"message\": \"$msg\"}"
 fi
 
 echo "$(date -u): running deploy script"

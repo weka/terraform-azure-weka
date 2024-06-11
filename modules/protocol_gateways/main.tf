@@ -120,6 +120,7 @@ locals {
     deploy_url               = var.deploy_function_url
     report_url               = var.report_function_url
     function_app_default_key = var.function_app_default_key
+    protocol                 = lower(var.protocol)
   })
 
   setup_smb_protocol_script = templatefile("${path.module}/setup_smb.sh", {
@@ -129,7 +130,7 @@ locals {
     gateways_number              = var.gateways_number
     gateways_name                = var.gateways_name
     frontend_container_cores_num = var.frontend_container_cores_num
-    report_function_url          = format("https://%s.azurewebsites.net/api/report", var.function_app_name)
+    report_function_url          = var.report_function_url
     vault_function_app_key_name  = var.vault_function_app_key_name
     key_vault_url                = var.key_vault_url
   })
@@ -139,7 +140,7 @@ locals {
   setup_validation_script = templatefile("${path.module}/setup_validation.sh", {
     gateways_number             = var.gateways_number
     gateways_name               = var.gateways_name
-    report_function_url         = format("https://%s.azurewebsites.net/api/report", var.function_app_name)
+    report_function_url         = var.report_function_url
     vault_function_app_key_name = var.vault_function_app_key_name
     key_vault_url               = var.key_vault_url
     protocol                    = var.protocol
@@ -148,10 +149,9 @@ locals {
 
   smb_protocol_script = var.protocol == "SMB" ? local.setup_smb_protocol_script : ""
   s3_protocol_script  = var.protocol == "S3" ? local.setup_s3_protocol_script : ""
-  nfs_protocol_script = ""
   validation_script   = var.setup_protocol && (var.protocol == "SMB" || var.protocol == "S3") ? local.setup_validation_script : ""
 
-  setup_protocol_script = var.setup_protocol ? compact([local.nfs_protocol_script, local.smb_protocol_script, local.s3_protocol_script]) : []
+  setup_protocol_script = var.setup_protocol ? compact([local.smb_protocol_script, local.s3_protocol_script]) : []
 
   custom_data_parts = concat([local.init_script, local.validation_script], local.setup_protocol_script)
 
@@ -204,7 +204,7 @@ resource "azurerm_linux_virtual_machine" "this" {
       error_message = "The amount of protocol gateways should be at least 1 for S3 and at least 3 and at most 8 for SMB."
     }
     precondition {
-      condition     = var.setup_protocol ? var.smb_domain_name != "" : true
+      condition     = var.protocol == "SMB" && var.setup_protocol ? var.smb_domain_name != "" : true
       error_message = "The SMB domain name should be set when deploying SMB protocol gateways."
     }
     precondition {

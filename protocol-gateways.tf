@@ -22,9 +22,9 @@ module "nfs_protocol_gateways" {
   key_vault_url                = azurerm_key_vault.key_vault.vault_uri
   key_vault_id                 = azurerm_key_vault.key_vault.id
   assign_public_ip             = local.assign_public_ip
+  traces_per_frontend          = var.traces_per_ionode
   disk_size                    = var.nfs_protocol_gateway_disk_size
   frontend_container_cores_num = var.nfs_protocol_gateway_fe_cores_num
-  function_app_name            = azurerm_linux_function_app.function_app.name
   vm_identity_name             = var.protocol_gateways_identity_name
   deploy_function_url          = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/deploy"
   report_function_url          = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/report"
@@ -123,12 +123,12 @@ module "smb_protocol_gateways" {
   key_vault_url                = azurerm_key_vault.key_vault.vault_uri
   key_vault_id                 = azurerm_key_vault.key_vault.id
   assign_public_ip             = local.assign_public_ip
+  traces_per_frontend          = var.traces_per_ionode
   disk_size                    = var.smb_protocol_gateway_disk_size
   frontend_container_cores_num = var.smb_protocol_gateway_fe_cores_num
   smb_cluster_name             = var.smb_cluster_name
   smb_domain_name              = var.smb_domain_name
   smbw_enabled                 = var.smbw_enabled
-  function_app_name            = azurerm_linux_function_app.function_app.name
   deploy_function_url          = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/deploy"
   report_function_url          = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/report"
   function_app_default_key     = data.azurerm_function_app_host_keys.function_keys.default_function_key
@@ -150,8 +150,6 @@ module "s3_protocol_gateways" {
   gateways_name                = "${var.prefix}-${var.cluster_name}-s3-protocol-gateway"
   protocol                     = "S3"
   secondary_ips_per_nic        = 0
-  backend_lb_ip                = var.create_lb ? azurerm_lb.backend_lb[0].private_ip_address : ""
-  install_weka_url             = local.install_weka_url
   instance_type                = var.s3_protocol_gateway_instance_type
   apt_repo_server              = var.apt_repo_server
   vm_username                  = var.vm_username
@@ -161,8 +159,11 @@ module "s3_protocol_gateways" {
   key_vault_url                = azurerm_key_vault.key_vault.vault_uri
   key_vault_id                 = azurerm_key_vault.key_vault.id
   assign_public_ip             = local.assign_public_ip
+  traces_per_frontend          = var.traces_per_ionode
   disk_size                    = var.s3_protocol_gateway_disk_size
   frontend_container_cores_num = var.s3_protocol_gateway_fe_cores_num
-  function_app_name            = azurerm_linux_function_app.function_app.name
+  deploy_function_url          = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/deploy"
+  report_function_url          = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/report"
+  function_app_default_key     = data.azurerm_function_app_host_keys.function_keys.default_function_key
   depends_on                   = [module.network, azurerm_key_vault_secret.get_weka_io_token, azurerm_proximity_placement_group.ppg, azurerm_private_dns_resolver_dns_forwarding_ruleset.dns_forwarding_ruleset]
 }
