@@ -43,12 +43,16 @@ type AzureDeploymentParams struct {
 	NFSInterfaceGroupName string
 	NFSClientGroupName    string
 	NFSProtocolGWsNum     int
-	NFSGWFeCoresNum       int
+	NFSGatewayFeCoresNum  int
 	NFSStateParams        common.BlobObjParams
 	NFSSecondaryIpsNum    int
 	NFSVmssName           string
 	NFSDiskSize           int
 	BackendLbIp           string
+	SMBGatewayFeCoresNum  int
+	SMBDiskSize           int
+	S3GatewayFeCoresNum   int
+	S3DiskSize            int
 }
 
 func GetDeviceName(diskSize int) string {
@@ -80,12 +84,6 @@ func GetNfsDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, 
 		logger.Error().Err(err).Send()
 		return
 	}
-	instanceParams := protocol.BackendCoreCount{
-		Compute:       p.ComputeContainerNum,
-		Frontend:      p.FrontendContainerNum,
-		Drive:         p.DriveContainerNum,
-		ComputeMemory: p.ComputeMemory,
-	}
 
 	wekaPassword, err := common.GetWekaClusterPassword(ctx, p.KeyVaultUri)
 	if err != nil {
@@ -101,7 +99,6 @@ func GetNfsDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, 
 
 	deploymentParams := deploy.DeploymentParams{
 		VMName:                    p.VmName,
-		InstanceParams:            instanceParams,
 		WekaInstallUrl:            p.InstallUrl,
 		WekaToken:                 token,
 		NicsNum:                   p.NicsNum,
@@ -114,7 +111,7 @@ func GetNfsDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, 
 		NFSInterfaceGroupName:     p.NFSInterfaceGroupName,
 		NFSClientGroupName:        p.NFSClientGroupName,
 		NFSSecondaryIpsNum:        p.NFSSecondaryIpsNum,
-		ProtocolGatewayFeCoresNum: p.NFSGWFeCoresNum,
+		ProtocolGatewayFeCoresNum: p.NFSGatewayFeCoresNum,
 		LoadBalancerIP:            p.BackendLbIp,
 		GetPrimaryIpCmd:           GetAzurePrimaryIpCmd(),
 	}
@@ -137,6 +134,49 @@ func GetNfsDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, 
 		bashScript = joinScriptGenerator.GetJoinNFSHostScript()
 	}
 
+	return
+}
+
+func GetProtocolDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, p AzureDeploymentParams, protocolGw protocol.ProtocolGW) (bashScript string, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Str("protocol", string(protocolGw)).Msgf("Getting deploy script")
+
+	var token string
+	token, err = getWekaIoToken(ctx, p.KeyVaultUri)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	var protocolGatewayFeCoresNum int
+	var diskSize int
+	if protocolGw == protocol.SMB || protocolGw == protocol.SMBW {
+		protocolGatewayFeCoresNum = p.SMBGatewayFeCoresNum
+		diskSize = p.SMBDiskSize
+	} else if protocolGw == protocol.S3 {
+		protocolGatewayFeCoresNum = p.S3GatewayFeCoresNum
+		diskSize = p.S3DiskSize
+	}
+
+	deploymentParams := deploy.DeploymentParams{
+		VMName:                    p.VmName,
+		WekaInstallUrl:            p.InstallUrl,
+		WekaToken:                 token,
+		NicsNum:                   p.NicsNum,
+		InstallDpdk:               p.InstallDpdk,
+		ProxyUrl:                  p.ProxyUrl,
+		Protocol:                  protocolGw,
+		ProtocolGatewayFeCoresNum: protocolGatewayFeCoresNum,
+		Gateways:                  p.Gateways,
+		LoadBalancerIP:            p.BackendLbIp,
+	}
+
+	deployScriptGenerator := deploy.DeployScriptGenerator{
+		FuncDef:       funcDef,
+		Params:        deploymentParams,
+		DeviceNameCmd: GetDeviceName(diskSize),
+	}
+	bashScript = deployScriptGenerator.GetDeployScript()
 	return
 }
 
@@ -294,8 +334,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	nfsStateBlobName := os.Getenv("NFS_STATE_BLOB_NAME")
 	nfsSecondaryIpsNum, _ := strconv.Atoi(os.Getenv("NFS_SECONDARY_IPS_NUM"))
 	nfsProtocolGatewayFeCoresNum, _ := strconv.Atoi(os.Getenv("NFS_PROTOCOL_GATEWAY_FE_CORES_NUM"))
+	smbProtocolGatewayFeCoresNum, _ := strconv.Atoi(os.Getenv("SMB_PROTOCOL_GATEWAY_FE_CORES_NUM"))
+	s3ProtocolGatewayFeCoresNum, _ := strconv.Atoi(os.Getenv("S3_PROTOCOL_GATEWAY_FE_CORES_NUM"))
 	nfsVmssName := os.Getenv("NFS_VMSS_NAME")
 	nfsDiskSize, _ := strconv.Atoi(os.Getenv("NFS_DISK_SIZE"))
+	smbDiskSize, _ := strconv.Atoi(os.Getenv("SMB_DISK_SIZE"))
+	s3DiskSize, _ := strconv.Atoi(os.Getenv("S3_DISK_SIZE"))
+	tracesPerFrontend, _ := strconv.Atoi(os.Getenv("TRACES_PER_FRONTEND"))
 	backendLbIp := os.Getenv("BACKEND_LB_IP")
 
 	installUrl := os.Getenv("INSTALL_URL")
@@ -356,10 +401,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		NFSProtocolGWsNum:     nfsProtocolgwsNum,
 		NFSStateParams:        common.BlobObjParams{StorageName: stateStorageName, ContainerName: nfsStateContainerName, BlobName: nfsStateBlobName},
 		NFSSecondaryIpsNum:    nfsSecondaryIpsNum,
-		NFSGWFeCoresNum:       nfsProtocolGatewayFeCoresNum,
+		NFSGatewayFeCoresNum:  nfsProtocolGatewayFeCoresNum,
 		NFSVmssName:           nfsVmssName,
-		NFSDiskSize:           nfsDiskSize,
+		NFSDiskSize:           nfsDiskSize + tracesPerFrontend*nfsProtocolGatewayFeCoresNum,
 		BackendLbIp:           backendLbIp,
+		SMBGatewayFeCoresNum:  smbProtocolGatewayFeCoresNum,
+		SMBDiskSize:           smbDiskSize + tracesPerFrontend*smbProtocolGatewayFeCoresNum,
+		S3GatewayFeCoresNum:   s3ProtocolGatewayFeCoresNum,
+		S3DiskSize:            s3DiskSize + tracesPerFrontend*s3ProtocolGatewayFeCoresNum,
 	}
 
 	// create Function Definer
@@ -373,6 +422,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	var bashScript string
 	if vm.Protocol == protocol.NFS {
 		bashScript, err = GetNfsDeployScript(ctx, funcDef, params)
+	} else if vm.Protocol == protocol.SMB || vm.Protocol == protocol.SMBW || vm.Protocol == protocol.S3 {
+		bashScript, err = GetProtocolDeployScript(ctx, funcDef, params, vm.Protocol)
+	} else if vm.Protocol != "" {
+		err = fmt.Errorf("unsupported protocol: %s", vm.Protocol)
 	} else {
 		bashScript, err = GetDeployScript(ctx, funcDef, params)
 	}

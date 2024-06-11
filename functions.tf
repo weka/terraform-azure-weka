@@ -200,8 +200,13 @@ resource "azurerm_linux_function_app" "function_app" {
     NFS_PROTOCOL_GATEWAY_FE_CORES_NUM = var.nfs_protocol_gateway_fe_cores_num
     NFS_PROTOCOL_GATEWAYS_NUM         = var.nfs_protocol_gateways_number
     NFS_VMSS_NAME                     = var.nfs_protocol_gateways_number > 0 ? "${var.prefix}-${var.cluster_name}-nfs-protocol-gateway-vmss" : ""
-    # TODO: do not use disk size for getting device name
-    NFS_DISK_SIZE = var.nfs_protocol_gateway_disk_size + 10 * var.nfs_protocol_gateway_fe_cores_num
+    NFS_DISK_SIZE                     = var.nfs_protocol_gateway_disk_size
+    SMB_DISK_SIZE                     = var.smb_protocol_gateway_disk_size
+    S3_DISK_SIZE                      = var.s3_protocol_gateway_disk_size
+    SMB_PROTOCOL_GATEWAY_FE_CORES_NUM = var.smb_protocol_gateway_fe_cores_num
+    S3_PROTOCOL_GATEWAY_FE_CORES_NUM  = var.s3_protocol_gateway_fe_cores_num
+    TRACES_PER_FRONTEND               = var.traces_per_ionode
+
     BACKEND_LB_IP = var.create_lb ? azurerm_lb.backend_lb[0].private_ip_address : ""
   }
 

@@ -174,8 +174,8 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 
 	if p.Vm.Protocol == protocol.NFS {
 		clusterizeScript, err = doNFSClusterize(ctx, p, funcDef)
-	} else if p.Vm.Protocol == protocol.SMB || p.Vm.Protocol == protocol.SMBW {
-		clusterizeScript = "echo 'SMB clusterization is not supported'"
+	} else if p.Vm.Protocol == protocol.SMB || p.Vm.Protocol == protocol.SMBW || p.Vm.Protocol == protocol.S3 {
+		clusterizeScript = "echo 'SMB / S3 clusterization is not supported'"
 	} else {
 		clusterizeScript, err = doClusterize(ctx, p, funcDef)
 	}

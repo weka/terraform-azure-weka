@@ -52,7 +52,6 @@ No modules.
 | <a name="input_disk_size"></a> [disk\_size](#input\_disk\_size) | The disk size. | `number` | n/a | yes |
 | <a name="input_frontend_container_cores_num"></a> [frontend\_container\_cores\_num](#input\_frontend\_container\_cores\_num) | The number of frontend ionodes per instance. | `number` | `1` | no |
 | <a name="input_function_app_default_key"></a> [function\_app\_default\_key](#input\_function\_app\_default\_key) | The default key of the function app. | `string` | n/a | yes |
-| <a name="input_function_app_name"></a> [function\_app\_name](#input\_function\_app\_name) | The name of the function app. | `string` | n/a | yes |
 | <a name="input_gateways_name"></a> [gateways\_name](#input\_gateways\_name) | The protocol group name. | `string` | n/a | yes |
 | <a name="input_gateways_number"></a> [gateways\_number](#input\_gateways\_number) | The number of virtual machines to deploy as protocol gateways. | `number` | n/a | yes |
 | <a name="input_instance_type"></a> [instance\_type](#input\_instance\_type) | The virtual machine type (sku) to deploy. | `string` | n/a | yes |
