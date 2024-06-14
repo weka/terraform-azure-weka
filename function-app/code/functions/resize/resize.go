@@ -85,12 +85,12 @@ func updateDesiredClusterSize(ctx context.Context, newSize int, subscriptionId, 
 		return err
 	}
 
-	if !state.Clusterized {
-		err = fmt.Errorf("weka cluster is not ready")
-		logger := logging.LoggerFromCtx(ctx)
-		logger.Error().Err(err).Send()
-		return err
-	}
+	//if !state.Clusterized {
+	//	err = fmt.Errorf("weka cluster is not ready")
+	//	logger := logging.LoggerFromCtx(ctx)
+	//	logger.Error().Err(err).Send()
+	//	return err
+	//}
 	oldSize := state.DesiredSize
 	state.DesiredSize = newSize
 
