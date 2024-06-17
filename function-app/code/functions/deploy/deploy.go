@@ -53,6 +53,7 @@ type AzureDeploymentParams struct {
 	SMBDiskSize           int
 	S3GatewayFeCoresNum   int
 	S3DiskSize            int
+	NvmesNum              int
 }
 
 func GetDeviceName(diskSize int) string {
@@ -215,6 +216,7 @@ func GetDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, p A
 			NicsNum:        p.NicsNum,
 			Gateways:       p.Gateways,
 			ProxyUrl:       p.ProxyUrl,
+			NvmesNum:       p.NvmesNum,
 		}
 		deployScriptGenerator := deploy.DeployScriptGenerator{
 			FuncDef:       funcDef,
@@ -342,6 +344,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	s3DiskSize, _ := strconv.Atoi(os.Getenv("S3_DISK_SIZE"))
 	tracesPerFrontend, _ := strconv.Atoi(os.Getenv("TRACES_PER_FRONTEND"))
 	backendLbIp := os.Getenv("BACKEND_LB_IP")
+	nvmesNum, _ := strconv.Atoi(os.Getenv("NVMES_NUM"))
 
 	installUrl := os.Getenv("INSTALL_URL")
 	proxyUrl := os.Getenv("PROXY_URL")
@@ -409,6 +412,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		SMBDiskSize:           smbDiskSize + tracesPerFrontend*smbProtocolGatewayFeCoresNum,
 		S3GatewayFeCoresNum:   s3ProtocolGatewayFeCoresNum,
 		S3DiskSize:            s3DiskSize + tracesPerFrontend*s3ProtocolGatewayFeCoresNum,
+		NvmesNum:              nvmesNum,
 	}
 
 	// create Function Definer
