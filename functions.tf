@@ -159,7 +159,7 @@ resource "azurerm_linux_function_app" "function_app" {
     "RESOURCE_GROUP_NAME"            = data.azurerm_resource_group.rg.name
     "LOCATION"                       = data.azurerm_resource_group.rg.location
     "SET_OBS"                        = var.tiering_enable_obs_integration
-    "SMBW_ENABLED"                   = var.smbw_enabled
+    "CREATE_CONFIG_FS"               = (var.smbw_enabled && var.smb_setup_protocol) || var.s3_setup_protocol
     "OBS_NAME"                       = local.obs_storage_account_name
     "OBS_CONTAINER_NAME"             = local.obs_container_name
     "OBS_ACCESS_KEY"                 = var.tiering_blob_obs_access_key

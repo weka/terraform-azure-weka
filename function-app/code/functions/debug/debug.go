@@ -28,7 +28,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	obsContainerName := os.Getenv("OBS_CONTAINER_NAME")
 	obsAccessKey := os.Getenv("OBS_ACCESS_KEY")
 	location := os.Getenv("LOCATION")
-	nvmesNum, _ := strconv.Atoi(os.Getenv("NVMES_NUM"))
 	tieringSsdPercent := os.Getenv("TIERING_SSD_PERCENT")
 	prefix := os.Getenv("PREFIX")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
@@ -110,7 +109,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 				StateParams:       stateParams,
 				Cluster: clusterize.ClusterParams{
 					ClusterName: clusterName,
-					NvmesNum:    nvmesNum,
 					DataProtection: clusterize.DataProtectionParams{
 						StripeWidth:     stripeWidth,
 						ProtectionLevel: protectionLevel,
