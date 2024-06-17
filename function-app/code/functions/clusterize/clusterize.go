@@ -345,12 +345,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
 	setObs, _ := strconv.ParseBool(os.Getenv("SET_OBS"))
-	smbwEnabled, _ := strconv.ParseBool(os.Getenv("SMBW_ENABLED"))
+	createConfigFs, _ := strconv.ParseBool(os.Getenv("CREATE_CONFIG_FS"))
 	obsName := os.Getenv("OBS_NAME")
 	obsContainerName := os.Getenv("OBS_CONTAINER_NAME")
 	obsAccessKey := os.Getenv("OBS_ACCESS_KEY")
 	location := os.Getenv("LOCATION")
-	nvmesNum, _ := strconv.Atoi(os.Getenv("NVMES_NUM"))
 	tieringSsdPercent := os.Getenv("TIERING_SSD_PERCENT")
 	prefix := os.Getenv("PREFIX")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
@@ -413,9 +412,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		Cluster: clusterize.ClusterParams{
 			ClusterizationTarget: clusterizationTarget,
 			ClusterName:          clusterName,
-			NvmesNum:             nvmesNum,
 			SetObs:               setObs,
-			SmbwEnabled:          smbwEnabled,
+			CreateConfigFs:       createConfigFs,
 			AddFrontend:          addFrontend,
 			ProxyUrl:             proxyUrl,
 			WekaHomeUrl:          wekaHomeUrl,
