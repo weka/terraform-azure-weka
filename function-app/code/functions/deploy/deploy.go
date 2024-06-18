@@ -208,15 +208,16 @@ func GetDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, p A
 		}
 
 		deploymentParams := deploy.DeploymentParams{
-			VMName:         p.VmName,
-			InstanceParams: instanceParams,
-			WekaInstallUrl: p.InstallUrl,
-			WekaToken:      token,
-			InstallDpdk:    p.InstallDpdk,
-			NicsNum:        p.NicsNum,
-			Gateways:       p.Gateways,
-			ProxyUrl:       p.ProxyUrl,
-			NvmesNum:       p.NvmesNum,
+			VMName:           p.VmName,
+			InstanceParams:   instanceParams,
+			WekaInstallUrl:   p.InstallUrl,
+			WekaToken:        token,
+			InstallDpdk:      p.InstallDpdk,
+			NicsNum:          p.NicsNum,
+			Gateways:         p.Gateways,
+			ProxyUrl:         p.ProxyUrl,
+			NvmesNum:         p.NvmesNum,
+			FindDrivesScript: dedent.Dedent(common.FindDrivesScript),
 		}
 		deployScriptGenerator := deploy.DeployScriptGenerator{
 			FuncDef:       funcDef,
