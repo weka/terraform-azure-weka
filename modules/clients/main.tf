@@ -51,7 +51,6 @@ resource "azurerm_public_ip" "public_ip" {
   name                = "${var.clients_name}-public-ip-${count.index}"
   resource_group_name = var.rg_name
   location            = data.azurerm_resource_group.rg.location
-  #zones               = [var.zone]
   allocation_method = "Static"
   sku               = "Standard"
   tags              = var.tags_map

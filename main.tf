@@ -51,7 +51,6 @@ resource "azurerm_proximity_placement_group" "ppg" {
   count               = var.placement_group_id == "" && var.vmss_single_placement_group ? 1 : 0
   name                = "${var.prefix}-${var.cluster_name}-backend-ppg"
   location            = data.azurerm_resource_group.rg.location
-  zone                = var.zone
   allowed_vm_sizes    = [var.instance_type]
   resource_group_name = var.rg_name
   tags                = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
