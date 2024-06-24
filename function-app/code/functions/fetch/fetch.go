@@ -21,7 +21,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	stateBlobName := os.Getenv("STATE_BLOB_NAME")
 	nfsStateContainerName := os.Getenv("NFS_STATE_CONTAINER_NAME")
 	nfsStateBlobName := os.Getenv("NFS_STATE_BLOB_NAME")
-	nfsScaleSetName := os.Getenv("NFS_VMSS_NAME")
+	nfsScaleSetName := "" //Disabling Scale down. To return support, need to change to: 'os.Getenv("NFS_VMSS_NAME")'
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
 	prefix := os.Getenv("PREFIX")

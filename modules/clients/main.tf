@@ -51,9 +51,9 @@ resource "azurerm_public_ip" "public_ip" {
   name                = "${var.clients_name}-public-ip-${count.index}"
   resource_group_name = var.rg_name
   location            = data.azurerm_resource_group.rg.location
-  allocation_method = "Static"
-  sku               = "Standard"
-  tags              = var.tags_map
+  allocation_method   = "Static"
+  sku                 = "Standard"
+  tags                = var.tags_map
 }
 
 resource "azurerm_network_interface" "public_first_nic" {
