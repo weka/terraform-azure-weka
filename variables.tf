@@ -387,13 +387,13 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "5464597f9be93b3c954324b1811ace7a"
+  default     = "605c0957b53a5fe9bea91367cde61381"
 }
 
 variable "function_app_dist" {
   type        = string
   description = "Function app code dist"
-  default     = "release"
+  default     = "dev"
 
   validation {
     condition     = contains(["dev", "release"], var.function_app_dist)
@@ -641,12 +641,6 @@ variable "nfs_setup_protocol" {
   type        = bool
   description = "Config protocol, default if false"
   default     = false
-}
-
-variable "nfs_client_group_name" {
-  type        = string
-  description = "Client access group name."
-  default     = "weka-cg"
 }
 
 variable "nfs_interface_group_name" {
