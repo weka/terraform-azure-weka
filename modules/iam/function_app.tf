@@ -42,9 +42,33 @@ resource "azurerm_role_assignment" "obs_storage_blob_data_contributor" {
 
 resource "azurerm_role_assignment" "function_app_key_vault_secrets_user" {
   count                = var.function_app_identity_name == "" ? 1 : 0
-  scope                = data.azurerm_resource_group.rg.id
+  scope                = var.key_vault_id
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_user_assigned_identity.function_app[0].principal_id
+}
+
+resource "azurerm_role_definition" "key_vault_set_secret" {
+  count       = var.function_app_identity_name == "" ? 1 : 0
+  name        = "${var.prefix}-${var.cluster_name}-key-vault-new-secret-writer"
+  scope       = var.key_vault_id
+  description = "Can create new secrets in the key vault"
+
+  permissions {
+    actions = [
+      # See: https://learn.microsoft.com/en-us/azure/role-based-access-control/permissions/security#microsoftkeyvault
+      "Microsoft.KeyVault/vaults/secrets/write",
+    ]
+    not_actions = []
+  }
+
+  assignable_scopes = [var.key_vault_id]
+}
+
+resource "azurerm_role_assignment" "key_vault_set_secret" {
+  count              = var.function_app_identity_name == "" ? 1 : 0
+  scope              = var.key_vault_id
+  role_definition_id = azurerm_role_definition.key_vault_set_secret[0].role_definition_resource_id
+  principal_id       = azurerm_user_assigned_identity.function_app[0].principal_id
 }
 
 resource "azurerm_role_assignment" "function_app_reader" {

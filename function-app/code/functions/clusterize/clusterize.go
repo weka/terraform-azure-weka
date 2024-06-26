@@ -110,9 +110,16 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 		}
 	}
 
-	wekaPassword, err := common.GetWekaClusterPassword(ctx, p.KeyVaultUri)
+	wekaAdminPassword, err := common.GetWekaAdminPassword(ctx, p.KeyVaultUri)
 	if err != nil {
-		err = fmt.Errorf("failed to get weka cluster password: %w", err)
+		err = fmt.Errorf("failed to get weka cluster admin password: %w", err)
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	wekaServicePassword, err := common.GetWekaClusterPassword(ctx, p.KeyVaultUri)
+	if err != nil {
+		err = fmt.Errorf("failed to get weka service password: %w", err)
 		logger.Error().Err(err).Send()
 		return
 	}
@@ -145,8 +152,10 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 	clusterParams.VMNames = vmNamesList
 	clusterParams.IPs = ipsList
 	clusterParams.ObsScript = GetObsScript(p.Obs)
-	clusterParams.WekaPassword = wekaPassword
-	clusterParams.WekaUsername = common.WekaAdminUsername
+	clusterParams.WekaAdminUsername = common.WekaAdminUsername
+	clusterParams.WekaAdminPassword = wekaAdminPassword
+	clusterParams.WekaServiceUsername = common.WekaServiceUsername
+	clusterParams.WekaServicePassword = wekaServicePassword
 	clusterParams.InstallDpdk = p.InstallDpdk
 	clusterParams.FindDrivesScript = common.FindDrivesScript
 	clusterParams.ClusterizationTarget = state.ClusterizationTarget
@@ -300,12 +309,6 @@ func doClusterize(ctx context.Context, p ClusterizationParams, funcDef functions
 			clusterizeScript = cloudCommon.GetErrorScript(err, reportFunction, p.Vm.Protocol)
 		}
 	} else {
-		wekaPassword, err2 := common.GetWekaClusterPassword(ctx, p.KeyVaultUri)
-		if err2 != nil {
-			logger.Error().Err(err2).Send()
-			return
-		}
-
 		vmsPrivateIps, err2 := common.GetVmsPrivateIps(ctx, vmssParams)
 		if err2 != nil {
 			err = fmt.Errorf("failed to get vms private ips: %w", err)
@@ -320,9 +323,7 @@ func doClusterize(ctx context.Context, p ClusterizationParams, funcDef functions
 		}
 
 		joinParams := join.JoinParams{
-			WekaUsername: common.WekaAdminUsername,
-			WekaPassword: wekaPassword,
-			IPs:          ipsList,
+			IPs: ipsList,
 		}
 
 		joinScriptGenerator := join.JoinScriptGenerator{

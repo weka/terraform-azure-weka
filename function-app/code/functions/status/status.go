@@ -136,13 +136,13 @@ func GetClusterStatus(ctx context.Context, vmssParams *common.ScaleSetParams, st
 		return
 	}
 
-	wekaPassword, err := common.GetWekaClusterPassword(ctx, keyVaultUri)
+	wekaPassword, err := common.GetWekaClusterPasswordIfExists(ctx, keyVaultUri)
 	if err != nil {
 		return
 	}
 
 	jrpcBuilder := func(ip string) *jrpc.BaseClient {
-		return connectors.NewJrpcClient(ctx, ip, weka.ManagementJrpcPort, common.WekaAdminUsername, wekaPassword)
+		return connectors.NewJrpcClient(ctx, ip, weka.ManagementJrpcPort, common.WekaServiceUsername, wekaPassword)
 	}
 
 	vmIps, err := common.GetVmsPrivateIps(ctx, vmssParams)
