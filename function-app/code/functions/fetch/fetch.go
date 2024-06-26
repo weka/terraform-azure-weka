@@ -58,7 +58,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wekaAdminPassword, err := common.GetWekaClusterPassword(ctx, keyVaultUri)
+	wekaPassword, err := common.GetWekaClusterPasswordIfExists(ctx, keyVaultUri)
 	if err != nil {
 		err = fmt.Errorf("cannot get weka admin password: %v", err)
 		logger.Error().Err(err).Send()
@@ -74,8 +74,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := protocol.HostGroupInfoResponse{
-		Username:                    common.WekaAdminUsername,
-		Password:                    wekaAdminPassword,
+		Username:                    common.WekaServiceUsername,
+		Password:                    wekaPassword,
 		WekaBackendsDesiredCapacity: desiredCapacity,
 		WekaBackendInstances:        instances,
 		DownBackendsRemovalTimeout:  downBackendsRemovalTimeout,

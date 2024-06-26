@@ -14,13 +14,13 @@ resource "azurerm_key_vault" "key_vault" {
   }
 }
 
-resource "azurerm_key_vault_access_policy" "function_app_get_secret_permission" {
+resource "azurerm_key_vault_access_policy" "function_app_secret_permissions" {
   key_vault_id = azurerm_key_vault.key_vault.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
   object_id    = local.function_app_identity_principal
 
   secret_permissions = [
-    "Get",
+    "Get", "Set"
   ]
 
   depends_on = [azurerm_key_vault.key_vault]
@@ -107,7 +107,7 @@ resource "random_password" "weka_password" {
 }
 
 resource "azurerm_key_vault_secret" "weka_password_secret" {
-  name         = "weka-password"
+  name         = "weka-admin-password"
   value        = random_password.weka_password.result
   key_vault_id = azurerm_key_vault.key_vault.id
   tags         = merge(var.tags_map, { "weka_cluster" : var.cluster_name })

@@ -10,6 +10,7 @@ import (
 
 	"github.com/weka/go-cloud-lib/logging"
 	"github.com/weka/go-cloud-lib/protocol"
+	"github.com/weka/go-cloud-lib/utils"
 )
 
 var (
@@ -23,6 +24,7 @@ var (
 	nfsContainerName   = os.Getenv("NFS_STATE_CONTAINER_NAME")
 	nfsStateBlobName   = os.Getenv("NFS_STATE_BLOB_NAME")
 	nfsScaleSetName    = os.Getenv("NFS_VMSS_NAME")
+	keyVaultUri        = os.Getenv("KEY_VAULT_URI")
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -67,6 +69,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	// 1. Initial VMSS creation flow: initiale vmss creation if needed
 	if scaleSet == nil && !state.Clusterized && len(state.Instances) == 0 {
+		logger.Info().Msg("setting weka service password in key vault")
+		newWekaServicePassword := utils.GeneratePassword(16)
+		err = common.SetWekaServicePassword(ctx, keyVaultUri, newWekaServicePassword)
+		if err != nil {
+			err = fmt.Errorf("failed to set weka service password: %w", err)
+			logger.Error().Err(err).Send()
+			return
+		}
+
 		err := createVmss(ctx, &vmssConfig, vmScaleSetName, state.InitialSize)
 		if err != nil {
 			logger.Error().Err(err).Msgf("cannot create initial vmss")

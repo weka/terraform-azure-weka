@@ -86,12 +86,6 @@ func GetNfsDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, 
 		return
 	}
 
-	wekaPassword, err := common.GetWekaClusterPassword(ctx, p.KeyVaultUri)
-	if err != nil {
-		logger.Error().Err(err).Send()
-		return
-	}
-
 	var token string
 	token, err = getWekaIoToken(ctx, p.KeyVaultUri)
 	if err != nil {
@@ -107,8 +101,6 @@ func GetNfsDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, 
 		ProxyUrl:                  p.ProxyUrl,
 		Gateways:                  p.Gateways,
 		Protocol:                  protocol.NFS,
-		WekaUsername:              common.WekaAdminUsername,
-		WekaPassword:              wekaPassword,
 		NFSInterfaceGroupName:     p.NFSInterfaceGroupName,
 		NFSClientGroupName:        p.NFSClientGroupName,
 		NFSSecondaryIpsNum:        p.NFSSecondaryIpsNum,
@@ -226,12 +218,6 @@ func GetDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, p A
 		}
 		bashScript = deployScriptGenerator.GetDeployScript()
 	} else {
-		wekaPassword, err := common.GetWekaClusterPassword(ctx, p.KeyVaultUri)
-		if err != nil {
-			logger.Error().Err(err).Send()
-			return "", err
-		}
-
 		vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.ClusterName)
 		vmssParams := &common.ScaleSetParams{
 			SubscriptionId:    p.SubscriptionId,
@@ -262,8 +248,6 @@ func GetDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, p A
 		}
 
 		joinParams := join.JoinParams{
-			WekaUsername:   common.WekaAdminUsername,
-			WekaPassword:   wekaPassword,
 			IPs:            ips,
 			InstallDpdk:    p.InstallDpdk,
 			InstanceParams: instanceParams,
