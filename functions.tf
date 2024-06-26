@@ -197,7 +197,6 @@ resource "azurerm_linux_function_app" "function_app" {
     NFS_STATE_CONTAINER_NAME          = local.nfs_deployment_container_name
     NFS_STATE_BLOB_NAME               = "nfs_state"
     NFS_INTERFACE_GROUP_NAME          = var.nfs_interface_group_name
-    NFS_CLIENT_GROUP_NAME             = var.nfs_client_group_name
     NFS_SECONDARY_IPS_NUM             = var.nfs_protocol_gateway_secondary_ips_per_nic
     NFS_PROTOCOL_GATEWAY_FE_CORES_NUM = var.nfs_protocol_gateway_fe_cores_num
     NFS_PROTOCOL_GATEWAYS_NUM         = var.nfs_protocol_gateways_number

@@ -23,6 +23,7 @@ var (
 	nfsContainerName   = os.Getenv("NFS_STATE_CONTAINER_NAME")
 	nfsStateBlobName   = os.Getenv("NFS_STATE_BLOB_NAME")
 	nfsScaleSetName    = os.Getenv("NFS_VMSS_NAME")
+	keyVaultUri        = os.Getenv("KEY_VAULT_URI")
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
