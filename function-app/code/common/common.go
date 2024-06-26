@@ -31,7 +31,10 @@ import (
 )
 
 const (
-	WekaAdminUsername = "admin"
+	WekaAdminUsername         = "admin"
+	WekaAdminPasswordKey      = "weka-admin-password"
+	WekaDeploymentUsername    = "weka-deployment"
+	WekaDeploymentPasswordKey = "weka-deployment-password"
 	// NFS VMs tag
 	NfsInterfaceGroupPortKey   = "nfs_interface_group_port"
 	NfsInterfaceGroupPortValue = "ready"
@@ -489,12 +492,38 @@ func GetKeyVaultValue(ctx context.Context, keyVaultUri, secretName string) (secr
 	}
 	resp, err := client.GetSecret(ctx, secretName, "", nil)
 	if err != nil {
-		logger.Error().Err(err).Send()
+		logger.Info().Err(err).Send()
 		return
 	}
 
 	secret = *resp.Value
 
+	return
+}
+
+func SetKeyVaultValue(ctx context.Context, keyVaultUri, secretName, secretValue string) (err error) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msgf("setting key vault secret: %s", secretName)
+
+	credential, err := getCredential(ctx)
+	if err != nil {
+		return
+	}
+
+	client, err := azsecrets.NewClient(keyVaultUri, credential, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	params := azsecrets.SetSecretParameters{
+		Value: &secretValue,
+	}
+
+	_, err = client.SetSecret(ctx, secretName, params, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+	}
 	return
 }
 
@@ -855,15 +884,6 @@ func AssignStorageBlobDataContributorRoleToScaleSet(
 	return &res.RoleAssignment, nil
 }
 
-type ScaleSetInfo struct {
-	Id            string
-	Name          string
-	AdminUsername string
-	AdminPassword string
-	Capacity      int
-	VMSize        string
-}
-
 // Gets scale set
 // see https://learn.microsoft.com/en-us/rest/api/compute/virtual-machine-scale-sets/get
 func getScaleSet(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (*armcompute.VirtualMachineScaleSet, error) {
@@ -902,33 +922,6 @@ func GetScaleSetOrNil(ctx context.Context, subscriptionId, resourceGroupName, vm
 		return nil, err
 	}
 	return scaleSet, nil
-}
-
-// Gets single scale set info
-func GetScaleSetInfo(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, keyVaultUri string) (*ScaleSetInfo, error) {
-	logger := logging.LoggerFromCtx(ctx)
-
-	scaleSet, err := getScaleSet(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
-	if err != nil {
-		logger.Error().Err(err).Send()
-		return nil, err
-	}
-
-	wekaPassword, err := GetWekaClusterPassword(ctx, keyVaultUri)
-	if err != nil {
-		logger.Error().Err(err).Send()
-		return nil, err
-	}
-
-	scaleSetInfo := ScaleSetInfo{
-		Id:            *scaleSet.ID,
-		Name:          *scaleSet.Name,
-		AdminUsername: WekaAdminUsername,
-		AdminPassword: wekaPassword,
-		Capacity:      int(*scaleSet.SKU.Capacity),
-		VMSize:        *scaleSet.SKU.Name,
-	}
-	return &scaleSetInfo, err
 }
 
 func GetScaleSetInstances(ctx context.Context, vmssParams *ScaleSetParams) (vms []*VMInfoSummary, err error) {
@@ -1209,8 +1202,34 @@ func ReportMsg(ctx context.Context, hostName string, stateParams BlobObjParams, 
 	_ = UpdateStateReporting(ctx, stateParams, reportObj)
 }
 
-func GetWekaClusterPassword(ctx context.Context, keyVaultUri string) (password string, err error) {
-	return GetKeyVaultValue(ctx, keyVaultUri, "weka-password")
+func GetWekaAdminPassword(ctx context.Context, keyVaultUri string) (password string, err error) {
+	return GetKeyVaultValue(ctx, keyVaultUri, WekaAdminPasswordKey)
+}
+
+func GetWekaDeploymentPassword(ctx context.Context, keyVaultUri string) (password string, err error) {
+	return GetKeyVaultValue(ctx, keyVaultUri, WekaDeploymentPasswordKey)
+}
+
+// Get Weka deployment password if exists, otherwise get admin password
+func GetWekaClusterCredentials(ctx context.Context, keyVaultUri string) (protocol.ClusterCreds, error) {
+	usename := WekaDeploymentUsername
+	password, err := GetWekaDeploymentPassword(ctx, keyVaultUri)
+
+	var responseErr *azcore.ResponseError
+	if err != nil && errors.As(err, &responseErr) && responseErr.ErrorCode == "SecretNotFound" {
+		usename = WekaAdminUsername
+		password, err = GetWekaAdminPassword(ctx, keyVaultUri)
+	}
+
+	credentials := protocol.ClusterCreds{
+		Username: usename,
+		Password: password,
+	}
+	return credentials, err
+}
+
+func SetWekaDeploymentPassword(ctx context.Context, keyVaultUri, password string) (err error) {
+	return SetKeyVaultValue(ctx, keyVaultUri, WekaDeploymentPasswordKey, password)
 }
 
 func GetVmScaleSetName(prefix, clusterName string) string {

@@ -13,6 +13,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/weka/go-cloud-lib/join"
+	"github.com/weka/go-cloud-lib/utils"
 
 	"github.com/lithammer/dedent"
 
@@ -110,9 +111,11 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 		}
 	}
 
-	wekaPassword, err := common.GetWekaClusterPassword(ctx, p.KeyVaultUri)
+	logger.Info().Msg("setting weka service password in key vault")
+	wekaServicePassword := utils.GeneratePassword(16, 1, 1, 1)
+	err = common.SetWekaDeploymentPassword(ctx, p.KeyVaultUri, wekaServicePassword)
 	if err != nil {
-		err = fmt.Errorf("failed to get weka cluster password: %w", err)
+		err = fmt.Errorf("failed to set weka service password: %w", err)
 		logger.Error().Err(err).Send()
 		return
 	}
@@ -145,8 +148,6 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 	clusterParams.VMNames = vmNamesList
 	clusterParams.IPs = ipsList
 	clusterParams.ObsScript = GetObsScript(p.Obs)
-	clusterParams.WekaPassword = wekaPassword
-	clusterParams.WekaUsername = common.WekaAdminUsername
 	clusterParams.InstallDpdk = p.InstallDpdk
 	clusterParams.FindDrivesScript = common.FindDrivesScript
 	clusterParams.ClusterizationTarget = state.ClusterizationTarget
@@ -194,7 +195,6 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 
 func doNFSClusterize(ctx context.Context, p ClusterizationParams, funcDef functions_def.FunctionDef) (clusterizeScript string, err error) {
 	nfsInterfaceGroupName := os.Getenv("NFS_INTERFACE_GROUP_NAME")
-	nfsClientGroupName := os.Getenv("NFS_CLIENT_GROUP_NAME")
 	nfsProtocolgwsNum, _ := strconv.Atoi(os.Getenv("NFS_PROTOCOL_GATEWAYS_NUM"))
 	nfsSecondaryIpsNum, _ := strconv.Atoi(os.Getenv("NFS_SECONDARY_IPS_NUM"))
 	nfsVmssName := os.Getenv("NFS_VMSS_NAME")
@@ -241,7 +241,6 @@ func doNFSClusterize(ctx context.Context, p ClusterizationParams, funcDef functi
 
 	nfsParams := protocol.NFSParams{
 		InterfaceGroupName: nfsInterfaceGroupName,
-		ClientGroupName:    nfsClientGroupName,
 		SecondaryIps:       secondaryIps,
 		ContainersUid:      containersUid,
 		NicNames:           nicNames,
@@ -300,12 +299,6 @@ func doClusterize(ctx context.Context, p ClusterizationParams, funcDef functions
 			clusterizeScript = cloudCommon.GetErrorScript(err, reportFunction, p.Vm.Protocol)
 		}
 	} else {
-		wekaPassword, err2 := common.GetWekaClusterPassword(ctx, p.KeyVaultUri)
-		if err2 != nil {
-			logger.Error().Err(err2).Send()
-			return
-		}
-
 		vmsPrivateIps, err2 := common.GetVmsPrivateIps(ctx, vmssParams)
 		if err2 != nil {
 			err = fmt.Errorf("failed to get vms private ips: %w", err)
@@ -320,9 +313,7 @@ func doClusterize(ctx context.Context, p ClusterizationParams, funcDef functions
 		}
 
 		joinParams := join.JoinParams{
-			WekaUsername: common.WekaAdminUsername,
-			WekaPassword: wekaPassword,
-			IPs:          ipsList,
+			IPs: ipsList,
 		}
 
 		joinScriptGenerator := join.JoinScriptGenerator{
