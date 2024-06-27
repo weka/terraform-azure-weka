@@ -59,7 +59,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	logger.Info().Msgf("The requested new size is %d", *size.Value)
 
-	minCusterSize := 6
+	minCusterSize := 0
 	if *size.Value < minCusterSize {
 		err = fmt.Errorf("invalid size, minimal cluster size is %d", minCusterSize)
 		logger.Error().Err(err).Send()
