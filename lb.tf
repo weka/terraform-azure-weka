@@ -1,16 +1,40 @@
+locals {
+  lb_external_ip = var.assign_public_ip ? 1 : 0
+}
 # ================= ui lb =========================== #
+resource "azurerm_public_ip" "ui_ip" {
+  count               = var.assign_public_ip ? 1 : 0
+  name                = "${var.prefix}-${var.cluster_name}-ui-public-ip"
+  location            = local.location
+  resource_group_name = local.resource_group_name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+}
+
 resource "azurerm_lb" "ui_lb" {
   count               = var.create_lb ? 1 : 0
   name                = "${var.prefix}-${var.cluster_name}-ui-lb"
   resource_group_name = var.rg_name
   location            = data.azurerm_resource_group.rg.location
   sku                 = "Standard"
-  frontend_ip_configuration {
-    name                          = "${var.prefix}-${var.cluster_name}-ui-lb-frontend"
-    subnet_id                     = data.azurerm_subnet.subnet.id
-    private_ip_address_allocation = "Dynamic"
-    private_ip_address_version    = "IPv4"
+  dynamic "frontend_ip_configuration" {
+    for_each = range(0, local.lb_external_ip)
+    content {
+      name                 = "${var.prefix}-${var.cluster_name}-public-ui-frontend"
+      public_ip_address_id = azurerm_public_ip.ui_ip[0].id
+
+    }
   }
+  dynamic "frontend_ip_configuration" {
+    for_each = range(local.lb_external_ip, 1)
+    content {
+      name                          = "${var.prefix}-${var.cluster_name}-ui-lb-frontend"
+      subnet_id                     = data.azurerm_subnet.subnet.id
+      private_ip_address_allocation = "Dynamic"
+      private_ip_address_version    = "IPv4"
+    }
+  }
+
   tags = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
   lifecycle {
     ignore_changes = [tags]
@@ -53,6 +77,15 @@ resource "azurerm_lb_rule" "ui_lb_rule" {
 }
 
 # ================= backend lb =========================== #
+resource "azurerm_public_ip" "backend_ip" {
+  count               = var.assign_public_ip ? 1 : 0
+  name                = "${var.prefix}-${var.cluster_name}-backend-public-ip"
+  location            = local.location
+  resource_group_name = local.resource_group_name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+}
+
 resource "azurerm_lb" "backend_lb" {
   count               = var.create_lb ? 1 : 0
   name                = "${var.prefix}-${var.cluster_name}-backend-lb"
@@ -60,11 +93,21 @@ resource "azurerm_lb" "backend_lb" {
   location            = data.azurerm_resource_group.rg.location
   sku                 = "Standard"
   tags                = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
-  frontend_ip_configuration {
-    name                          = "${var.prefix}-${var.cluster_name}-backend-lb-frontend"
-    subnet_id                     = data.azurerm_subnet.subnet.id
-    private_ip_address_allocation = "Dynamic"
-    private_ip_address_version    = "IPv4"
+  dynamic "frontend_ip_configuration" {
+    for_each = range(0, local.lb_external_ip)
+    content {
+      name                 = "${var.prefix}-${var.cluster_name}-public-backend-frontend"
+      public_ip_address_id = azurerm_public_ip.backend_ip[0].id
+    }
+  }
+  dynamic "frontend_ip_configuration" {
+    for_each = range(local.lb_external_ip, 1)
+    content {
+      name                          = "${var.prefix}-${var.cluster_name}-backend-lb-frontend"
+      subnet_id                     = data.azurerm_subnet.subnet.id
+      private_ip_address_allocation = "Dynamic"
+      private_ip_address_version    = "IPv4"
+    }
   }
   lifecycle {
     ignore_changes = [tags]
@@ -112,7 +155,7 @@ resource "azurerm_private_dns_a_record" "dns_a_record_backend_lb" {
   zone_name           = local.private_dns_zone_name
   resource_group_name = local.private_dns_rg_name
   ttl                 = 300
-  records             = [azurerm_lb.backend_lb[0].frontend_ip_configuration[0].private_ip_address]
+  records             = var.assign_public_ip ? [azurerm_public_ip.backend_ip[0].ip_address] : [azurerm_lb.backend_lb[0].frontend_ip_configuration[0].private_ip_address]
   tags                = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
   depends_on          = [azurerm_lb.backend_lb, module.network]
   lifecycle {
