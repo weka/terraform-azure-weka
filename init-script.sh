@@ -121,8 +121,25 @@ while ! [ "$(lsblk | grep ${disk_size}G | awk '{print $1}')" ] ; do
   sleep 5
 done
 
-compute_name=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" | jq '.compute.name')
-compute_name=$(echo "$compute_name" | cut -c2- | rev | cut -c2- | rev)
+compute_name=""
+max_retries=10
+retry=0
+while [ -z "$compute_name" ] && [ $retry -lt $max_retries ]; do
+  compute_name=$(curl -s -H "Metadata:true" --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" | jq -r '.compute.name')
+
+  if [ -z "$compute_name" ]; then
+    echo "Attempt $((retry + 1)) to get compute name from metadata failed. Retrying in 3 seconds..."
+    retry=$((retry + 1))
+    sleep 3
+  fi
+done
+
+if [ -z "$compute_name" ]; then
+  echo "Failed to get compute name from metadata after $max_retries attempts"
+  shutdown -h now
+  exit 1
+fi
+
 retry=0
 while ! curl ${deploy_url}?code="${function_app_default_key}" --fail -H "Content-Type:application/json" -d "{\"name\": \"$compute_name:$HOSTNAME\"}" > /tmp/deploy.sh 2>/tmp/deploy_err.log || [ ! -s /tmp/deploy.sh ]; do
   echo "Retry $retry: waiting for deploy script generation success"
