@@ -14,7 +14,7 @@ output "sg_id" {
 }
 
 output "private_dns_zone_name" {
-  value       = var.private_dns_zone_name == "" ? azurerm_private_dns_zone.dns[0].name : var.private_dns_zone_name
+  value       = var.create_private_dns_zone && var.private_dns_zone_name == "" ? azurerm_private_dns_zone.dns[0].name : var.private_dns_zone_name
   description = "Displays the private DNS zone name."
 }
 
@@ -24,6 +24,6 @@ output "vnet_rg_name" {
 }
 
 output "private_dns_rg_name" {
-  value       = var.private_dns_rg_name == "" ? var.rg_name : var.private_dns_rg_name
+  value       = var.create_private_dns_zone && var.private_dns_rg_name == "" ? var.rg_name : var.private_dns_rg_name
   description = "The private DNS zone resource group name."
 }

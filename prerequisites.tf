@@ -3,20 +3,21 @@ data "azurerm_resource_group" "rg" {
 }
 
 module "network" {
-  source                = "./modules/network"
-  prefix                = var.prefix
-  vnet_name             = var.vnet_name
-  subnet_name           = var.subnet_name
-  rg_name               = var.rg_name
-  vnet_rg_name          = var.vnet_rg_name
-  private_dns_rg_name   = var.private_dns_rg_name
-  address_space         = var.address_space
-  subnet_prefix         = var.subnet_prefix
-  allow_ssh_cidrs       = var.allow_ssh_cidrs
-  allow_weka_api_cidrs  = var.allow_weka_api_cidrs
-  private_dns_zone_name = var.private_dns_zone_name
-  sg_id                 = var.sg_id
-  create_nat_gateway    = var.create_nat_gateway
+  source                  = "./modules/network"
+  prefix                  = var.prefix
+  vnet_name               = var.vnet_name
+  subnet_name             = var.subnet_name
+  rg_name                 = var.rg_name
+  vnet_rg_name            = var.vnet_rg_name
+  private_dns_rg_name     = var.private_dns_rg_name
+  address_space           = var.address_space
+  subnet_prefix           = var.subnet_prefix
+  allow_ssh_cidrs         = var.allow_ssh_cidrs
+  allow_weka_api_cidrs    = var.allow_weka_api_cidrs
+  private_dns_zone_name   = var.private_dns_zone_name
+  sg_id                   = var.sg_id
+  create_nat_gateway      = var.create_nat_gateway
+  create_private_dns_zone = var.create_private_dns_zone
 }
 
 module "iam" {
@@ -44,8 +45,8 @@ locals {
   vnet_rg_name          = var.vnet_rg_name == "" ? module.network.vnet_rg_name : var.vnet_rg_name
   subnet_name           = var.subnet_name == "" ? module.network.subnet_name : var.subnet_name
   sg_id                 = var.sg_id == "" ? module.network.sg_id : var.sg_id
-  private_dns_zone_name = var.private_dns_zone_name == "" ? module.network.private_dns_zone_name : var.private_dns_zone_name
-  private_dns_rg_name   = var.private_dns_rg_name == "" ? module.network.private_dns_rg_name : var.private_dns_rg_name
+  private_dns_zone_name = var.create_private_dns_zone && var.private_dns_zone_name == "" ? module.network.private_dns_zone_name : var.private_dns_zone_name
+  private_dns_rg_name   = var.create_private_dns_zone && var.private_dns_rg_name == "" ? module.network.private_dns_rg_name : var.private_dns_rg_name
   assign_public_ip      = var.assign_public_ip != "auto" ? var.assign_public_ip == "true" : var.subnet_name == ""
   # managed identities outputs
   logic_app_identity_id           = module.iam.logic_app_identity_id

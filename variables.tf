@@ -810,3 +810,9 @@ variable "debug_down_backends_removal_timeout" {
   default     = "3h"
   description = "Don't change this value without consulting weka support team. Timeout for removing down backends. Valid time units are ns, us (or µs), ms, s, m, h."
 }
+
+variable "create_private_dns_zone" {
+  type        = bool
+  default     = true
+  description = "Create private DNS zone"
+}

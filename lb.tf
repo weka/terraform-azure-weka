@@ -107,7 +107,7 @@ resource "azurerm_lb_rule" "backend_lb_rule" {
 }
 
 resource "azurerm_private_dns_a_record" "dns_a_record_backend_lb" {
-  count               = var.create_lb ? 1 : 0
+  count               = var.create_lb && var.create_private_dns_zone ? 1 : 0
   name                = lower("${var.cluster_name}-backend")
   zone_name           = local.private_dns_zone_name
   resource_group_name = local.private_dns_rg_name
