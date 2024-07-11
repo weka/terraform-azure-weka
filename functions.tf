@@ -170,6 +170,8 @@ resource "azurerm_linux_function_app" "function_app" {
     DISK_SIZE                        = local.disk_size
     "NVMES_NUM"                      = var.containers_config_map[var.instance_type].nvme
     "TIERING_SSD_PERCENT"            = var.tiering_enable_ssd_percent
+    "TIERING_TARGET_SSD_RETENTION"   = var.tiering_obs_target_ssd_retention
+    "TIERING_START_DEMOTE"           = var.tiering_obs_start_demote
     "PREFIX"                         = var.prefix
     "KEY_VAULT_URI"                  = azurerm_key_vault.key_vault.vault_uri
     "INSTALL_DPDK"                   = var.install_cluster_dpdk
