@@ -387,7 +387,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "8d7a869712d82a72fbf056fb583bc55d"
+  default     = "7bf2b138a870fe7cc34022bc938fd0ec"
 }
 
 variable "function_app_dist" {
@@ -479,6 +479,18 @@ variable "tiering_blob_obs_access_key" {
   description = "The access key of the existing Blob object store container."
   sensitive   = true
   default     = ""
+}
+
+variable "tiering_obs_target_ssd_retention" {
+  type        = number
+  description = "Target retention period (in seconds) before tiering to OBS (how long data will stay in SSD). Default is 86400 seconds (24 hours)."
+  default     = 86400
+}
+
+variable "tiering_obs_start_demote" {
+  type        = number
+  description = "Target tiering cue (in seconds) before starting upload data to OBS (turning it into read cache). Default is 10 seconds."
+  default     = 10
 }
 
 ############################### clients ############################
