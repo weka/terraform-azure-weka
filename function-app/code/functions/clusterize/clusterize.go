@@ -351,6 +351,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	obsAccessKey := os.Getenv("OBS_ACCESS_KEY")
 	location := os.Getenv("LOCATION")
 	tieringSsdPercent := os.Getenv("TIERING_SSD_PERCENT")
+	tieringTargetSsdRetention, _ := strconv.Atoi(os.Getenv("TIERING_TARGET_SSD_RETENTION"))
+	tieringStartDemote, _ := strconv.Atoi(os.Getenv("TIERING_START_DEMOTE"))
 	prefix := os.Getenv("PREFIX")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 	// data protection-related vars
@@ -424,6 +426,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			},
 			PreStartIoScript:          preStartIoScript,
 			PostClusterCreationScript: postClusterCreationScript,
+			TieringTargetSSDRetention: tieringTargetSsdRetention,
+			TieringStartDemote:        tieringStartDemote,
 		},
 		Obs: AzureObsParams{
 			Name:              obsName,
