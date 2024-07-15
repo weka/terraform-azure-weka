@@ -583,6 +583,12 @@ variable "deployment_storage_account_access_key" {
   default     = ""
 }
 
+variable "zone" {
+  type        = string
+  description = "The zone in which the resources should be created."
+  default     = "1"
+}
+
 variable "protocol_gateways_identity_name" {
   type        = string
   description = "The user assigned identity name for the protocol gateways instances (if empty - new one is created)."
