@@ -56,6 +56,7 @@ resource "azurerm_storage_blob" "vmss_config" {
   source_content = jsonencode({
     name                            = "${var.prefix}-${var.cluster_name}-vmss"
     location                        = data.azurerm_resource_group.rg.location
+    zones                           = [var.zone]
     resource_group_name             = var.rg_name
     sku                             = var.instance_type
     upgrade_mode                    = "Manual"
