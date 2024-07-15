@@ -586,7 +586,7 @@ variable "deployment_storage_account_access_key" {
 variable "zone" {
   type        = string
   description = "The zone in which the resources should be created."
-  default     = "1"
+  default     = null
 }
 
 variable "protocol_gateways_identity_name" {
