@@ -655,8 +655,10 @@ func GetPublicIp(ctx context.Context, vmssParams *ScaleSetParams, prefix, cluste
 			logger.Error().Err(err1).Send()
 			return "", err1
 		}
-		publicIp = *nextResult.Value[0].Properties.IPAddress
-		return
+		if len(nextResult.Value) > 0 {
+			publicIp = *nextResult.Value[0].Properties.IPAddress
+			return
+		}
 	}
 
 	return

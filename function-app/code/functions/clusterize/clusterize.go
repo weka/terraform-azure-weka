@@ -275,7 +275,7 @@ func doClusterize(ctx context.Context, p ClusterizationParams, funcDef functions
 	}
 
 	ip, err := common.GetPublicIp(ctx, vmssParams, p.Prefix, p.Cluster.ClusterName, instanceId)
-	if err != nil {
+	if err != nil && ip != "" {
 		logger.Error().Err(err).Msg("Failed to fetch public ip")
 	} else {
 		p.Vm.Name = fmt.Sprintf("%s:%s", p.Vm.Name, ip)
