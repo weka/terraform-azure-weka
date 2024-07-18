@@ -393,7 +393,7 @@ variable "function_app_version" {
 variable "function_app_dist" {
   type        = string
   description = "Function app code dist"
-  default     = "dev"
+  default     = "release"
 
   validation {
     condition     = contains(["dev", "release"], var.function_app_dist)
