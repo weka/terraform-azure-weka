@@ -96,23 +96,25 @@ resource "azurerm_key_vault_secret" "get_weka_io_token" {
   }
 }
 
-resource "random_password" "weka_password" {
-  length      = 16
-  lower       = true
-  min_lower   = 1
-  upper       = true
-  min_upper   = 1
-  numeric     = true
-  min_numeric = 1
-}
-
 resource "azurerm_key_vault_secret" "weka_password_secret" {
-  name         = "weka-admin-password"
-  value        = random_password.weka_password.result
+  name         = "weka-password"
+  value        = ""
   key_vault_id = azurerm_key_vault.key_vault.id
   tags         = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
   lifecycle {
     ignore_changes = [value, tags]
   }
-  depends_on = [azurerm_key_vault.key_vault, random_password.weka_password, azurerm_key_vault_access_policy.key_vault_access_policy]
+  depends_on = [azurerm_key_vault.key_vault, azurerm_key_vault_access_policy.key_vault_access_policy]
+}
+
+
+resource "azurerm_key_vault_secret" "weka_deployment_password" {
+  name         = "weka-deployment-password"
+  value        = ""
+  key_vault_id = azurerm_key_vault.key_vault.id
+  tags         = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
+  lifecycle {
+    ignore_changes = [value, tags]
+  }
+  depends_on = [azurerm_key_vault.key_vault, azurerm_key_vault_access_policy.key_vault_access_policy]
 }
