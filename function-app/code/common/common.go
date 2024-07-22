@@ -32,7 +32,7 @@ import (
 
 const (
 	WekaAdminUsername         = "admin"
-	WekaAdminPasswordKey      = "weka-admin-password"
+	WekaAdminPasswordKey      = "weka-password"
 	WekaDeploymentUsername    = "weka-deployment"
 	WekaDeploymentPasswordKey = "weka-deployment-password"
 	// NFS VMs tag
@@ -1216,7 +1216,7 @@ func GetWekaClusterCredentials(ctx context.Context, keyVaultUri string) (protoco
 	password, err := GetWekaDeploymentPassword(ctx, keyVaultUri)
 
 	var responseErr *azcore.ResponseError
-	if err != nil && errors.As(err, &responseErr) && responseErr.ErrorCode == "SecretNotFound" {
+	if err != nil && errors.As(err, &responseErr) && responseErr.ErrorCode == "SecretNotFound" || err == nil && password == "" {
 		usename = WekaAdminUsername
 		password, err = GetWekaAdminPassword(ctx, keyVaultUri)
 	}
@@ -1230,6 +1230,10 @@ func GetWekaClusterCredentials(ctx context.Context, keyVaultUri string) (protoco
 
 func SetWekaDeploymentPassword(ctx context.Context, keyVaultUri, password string) (err error) {
 	return SetKeyVaultValue(ctx, keyVaultUri, WekaDeploymentPasswordKey, password)
+}
+
+func SetWekaAdminPassword(ctx context.Context, keyVaultUri, password string) (err error) {
+	return SetKeyVaultValue(ctx, keyVaultUri, WekaAdminPasswordKey, password)
 }
 
 func GetVmScaleSetName(prefix, clusterName string) string {

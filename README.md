@@ -297,7 +297,6 @@ proxy_url = VALUE
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.4.6 |
 | <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~>3.75.0 |
 | <a name="requirement_local"></a> [local](#requirement\_local) | ~>2.4.0 |
-| <a name="requirement_random"></a> [random](#requirement\_random) | ~>3.5.1 |
 | <a name="requirement_tls"></a> [tls](#requirement\_tls) | ~>4.0.4 |
 
 ## Providers
@@ -306,7 +305,6 @@ proxy_url = VALUE
 |------|---------|
 | <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | ~>3.75.0 |
 | <a name="provider_local"></a> [local](#provider\_local) | ~>2.4.0 |
-| <a name="provider_random"></a> [random](#provider\_random) | ~>3.5.1 |
 | <a name="provider_tls"></a> [tls](#provider\_tls) | ~>4.0.4 |
 
 ## Modules
@@ -334,6 +332,7 @@ proxy_url = VALUE
 | [azurerm_key_vault_secret.get_weka_io_token](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.private_ssh_keys](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.public_ssh_keys](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
+| [azurerm_key_vault_secret.weka_deployment_password](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.weka_password_secret](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_lb.backend_lb](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/lb) | resource |
 | [azurerm_lb.ui_lb](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/lb) | resource |
@@ -379,7 +378,6 @@ proxy_url = VALUE
 | [local_file.public_key](https://registry.terraform.io/providers/hashicorp/local/latest/docs/resources/file) | resource |
 | [local_file.scale_down_workflow_file](https://registry.terraform.io/providers/hashicorp/local/latest/docs/resources/file) | resource |
 | [local_file.scale_up_workflow_file](https://registry.terraform.io/providers/hashicorp/local/latest/docs/resources/file) | resource |
-| [random_password.weka_password](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
 | [tls_private_key.ssh_key](https://registry.terraform.io/providers/hashicorp/tls/latest/docs/resources/private_key) | resource |
 | [azurerm_application_insights.application_insights](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/application_insights) | data source |
 | [azurerm_client_config.current](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/client_config) | data source |
@@ -429,7 +427,7 @@ proxy_url = VALUE
 | <a name="input_function_app_storage_account_prefix"></a> [function\_app\_storage\_account\_prefix](#input\_function\_app\_storage\_account\_prefix) | Weka storage account name prefix | `string` | `"weka"` | no |
 | <a name="input_function_app_subnet_delegation_cidr"></a> [function\_app\_subnet\_delegation\_cidr](#input\_function\_app\_subnet\_delegation\_cidr) | Subnet delegation enables you to designate a specific subnet for an Azure PaaS service. | `string` | `"10.0.1.0/25"` | no |
 | <a name="input_function_app_subnet_delegation_id"></a> [function\_app\_subnet\_delegation\_id](#input\_function\_app\_subnet\_delegation\_id) | Required to specify if subnet\_name were used to specify pre-defined subnets for weka. Function subnet delegation requires an additional subnet, and in the case of pre-defined networking this one also should be pre-defined | `string` | `""` | no |
-| <a name="input_function_app_version"></a> [function\_app\_version](#input\_function\_app\_version) | Function app code version (hash) | `string` | `"605c0957b53a5fe9bea91367cde61381"` | no |
+| <a name="input_function_app_version"></a> [function\_app\_version](#input\_function\_app\_version) | Function app code version (hash) | `string` | `"88377f16322e8c01849f45627e578f7d"` | no |
 | <a name="input_get_weka_io_token"></a> [get\_weka\_io\_token](#input\_get\_weka\_io\_token) | The token to download the Weka release from get.weka.io. | `string` | `""` | no |
 | <a name="input_hotspare"></a> [hotspare](#input\_hotspare) | Number of hotspares to set on weka cluster. Refer to https://docs.weka.io/overview/ssd-capacity-management#hot-spare | `number` | `1` | no |
 | <a name="input_install_cluster_dpdk"></a> [install\_cluster\_dpdk](#input\_install\_cluster\_dpdk) | Install weka cluster with DPDK | `bool` | `true` | no |
@@ -527,4 +525,5 @@ proxy_url = VALUE
 | <a name="output_vmss_name"></a> [vmss\_name](#output\_vmss\_name) | n/a |
 | <a name="output_vnet_name"></a> [vnet\_name](#output\_vnet\_name) | Virtual network name |
 | <a name="output_vnet_rg_name"></a> [vnet\_rg\_name](#output\_vnet\_rg\_name) | Virtual network resource group name |
+| <a name="output_weka_cluster_admin_password_secret_name"></a> [weka\_cluster\_admin\_password\_secret\_name](#output\_weka\_cluster\_admin\_password\_secret\_name) | Weka cluster admin password secret name |
 <!-- END_TF_DOCS -->
