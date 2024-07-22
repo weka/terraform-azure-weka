@@ -112,6 +112,11 @@ output "ppg_id" {
   description = "Placement proximity group id"
 }
 
+output "weka_cluster_admin_password_secret_name" {
+  value       = azurerm_key_vault_secret.weka_password_secret.name
+  description = "Weka cluster admin password secret name"
+}
+
 output "cluster_helper_commands" {
   value       = <<EOT
 ########################################## Get function key #####################################################################
@@ -126,7 +131,7 @@ function_key=$(az functionapp keys list --name ${local.function_app_name} --reso
 curl --fail https://${local.function_app_name}.azurewebsites.net/api/status?code=$function_key
 
 ######################################### Fetch weka cluster password ####################################################################
-az keyvault secret show --vault-name ${local.key_vault_name} --name weka-admin-password | jq .value
+az keyvault secret show --vault-name ${local.key_vault_name} --name ${azurerm_key_vault_secret.weka_password_secret.name} | jq .value
 
 ${local.blob_commands}
 

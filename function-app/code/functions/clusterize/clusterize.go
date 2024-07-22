@@ -111,7 +111,15 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 		}
 	}
 
-	logger.Info().Msg("setting weka service password in key vault")
+	log.Info().Msg("setting weka admin password in secrets manager")
+	adminPassword := utils.GeneratePassword(16, 1, 1, 1)
+	err = common.SetWekaAdminPassword(ctx, p.KeyVaultUri, adminPassword)
+	if err != nil {
+		log.Error().Err(err).Send()
+		return
+	}
+
+	logger.Info().Msg("setting weka deployment password in key vault")
 	wekaServicePassword := utils.GeneratePassword(16, 1, 1, 1)
 	err = common.SetWekaDeploymentPassword(ctx, p.KeyVaultUri, wekaServicePassword)
 	if err != nil {
