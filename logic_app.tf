@@ -4,6 +4,40 @@ resource "azurerm_storage_account" "logicapp" {
   location                 = local.location
   account_tier             = "Standard"
   account_replication_type = "LRS"
+  dynamic "network_rules" {
+    for_each = range(0,local.create_private_storage_account)
+    content {
+      virtual_network_subnet_ids = [data.azurerm_subnet.subnet.id]
+      default_action = "Deny"
+      ip_rules = ["185.114.120.82"]
+      bypass = ["AzureServices"]
+    }
+  }
+  routing {
+    choice = "MicrosoftRouting"
+  }
+}
+
+resource "azurerm_private_endpoint" "logicapp_storage_account_endpoint" {
+  name                          = "${var.prefix}-${var.cluster_name}-logicapp-sa-endpoint"
+  resource_group_name           = var.rg_name
+  location                      = local.location
+  subnet_id                     = data.azurerm_subnet.subnet.id
+  custom_network_interface_name = "${var.prefix}-${var.cluster_name}-sa-endpoint"
+  private_service_connection {
+    name                           = "${var.prefix}-${var.cluster_name}-sa-endpoint"
+    private_connection_resource_id = azurerm_storage_account.logicapp.id
+    is_manual_connection           = false
+    subresource_names              = ["blob"]
+  }
+  private_dns_zone_group {
+    name                 = "storage-blob-private-dns-zone-group"
+    private_dns_zone_ids = [azurerm_private_dns_zone.blob_privatelink.id]
+  }
+  lifecycle {
+    ignore_changes = [tags]
+  }
+  depends_on = [azurerm_storage_account.logicapp]
 }
 
 resource "azurerm_subnet" "logicapp_subnet_delegation" {

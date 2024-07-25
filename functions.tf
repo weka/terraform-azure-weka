@@ -190,7 +190,13 @@ resource "azurerm_linux_function_app" "function_app" {
     FUNCTION_APP_EDIT_MODE      = "readonly"
     HASH                        = var.function_app_version
     WEBSITE_RUN_FROM_PACKAGE    = "https://${local.weka_sa}.blob.core.windows.net/${local.weka_sa_container}/${local.function_app_zip_name}"
-    WEBSITE_VNET_ROUTE_ALL      = true
+
+    WEBSITE_VNET_ROUTE_ALL                   = 1
+    #AzureWebJobsStorage                      = "DefaultEndpointsProtocol=https;AccountName=${azurerm_storage_account.deployment_sa[0].name};AccountKey=${azurerm_storage_account.deployment_sa[0].primary_access_key};EndpointSuffix=core.windows.net"
+    WEBSITE_SKIP_CONTENTSHARE_VALIDATION     = 1
+    WEBSITE_CONTENTOVERVNET                  = 1
+    WEBSITE_CONTENTAZUREFILECONNECTIONSTRING = azurerm_storage_account.deployment_sa[0].primary_connection_string
+    WEBSITE_CONTENTSHARE                     = azurerm_storage_account.deployment_sa[0].name
 
     NFS_STATE_CONTAINER_NAME          = local.nfs_deployment_container_name
     NFS_STATE_BLOB_NAME               = "nfs_state"
@@ -228,5 +234,43 @@ resource "azurerm_linux_function_app" "function_app" {
     }
   }
 
-  depends_on = [module.network, azurerm_storage_account.deployment_sa, azurerm_subnet.logicapp_subnet_delegation]
+  depends_on = [module.network, azurerm_storage_account.deployment_sa, azurerm_subnet.logicapp_subnet_delegation, azurerm_private_endpoint.storage_account_endpoint]
+}
+
+
+resource "azurerm_private_endpoint" "function_endpoint" {
+  name                          = "${var.prefix}-${var.cluster_name}-function-endpoint"
+  resource_group_name           = var.rg_name
+  location                      = data.azurerm_resource_group.rg.location
+  subnet_id                     = data.azurerm_subnet.subnet.id
+  custom_network_interface_name = "${var.prefix}-${var.cluster_name}-function-endpoint"
+  tags                          = merge(var.tags_map, {"weka_cluster": var.cluster_name})
+  private_service_connection {
+    name                           = "${var.prefix}-${var.cluster_name}-function-endpoint"
+    private_connection_resource_id = azurerm_linux_function_app.function_app.id
+    is_manual_connection           = false
+    subresource_names              = ["sites"]
+  }
+  private_dns_zone_group {
+    name                 = "sites-private-dns-zone-group"
+    private_dns_zone_ids = [azurerm_private_dns_zone.sites_private_link.id]
+  }
+  lifecycle {
+    ignore_changes = [tags]
+  }
+  depends_on = [azurerm_linux_function_app.function_app, azurerm_private_dns_zone.sites_private_link]
+}
+
+
+
+resource "azurerm_private_dns_zone" "sites_private_link" {
+  name                = "privatelink.azurewebsites.net"
+  resource_group_name = local.resource_group_name
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "sites_private_link" {
+  name                  = "azurewebsites_privatelink"
+  resource_group_name   = local.resource_group_name
+  private_dns_zone_name = azurerm_private_dns_zone.sites_private_link.name
+  virtual_network_id    = data.azurerm_virtual_network.vnet.id
 }

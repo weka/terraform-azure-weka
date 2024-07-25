@@ -3,8 +3,14 @@ locals {
   # fields that depend on LB creation
   vmss_health_probe_id = var.create_lb ? azurerm_lb_probe.backend_lb_probe[0].id : null
   lb_backend_pool_ids  = var.create_lb ? [azurerm_lb_backend_address_pool.lb_backend_pool[0].id] : []
+  create_private_storage_account = var.storage_account_access_restriction_enabled ? 1 : 0
+  create_private_dns_zone = var.create_private_dns_zone ? 1 : 0
+  my_ip = data.http.my_public_ip.response_body
+  function_subnet_id = var.function_app_subnet_delegation_id == "" ? azurerm_subnet.subnet_delegation[0].id : var.function_app_subnet_delegation_id
 }
-
+data "http" "my_public_ip" {
+  url = "https://ifconfig.me/ip"
+}
 
 resource "azurerm_storage_account" "deployment_sa" {
   count                    = var.deployment_storage_account_name == "" ? 1 : 0
@@ -15,6 +21,18 @@ resource "azurerm_storage_account" "deployment_sa" {
   account_tier             = "Standard"
   account_replication_type = "ZRS"
   tags                     = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
+  dynamic "network_rules" {
+    for_each = range(0,local.create_private_storage_account)
+    content {
+      virtual_network_subnet_ids = [data.azurerm_subnet.subnet.id]
+      default_action = "Deny"
+      ip_rules = ["185.114.120.82"]
+      bypass = ["AzureServices"]
+    }
+  }
+  routing {
+    choice = "MicrosoftRouting"
+  }
   lifecycle {
     ignore_changes = [tags]
   }
@@ -39,6 +57,7 @@ resource "azurerm_storage_blob" "state" {
   lifecycle {
     ignore_changes = all
   }
+
 }
 
 data "azurerm_storage_account" "deployment_blob" {
@@ -155,4 +174,40 @@ resource "azurerm_storage_blob" "nfs_state" {
   lifecycle {
     ignore_changes = all
   }
+}
+
+
+resource "azurerm_private_dns_zone" "blob_privatelink" {
+  name                = "privatelink.blob.core.windows.net"
+  resource_group_name = local.resource_group_name
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "blob_privatelink" {
+  name                  = "blob_privatelink"
+  resource_group_name   = local.resource_group_name
+  private_dns_zone_name = azurerm_private_dns_zone.blob_privatelink.name
+  virtual_network_id    = data.azurerm_virtual_network.vnet.id
+}
+
+
+resource "azurerm_private_endpoint" "storage_account_endpoint" {
+  name                          = "${var.prefix}-${var.cluster_name}-sa-endpoint"
+  resource_group_name           = var.rg_name
+  location                      = local.location
+  subnet_id                     = data.azurerm_subnet.subnet.id
+  custom_network_interface_name = "${var.prefix}-${var.cluster_name}-sa-endpoint"
+  private_service_connection {
+    name                           = "${var.prefix}-${var.cluster_name}-sa-endpoint"
+    private_connection_resource_id = azurerm_storage_account.deployment_sa[0].id
+    is_manual_connection           = false
+    subresource_names              = ["blob"]
+  }
+  private_dns_zone_group {
+    name                 = "storage-blob-private-dns-zone-group"
+    private_dns_zone_ids = [azurerm_private_dns_zone.blob_privatelink.id]
+  }
+  lifecycle {
+    ignore_changes = [tags]
+  }
+  depends_on = [azurerm_storage_account.deployment_sa]
 }

@@ -816,3 +816,16 @@ variable "create_private_dns_zone" {
   default     = true
   description = "Create private DNS zone"
 }
+
+variable "storage_account_access_restriction_enabled" {
+  type        = bool
+  default     = false
+  description = "Allow public access, Access restrictions apply to inbound access to internal vent"
+}
+
+variable "create_public_key_vault" {
+  type        = bool
+  default     = false
+  description = "Allow public access, Access restrictions apply to inbound access to internal vent"
+}
+

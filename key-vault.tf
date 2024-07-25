@@ -1,5 +1,7 @@
 data "azurerm_client_config" "current" {}
-
+locals {
+  create_private_key_vault = var.create_public_key_vault ? 0 : 1
+}
 resource "azurerm_key_vault" "key_vault" {
   name                     = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}"
   location                 = data.azurerm_resource_group.rg.location
@@ -116,3 +118,40 @@ resource "azurerm_key_vault_secret" "weka_password_secret" {
   }
   depends_on = [azurerm_key_vault.key_vault, random_password.weka_password, azurerm_key_vault_access_policy.key_vault_access_policy]
 }
+
+resource azurerm_private_dns_zone "keyvault_dns" {
+  name                = "privatelink.vaultcore.azure.net"
+  resource_group_name = var.rg_name
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "kv_private_link" {
+  name                  = "keyvault_privatelink"
+  resource_group_name   = var.rg_name
+  private_dns_zone_name = azurerm_private_dns_zone.keyvault_dns.name
+  virtual_network_id    = data.azurerm_virtual_network.vnet.id
+}
+
+resource "azurerm_private_endpoint" "key_vault_endpoint" {
+  name                          = "${var.prefix}-${var.cluster_name}-key-vault-endpoint"
+  resource_group_name           = var.rg_name
+  location                      = data.azurerm_resource_group.rg.location
+  subnet_id                     = data.azurerm_subnet.subnet.id
+  custom_network_interface_name = "${var.prefix}-${var.cluster_name}-key-vault-endpoint"
+  tags                          = merge(var.tags_map, {"weka_cluster": var.cluster_name})
+  private_service_connection {
+    name                           = "${var.prefix}-${var.cluster_name}-key-vault-endpoint"
+    private_connection_resource_id = azurerm_key_vault.key_vault.id
+    is_manual_connection           = false
+    subresource_names              = ["vault"]
+  }
+  private_dns_zone_group {
+    name                 = "keyvault-private-dns-zone-group"
+    private_dns_zone_ids = [azurerm_private_dns_zone.keyvault_dns.id]
+  }
+
+  lifecycle {
+    ignore_changes = [tags]
+  }
+  depends_on = [azurerm_key_vault.key_vault]
+}
+
