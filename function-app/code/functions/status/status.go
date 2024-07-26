@@ -180,8 +180,8 @@ func GetClusterStatus(ctx context.Context, vmssParams *common.ScaleSetParams, st
 	return
 }
 
-func GetRefreshStatus(ctx context.Context, vmssParams *common.ScaleSetParams, stateParams common.BlobObjParams, extended bool) (*common.VMSSStateVerbose, error) {
-	vmssConfig, err := common.ReadVmssConfig(ctx, stateParams.StorageName, stateParams.ContainerName)
+func GetRefreshStatus(ctx context.Context, vmssParams *common.ScaleSetParams, stateParams common.BlobObjParams, vmssConfigStr string, extended bool) (*common.VMSSStateVerbose, error) {
+	vmssConfig, err := common.ReadVmssConfig(ctx, vmssConfigStr)
 	if err != nil {
 		return nil, err
 	}
@@ -235,6 +235,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	nfsStateContainerName := os.Getenv("NFS_STATE_CONTAINER_NAME")
 	nfsStateBlobName := os.Getenv("NFS_STATE_BLOB_NAME")
 	nfsScaleSetName := os.Getenv("NFS_VMSS_NAME")
+	vmssConfigStr := os.Getenv("VMSS_CONFIG")
 
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
@@ -298,9 +299,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	} else if requestBody.Type == "progress" {
 		result, err = GetReports(ctx, stateParams, vmssParams)
 	} else if requestBody.Type == "vmss" {
-		result, err = GetRefreshStatus(ctx, vmssParams, stateParams, false)
+		result, err = GetRefreshStatus(ctx, vmssParams, stateParams, vmssConfigStr, false)
 	} else if requestBody.Type == "vmss-extended" {
-		result, err = GetRefreshStatus(ctx, vmssParams, stateParams, true)
+		result, err = GetRefreshStatus(ctx, vmssParams, stateParams, vmssConfigStr, true)
 	} else {
 		result = "Invalid status type"
 	}

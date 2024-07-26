@@ -1,15 +1,15 @@
 locals {
-  clusterization_target = var.clusterization_target != null ? var.clusterization_target : min(var.cluster_size, max(20, ceil(var.cluster_size * 0.8)))
-  # fields that depend on LB creation
-  vmss_health_probe_id = var.create_lb ? azurerm_lb_probe.backend_lb_probe[0].id : null
-  lb_backend_pool_ids  = var.create_lb ? [azurerm_lb_backend_address_pool.lb_backend_pool[0].id] : []
+  deployment_storage_account_id   = var.deployment_storage_account_name == "" ? azurerm_storage_account.deployment_sa[0].id : data.azurerm_storage_account.deployment_blob[0].id
+  deployment_storage_account_name = var.deployment_storage_account_name == "" ? azurerm_storage_account.deployment_sa[0].name : var.deployment_storage_account_name
+  deployment_sa_connection_string = var.deployment_storage_account_name == "" ? azurerm_storage_account.deployment_sa[0].primary_connection_string : data.azurerm_storage_account.deployment_blob[0].primary_connection_string
+  deployment_container_name       = var.deployment_container_name == "" ? "${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}-deployment" : var.deployment_container_name
+  deployment_sa_access_key        = var.deployment_storage_account_name == "" ? azurerm_storage_account.deployment_sa[0].primary_access_key : data.azurerm_storage_account.deployment_blob[0].primary_access_key
 }
 
-
 resource "azurerm_storage_account" "deployment_sa" {
-  count                    = var.deployment_storage_account_name == "" ? 1 : 0
+  count                    = var.deployment_storage_account_name == "" && var.allow_sa_public_network_access ? 1 : 0
   name                     = substr("${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}deployment", 0, 24)
-  location                 = data.azurerm_resource_group.rg.location
+  location                 = local.location
   resource_group_name      = var.rg_name
   account_kind             = "StorageV2"
   account_tier             = "Standard"
@@ -20,140 +20,119 @@ resource "azurerm_storage_account" "deployment_sa" {
   }
 }
 
-resource "azurerm_storage_container" "deployment" {
-  count                 = var.deployment_container_name == "" ? 1 : 0
-  name                  = "${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}-deployment"
-  storage_account_name  = local.deployment_storage_account_name
-  container_access_type = "private"
-  depends_on            = [azurerm_storage_account.deployment_sa]
-}
-
-resource "azurerm_storage_blob" "state" {
-  name                   = "state"
-  storage_account_name   = local.deployment_storage_account_name
-  storage_container_name = local.deployment_container_name
-  type                   = "Block"
-  source_content         = "{\"initial_size\":${var.cluster_size}, \"desired_size\":${var.cluster_size}, \"instances\":[], \"clusterized\":false, \"clusterization_target\":${local.clusterization_target}}"
-  depends_on             = [azurerm_storage_container.deployment]
-
-  lifecycle {
-    ignore_changes = all
-  }
+resource "azurerm_storage_account" "logicapp" {
+  count                    = var.allow_sa_public_network_access ? 1 : 0
+  name                     = substr("${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}logicappsa", 0, 24)
+  resource_group_name      = var.rg_name
+  location                 = local.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
 }
 
 data "azurerm_storage_account" "deployment_blob" {
   count               = var.deployment_storage_account_name != "" ? 1 : 0
   name                = var.deployment_storage_account_name
-  resource_group_name = var.rg_name
+  resource_group_name = local.resource_group_name
 }
 
-resource "azurerm_storage_blob" "vmss_config" {
-  name                   = "vmss-config"
-  storage_account_name   = local.deployment_storage_account_name
-  storage_container_name = local.deployment_container_name
-  type                   = "Block"
-
-  source_content = jsonencode({
-    name                            = "${var.prefix}-${var.cluster_name}-vmss"
-    location                        = data.azurerm_resource_group.rg.location
-    zones                           = var.zone != null ? [var.zone] : []
-    resource_group_name             = var.rg_name
-    sku                             = var.instance_type
-    upgrade_mode                    = "Manual"
-    health_probe_id                 = local.vmss_health_probe_id
-    admin_username                  = var.vm_username
-    ssh_public_key                  = local.public_ssh_key
-    computer_name_prefix            = "${var.prefix}-${var.cluster_name}-backend"
-    custom_data                     = base64encode(local.custom_data_script)
-    disable_password_authentication = true
-    proximity_placement_group_id    = local.placement_group_id
-    single_placement_group          = var.vmss_single_placement_group
-    source_image_id                 = var.source_image_id
-    overprovision                   = false
-    orchestration_mode              = "Uniform"
-    tags = merge(var.tags_map, {
-      "weka_cluster" : var.cluster_name,
-      "user_id" : data.azurerm_client_config.current.object_id,
-    })
-
-    os_disk = {
-      caching              = "ReadWrite"
-      storage_account_type = "Premium_LRS"
-    }
-
-    data_disk = {
-      lun                  = 0
-      caching              = "None"
-      create_option        = "Empty"
-      disk_size_gb         = local.disk_size
-      storage_account_type = "Premium_LRS"
-    }
-
-    identity = {
-      type         = "UserAssigned"
-      identity_ids = [local.vmss_identity_id]
-    }
-
-    primary_nic = {
-      name                          = "${var.prefix}-${var.cluster_name}-backend-nic-0"
-      network_security_group_id     = local.sg_id
-      enable_accelerated_networking = var.install_cluster_dpdk
-
-      ip_configurations = [{
-        primary                                = true
-        subnet_id                              = data.azurerm_subnet.subnet.id
-        load_balancer_backend_address_pool_ids = local.lb_backend_pool_ids
-        public_ip_address = {
-          assign            = local.assign_public_ip
-          name              = "${var.prefix}-${var.cluster_name}-public-ip"
-          domain_name_label = "${var.prefix}-${var.cluster_name}-backend"
-        }
-      }]
-    }
-
-    secondary_nics = {
-      number                        = local.nics_numbers - 1
-      name_prefix                   = "${var.prefix}-${var.cluster_name}-backend-nic"
-      network_security_group_id     = local.sg_id
-      enable_accelerated_networking = var.install_cluster_dpdk
-      ip_configurations = [{
-        primary                                = true
-        subnet_id                              = data.azurerm_subnet.subnet.id
-        load_balancer_backend_address_pool_ids = local.lb_backend_pool_ids
-      }]
-    }
-  })
-  depends_on = [
-    azurerm_storage_container.deployment, azurerm_lb_backend_address_pool.lb_backend_pool, azurerm_lb_probe.backend_lb_probe,
-    azurerm_proximity_placement_group.ppg, azurerm_lb_rule.backend_lb_rule, azurerm_lb_rule.ui_lb_rule
-  ]
-}
-
-# state for protocols
-resource "azurerm_storage_container" "nfs_deployment" {
-  count                 = var.nfs_deployment_container_name == "" ? 1 : 0
-  name                  = "${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}-protocol-deployment"
-  storage_account_name  = local.deployment_storage_account_name
-  container_access_type = "private"
-  depends_on            = [azurerm_storage_account.deployment_sa]
-}
-
-resource "azurerm_storage_blob" "nfs_state" {
-  count                  = var.nfs_protocol_gateways_number > 0 ? 1 : 0
-  name                   = "nfs_state"
-  storage_account_name   = local.deployment_storage_account_name
-  storage_container_name = local.nfs_deployment_container_name
-  type                   = "Block"
-  source_content = jsonencode({
-    initial_size          = var.nfs_protocol_gateways_number
-    desired_size          = var.nfs_protocol_gateways_number
-    instances             = []
-    clusterized           = false
-    clusterization_target = var.nfs_protocol_gateways_number
-  })
-  depends_on = [azurerm_storage_container.nfs_deployment]
+resource "azurerm_private_dns_zone" "blob" {
+  count               = !var.allow_sa_public_network_access && var.create_storage_account_private_links ? 1 : 0
+  name                = "privatelink.blob.core.windows.net"
+  resource_group_name = local.resource_group_name
 
   lifecycle {
-    ignore_changes = all
+    precondition {
+      condition     = var.deployment_function_app_code_blob != ""
+      error_message = "Function app code blob is not provided"
+    }
+    precondition {
+      condition     = var.deployment_container_name != ""
+      error_message = "Function app storage account container name is not provided"
+    }
+    precondition {
+      condition     = var.deployment_storage_account_name != ""
+      error_message = "Function app storage account name is not provided"
+    }
+  }
+}
+
+resource "azurerm_private_dns_zone" "file" {
+  count               = !var.allow_sa_public_network_access && var.create_storage_account_private_links ? 1 : 0
+  name                = "privatelink.file.core.windows.net"
+  resource_group_name = local.resource_group_name
+
+  depends_on = [azurerm_private_dns_zone.blob]
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "blob_privatelink" {
+  count                 = !var.allow_sa_public_network_access && var.create_storage_account_private_links ? 1 : 0
+  name                  = "${var.prefix}-${var.cluster_name}-blob-privatelink"
+  resource_group_name   = local.resource_group_name
+  private_dns_zone_name = azurerm_private_dns_zone.blob[0].name
+  virtual_network_id    = data.azurerm_virtual_network.vnet.id
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "file_privatelink" {
+  count                 = !var.allow_sa_public_network_access && var.create_storage_account_private_links ? 1 : 0
+  name                  = "${var.prefix}-${var.cluster_name}-file-privatelink"
+  resource_group_name   = local.resource_group_name
+  private_dns_zone_name = azurerm_private_dns_zone.file[0].name
+  virtual_network_id    = data.azurerm_virtual_network.vnet.id
+}
+
+resource "azurerm_private_endpoint" "file_endpoint" {
+  count               = !var.allow_sa_public_network_access && var.create_storage_account_private_links ? 1 : 0
+  name                = "${var.prefix}-${var.cluster_name}-file-endpoint"
+  location            = data.azurerm_resource_group.rg.location
+  resource_group_name = data.azurerm_resource_group.rg.name
+  subnet_id           = data.azurerm_subnet.subnet.id
+  tags                = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
+
+  private_dns_zone_group {
+    name                 = "${var.prefix}-${var.cluster_name}-dns-zone-group-file"
+    private_dns_zone_ids = [azurerm_private_dns_zone.file[0].id]
+  }
+
+  private_service_connection {
+    name                           = "${var.prefix}-${var.cluster_name}-privateFileSvcCon"
+    is_manual_connection           = false
+    private_connection_resource_id = local.deployment_storage_account_id
+    subresource_names              = ["file"]
+  }
+}
+
+resource "azurerm_private_endpoint" "blob_endpoint" {
+  count               = !var.allow_sa_public_network_access && var.create_storage_account_private_links ? 1 : 0
+  name                = "${var.prefix}-${var.cluster_name}-blob-endpoint"
+  location            = data.azurerm_resource_group.rg.location
+  resource_group_name = data.azurerm_resource_group.rg.name
+  subnet_id           = data.azurerm_subnet.subnet.id
+  tags                = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
+
+  private_dns_zone_group {
+    name                 = "${var.prefix}-${var.cluster_name}-dns-zone-group-blob"
+    private_dns_zone_ids = [azurerm_private_dns_zone.blob[0].id]
+  }
+  private_service_connection {
+    name                           = "${var.prefix}-${var.cluster_name}-privateBlobSvcCon"
+    is_manual_connection           = false
+    private_connection_resource_id = local.deployment_storage_account_id
+    subresource_names              = ["blob"]
+  }
+}
+
+data "azurerm_storage_account_blob_container_sas" "function_app_code_sas" {
+  count             = var.allow_sa_public_network_access ? 0 : 1
+  connection_string = local.deployment_sa_connection_string
+  container_name    = local.deployment_container_name
+  start             = timestamp()
+  expiry            = formatdate("YYYY-MM-DD'T'hh:mm:ssZ", timeadd(timestamp(), "1h"))
+  permissions {
+    read   = true
+    add    = false
+    create = false
+    write  = false
+    delete = false
+    list   = false
   }
 }
