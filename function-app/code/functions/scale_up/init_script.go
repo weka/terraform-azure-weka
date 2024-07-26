@@ -1,38 +1,40 @@
-function retry {
-  local retry_max=$1
-  local retry_sleep=$2
-  shift 2
-  local count=$retry_max
-  while [ $count -gt 0 ]; do
-      "$@" && break
-      count=$(($count - 1))
-      sleep $retry_sleep
-  done
-  [ $count -eq 0 ] && {
-      echo "Retry failed [$retry_max]"
-      shutdown -h now
-      return 1
-  }
-  return 0
-}
+package scale_up
 
-# retry for 2 minutes
-# NOTE: in some cases it takes time for all access policies to be applied
-retry 12 10 curl --fail ${report_url}?code="${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running init script\"}"
+import "fmt"
+
+var (
+	initScript = `#!/bin/bash
+set -ex
+
+# user data
+%s
+
+DISK_SIZE=%d
+NICS_NUM=%d
+SUBNET_RANGE="%s"
+APT_REPO_SERVER="%s"
+
+# report function definition
+%s
+
+# deploy function definition
+%s
+
+report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Running init script\"}"
 
 while fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; do
    sleep 2
 done
 
 # set apt private repo
-if [[ "${apt_repo_server}" ]]; then
+if [[ "$APT_REPO_SERVER" ]]; then
   mv /etc/apt/sources.list /etc/apt/sources.list.bak
-  echo "deb ${apt_repo_server} focal main restricted universe" > /etc/apt/sources.list
-  echo "deb ${apt_repo_server} focal-updates main restricted" >> /etc/apt/sources.list
+  echo "deb $APT_REPO_SERVER focal main restricted universe" > /etc/apt/sources.list
+  echo "deb $APT_REPO_SERVER focal-updates main restricted" >> /etc/apt/sources.list
   apt update -y
 fi
 
-for(( i=0; i<${nics_num}; i++ )); do
+for(( i=0; i<$NICS_NUM; i++ )); do
     cat <<-EOF | sed -i "/        eth$i/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
             mtu: 3900
 EOF
@@ -47,7 +49,7 @@ gateway=$(ip r | grep default | awk '{print $3}')
 eth=$(ifconfig | grep eth0 -C2 | grep 'inet ' | awk '{print $2}')
 cat <<-EOF | sed -i "/            set-name: eth0/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
             routes:
-             - to: ${subnet_range}
+             - to: $SUBNET_RANGE
                via: $gateway
                metric: 200
                table: 200
@@ -63,9 +65,9 @@ EOF
 
 netplan apply
 
-if [[ ${nics_num} -gt 1 ]]; then
+if [[ $NICS_NUM -gt 1 ]]; then
   are_routes_ready='ip route | grep eth1'
-  for(( i=2; i<${nics_num}; i++ )); do
+  for(( i=2; i<$NICS_NUM; i++ )); do
     are_routes_ready=$are_routes_ready' && ip route | grep eth'"$i"
   done
 cat >>/usr/sbin/remove-routes.sh <<EOF
@@ -74,8 +76,8 @@ set -ex
 retry_max=24
 for(( i=0; i<\$retry_max; i++ )); do
   if eval "$are_routes_ready"; then
-    for(( j=1; j<${nics_num}; j++ )); do
-      /usr/sbin/ip route del ${subnet_range} dev eth\$j
+    for(( j=1; j<$NICS_NUM; j++ )); do
+      /usr/sbin/ip route del $SUBNET_RANGE dev eth\$j
     done
     break
   fi
@@ -116,7 +118,8 @@ fi
 
 echo "$(date -u): routes configured"
 
-while ! [ "$(lsblk | grep ${disk_size}G | awk '{print $1}')" ] ; do
+disk_size_str="${DISK_SIZE}G"
+while ! [ "$(lsblk | grep $disk_size_str | awk '{print $1}')" ] ; do
   echo "waiting for disk to be ready"
   sleep 5
 done
@@ -141,7 +144,7 @@ if [ -z "$compute_name" ]; then
 fi
 
 retry=0
-while ! curl ${deploy_url}?code="${function_app_default_key}" --fail -H "Content-Type:application/json" -d "{\"name\": \"$compute_name:$HOSTNAME\"}" > /tmp/deploy.sh 2>/tmp/deploy_err.log || [ ! -s /tmp/deploy.sh ]; do
+while ! deploy "{\"name\": \"$compute_name:$HOSTNAME\"}" > /tmp/deploy.sh 2>/tmp/deploy_err.log || [ ! -s /tmp/deploy.sh ]; do
   echo "Retry $retry: waiting for deploy script generation success"
   cat /tmp/deploy_err.log
   retry=$((retry + 1))
@@ -155,10 +158,16 @@ mv /root/weka-prepackaged $weka_dir
 if [ $retry -gt 0 ]; then
   msg="Deploy script generation retried $retry times"
   echo "$msg"
-  curl -i "${report_url}?code=${function_app_default_key}" -H "Content-Type:application/json" -d "{\"hostname\": \"$HOSTNAME\", \"type\": \"debug\", \"message\": \"$msg\"}"
+  report "{\"hostname\": \"$HOSTNAME\", \"type\": \"debug\", \"message\": \"$msg\"}"
 fi
 
 echo "$(date -u): running deploy script"
 
 chmod +x /tmp/deploy.sh
 /tmp/deploy.sh 2>&1 | tee /tmp/weka_deploy.log
+`
+)
+
+func getInitScript(userData string, diskSize int, nicsNum int, subnetRange string, aptRepoServer string, reportFuncDef string, deployFuncDef string) string {
+	return fmt.Sprintf(initScript, userData, diskSize, nicsNum, subnetRange, aptRepoServer, reportFuncDef, deployFuncDef)
+}
