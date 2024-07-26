@@ -65,6 +65,19 @@ private_dns_rg_name               = "myResourceGroup"
 ```
 **If you don't pass these params, we will automatically create the network resources for you.**
 
+## Using pre-created storage account with disabled public access
+To use secured storage account with function app, user should create private storage account first, and then upload our function code zip file to the container `<deployment_container_name>`.
+Zip file is accessible in our public storage acccount by this url:
+https://wekaeastus.blob.core.windows.net/weka-tf-functions-deployment-eastus/dev/c52522f254123df61cd906bbf3dce6af.zip
+
+```hcl
+allow_sa_public_network_access    = false
+deployment_function_app_code_blob = "function_app_code.zip"
+deployment_storage_account_name   = "myprivatestorage"
+deployment_container_name         = "weka-deployment"
+```
+User should also create file share in storage account with the name `${var.deployment_container_name}-share`.
+
 ## Usage example
 ```hcl
 provider "azurerm" {

@@ -9,21 +9,7 @@ locals {
   alphanumeric_prefix_name  = lower(replace(var.prefix, "/\\W|_|\\s/", ""))
   subnet_range              = data.azurerm_subnet.subnet.address_prefix
   nics_numbers              = var.install_cluster_dpdk ? var.containers_config_map[var.instance_type].nics : 1
-  init_script = templatefile("${path.module}/init-script.sh", {
-    apt_repo_server          = var.apt_repo_server
-    user                     = var.vm_username
-    subnet_range             = local.subnet_range
-    nics_num                 = local.nics_numbers
-    deploy_url               = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/deploy"
-    report_url               = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/report"
-    function_app_default_key = data.azurerm_function_app_host_keys.function_keys.default_function_key
-    disk_size                = local.disk_size
-  })
-  custom_data_script = templatefile("${path.module}/user-data.sh", {
-    user_data   = var.user_data
-    init_script = local.init_script
-  })
-  placement_group_id = var.placement_group_id != "" ? var.placement_group_id : var.vmss_single_placement_group ? azurerm_proximity_placement_group.ppg[0].id : null
+  placement_group_id        = var.placement_group_id != "" ? var.placement_group_id : var.vmss_single_placement_group ? azurerm_proximity_placement_group.ppg[0].id : null
 }
 
 # ===================== SSH key ++++++++++++++++++++++++= #
