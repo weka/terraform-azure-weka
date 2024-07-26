@@ -33,6 +33,12 @@ variable "function_app_identity_name" {
   default     = ""
 }
 
+variable "support_logic_app" {
+  type        = bool
+  description = "Enable support for logic app."
+  default     = true
+}
+
 variable "logic_app_identity_name" {
   type        = string
   description = "The user assigned identity name for the logic app (if empty - new one is created)."

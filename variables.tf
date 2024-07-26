@@ -387,7 +387,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "0e787ecc4b4936228cdb784e52ec408a"
+  default     = "c52522f254123df61cd906bbf3dce6af"
 }
 
 variable "function_app_dist" {
@@ -582,11 +582,10 @@ variable "deployment_container_name" {
   description = "Name of exising deployment container"
 }
 
-variable "deployment_storage_account_access_key" {
+variable "deployment_function_app_code_blob" {
   type        = string
-  description = "The access key of the existing Blob object store container."
-  sensitive   = true
-  default     = ""
+  description = "The path to the function app code blob file."
+  default     = "function_app_code.zip"
 }
 
 variable "zone" {
@@ -827,4 +826,16 @@ variable "debug_down_backends_removal_timeout" {
   type        = string
   default     = "3h"
   description = "Don't change this value without consulting weka support team. Timeout for removing down backends. Valid time units are ns, us (or µs), ms, s, m, h."
+}
+
+variable "allow_sa_public_network_access" {
+  type        = bool
+  default     = true
+  description = "Allow public network access to the storage account."
+}
+
+variable "create_storage_account_private_links" {
+  type        = bool
+  default     = true
+  description = "Create private links for storage accounts (in case if public network access for the storage account is disabled)."
 }

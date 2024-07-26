@@ -21,6 +21,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v4"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/lease"
 	"github.com/google/uuid"
@@ -234,6 +235,138 @@ func ReadBlobObject(ctx context.Context, bl BlobObjParams) (state []byte, err er
 
 }
 
+// func getStorageAccountKey(ctx context.Context, credential *azidentity.TokenCredential, subscriptionId, resourceGroupName, storageName string) (string, error) {
+// 	saClient, err := armstorage.NewAccountsClient(subscriptionId, credential, nil)
+// 	if err != nil {
+// 		err = fmt.Errorf("failed to create storage account client: %v", err)
+// 		return "", err
+// 	}
+// 	resp, err := saClient.ListKeys(ctx, resourceGroupName, storageName, nil)
+// 	if err != nil {
+// 		err = fmt.Errorf("failed to list storage account keys: %v", err)
+// 		return "", err
+// 	}
+// 	if len(resp.Keys) == 0 {
+// 		err = fmt.Errorf("no storage account keys found")
+// 		return "", err
+// 	}
+// 	return *resp.Keys[0].Value, nil
+// }
+
+func containerExists(ctx context.Context, containerClient *container.Client, storageName, containerName string) (bool, error) {
+	_, err := containerClient.GetProperties(ctx, nil)
+	if err != nil {
+		var responseErr *azcore.ResponseError
+		if errors.As(err, &responseErr) && responseErr.ErrorCode == "ContainerNotFound" {
+			return false, nil
+		}
+		err = fmt.Errorf("failed to get container properties: %w", err)
+		return false, err
+	}
+	return true, nil
+}
+
+func ensureStorageContainer(ctx context.Context, storageAccountName, containerName string) (err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	credential, err := getCredential(ctx)
+	if err != nil {
+		return
+	}
+
+	containerUrl := getContainerUrl(storageAccountName, containerName)
+	containerClient, err := container.NewClient(containerUrl, credential, nil)
+	if err != nil {
+		err = fmt.Errorf("failed to create container client: %v", err)
+		return err
+	}
+
+	exists, err := containerExists(ctx, containerClient, storageAccountName, containerName)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	if exists {
+		logger.Info().Str("container", containerName).Msg("container already exists")
+		return
+	}
+
+	logger.Info().Str("container", containerName).Msg("container does not exist, creating new container")
+
+	_, err = containerClient.Create(ctx, nil)
+	if err != nil {
+		err = fmt.Errorf("failed to create container: %v", err)
+		logger.Error().Err(err).Send()
+	}
+	return
+}
+
+func blobExists(ctx context.Context, blobClient *blob.Client) (bool, error) {
+	_, err := blobClient.GetProperties(ctx, nil)
+	if err != nil {
+		var responseErr *azcore.ResponseError
+		if errors.As(err, &responseErr) && responseErr.ErrorCode == "BlobNotFound" {
+			return false, nil
+		}
+		err = fmt.Errorf("failed to get blob properties: %w", err)
+		return false, err
+	}
+	return true, nil
+}
+
+func EnsureStateIsCreated(ctx context.Context, p BlobObjParams, initialState protocol.ClusterState) (exists bool, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	err = ensureStorageContainer(ctx, p.StorageName, p.ContainerName)
+	if err != nil {
+		return
+	}
+
+	credential, err := getCredential(ctx)
+	if err != nil {
+		return
+	}
+
+	url := getBlobFileUrl(p.StorageName, p.ContainerName, p.BlobName)
+	blobClient, err := blob.NewClient(url, credential, nil)
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to create blob client")
+		return
+	}
+
+	exists, err = blobExists(ctx, blobClient)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	if exists {
+		logger.Info().Msg("state already exists")
+		return
+	}
+
+	logger.Info().Msg("state does not exist, creating new state")
+
+	err = WriteState(ctx, p, initialState)
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to write initial state")
+	}
+	return
+}
+
+func ReadStateOrCreateNew(ctx context.Context, p BlobObjParams, initialState protocol.ClusterState) (state protocol.ClusterState, err error) {
+	exists, err := EnsureStateIsCreated(ctx, p, initialState)
+	if err != nil {
+		return
+	}
+
+	if exists {
+		return ReadState(ctx, p)
+	}
+	return initialState, nil
+}
+
 func ReadState(ctx context.Context, stateParams BlobObjParams) (state protocol.ClusterState, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
@@ -285,6 +418,10 @@ func WriteState(ctx context.Context, stateParams BlobObjParams, state protocol.C
 
 func getBlobUrl(storageName string) string {
 	return fmt.Sprintf("https://%s.blob.core.windows.net/", storageName)
+}
+
+func getBlobFileUrl(storageName, containerName, blobName string) string {
+	return fmt.Sprintf("https://%s.blob.core.windows.net/%s/%s", storageName, containerName, blobName)
 }
 
 func getContainerUrl(storageName, containerName string) string {
@@ -377,11 +514,15 @@ func CreateStorageAccount(ctx context.Context, subscriptionId, resourceGroupName
 	}
 	skuName := armstorage.SKUNameStandardZRS
 	kind := armstorage.KindStorageV2
+	publicAccessDisabled := armstorage.PublicNetworkAccessDisabled
 	_, err = client.BeginCreate(ctx, resourceGroupName, obsName, armstorage.AccountCreateParameters{
 		Kind:     &kind,
 		Location: &location,
 		SKU: &armstorage.SKU{
 			Name: &skuName,
+		},
+		Properties: &armstorage.AccountPropertiesCreateParameters{
+			PublicNetworkAccess: &publicAccessDisabled,
 		},
 	}, nil)
 
@@ -1455,28 +1596,25 @@ func GetAzureInstanceNameCmd() string {
 	return "curl -s -H Metadata:true --noproxy * http://169.254.169.254/metadata/instance?api-version=2021-02-01 | jq '.compute.name' | cut -c2- | rev | cut -c2- | rev"
 }
 
-func ReadVmssConfig(ctx context.Context, storageName, containerName string) (vmssConfig VMSSConfig, err error) {
+func ReadVmssConfig(ctx context.Context, vmssConfigStr string) (vmssConfig VMSSConfig, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	params := BlobObjParams{
-		StorageName:   storageName,
-		ContainerName: containerName,
-		BlobName:      "vmss-config",
+	if vmssConfigStr == "" {
+		err = fmt.Errorf("vmss config is not set")
+		logger.Error().Err(err).Msg("cannot read vmss config")
+		return
 	}
-	asByteArray, err := ReadBlobObject(ctx, params)
+
+	asByteArray := []byte(vmssConfigStr)
+	err = json.Unmarshal(asByteArray, &vmssConfig)
 	if err != nil {
+		logger.Error().Err(err).Msg("cannot unmarshal vmss config")
 		return
 	}
 
 	// calculate hash of the config (used to identify vmss config changes)
 	hash := sha256.Sum256(asByteArray)
 	hashStr := fmt.Sprintf("%x", hash)
-
-	err = json.Unmarshal(asByteArray, &vmssConfig)
-	if err != nil {
-		logger.Error().Err(err).Send()
-		return
-	}
 
 	// take first 16 characters of the hash
 	vmssConfig.ConfigHash = hashStr[:16]
