@@ -1,0 +1,180 @@
+# ./.github/workflows/staging-auto-pr.yaml
+name: create draft release
+on:
+  workflow_dispatch:
+    inputs:
+      beta_version:
+        required: false
+        default: false
+        description: beta version
+      publish_release:
+        required: false
+        default: false
+        description: publish release
+
+env:
+  GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL_TEST }}
+
+jobs:
+  run-regressions:
+    name: run regressions tesing
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Run full regressions tests"
+        run: "echo full regressions tests...."
+
+  update-readme:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    needs: run-regressions
+    name: update weka version
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Bump version and push tag
+        uses: anothrNick/github-tag-action@1.64.0 # Don't use @master or @v1 unless you're happy to test the latest version
+        id: tag_version
+        env:
+          WITH_V: false
+          PRERELEASE: ${{ inputs.beta_version }}
+          DRY_RUN: true
+
+      - name: Find and Replace
+        if: ${{ inputs.beta_version != 'true' }}
+        run: sed -i -e '/version.*=/ s/= .*/= "${{ steps.tag_version.outputs.new_tag }}"/' README.md
+
+      - name: Commit README.md file
+        if: ${{ inputs.beta_version != 'true' }}
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "Github Actions"
+          git commit -a -m "refactor: Update README file with new weka tag version (auto github action)"
+
+      - name: Push README.md file changes
+        if: ${{ inputs.beta_version != 'true' }}
+        uses: ad-m/github-push-action@v0.6.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: dev
+
+  create-pull-request:
+    name: open pr to main
+    runs-on: ubuntu-latest
+    needs: update-readme
+    steps:
+      - uses: actions/checkout@v3
+        name: checkout
+        with:
+          fetch-depth: 0
+          ref: dev
+
+      - uses: repo-sync/pull-request@v2
+        name: pull-request
+        id: pr
+        with:
+          destination_branch: "main"
+          pr_title: "Create PR from ${{ github.ref }} into main"
+          pr_body: "*An automated PR*, rebase dev to main"
+          pr_draft: false
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: automatic rebase
+        uses: cirrus-actions/rebase@1.5
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+
+      - name: add label
+        uses: actions-ecosystem/action-add-labels@v1
+        env:
+          issue_number: ${{ steps.pr.outputs.pr_number }}
+        with:
+          labels: automerge
+          number: ${{ steps.pr.outputs.pr_number }}
+
+      - id: automerge
+        name: automerge
+        uses: "pascalgn/automerge-action@v0.15.6"
+
+  create-tag:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    needs: create-pull-request
+    name: create tag
+    outputs:
+      new_tag: ${{ steps.tag_version.outputs.new_tag }}
+      tag: ${{ steps.tag_version.outputs.tag }}
+      changelog: ${{ steps.tag_version.outputs.changelog }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: '0'
+
+      - name: Bump version and push tag
+        uses: anothrNick/github-tag-action@1.64.0 # Don't use @master or @v1 unless you're happy to test the latest version
+        id: tag_version
+        env:
+          WITH_V: true
+          PRERELEASE: ${{ inputs.beta_version }}
+
+  create-release:
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    needs: create-tag
+    name: create release
+    outputs:
+      url: ${{ steps.release_draft.outputs.html_url }}
+    steps:
+      - id: release_draft
+        uses: release-drafter/release-drafter@v5
+        with:
+          #disable-autolabeler: false
+          publish: ${{ inputs.publish_release }}
+          version: ${{ needs.create-tag.outputs.new_tag }}
+
+  on-failure:
+    if: ${{ always() && contains(needs.*.result, 'failure') }}
+    needs: [create-pull-request, create-tag, create-release]
+    runs-on: ubuntu-latest
+    name: revert commit on fail job
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: dev
+          fetch-depth: '0'
+
+      - name: Undo Push
+        uses: exions/undo-push@v1
+        with:
+          branch: dev
+
+  notify-slack:
+    runs-on: ubuntu-latest
+    needs: [ create-release, create-tag ]
+    name: slack notification
+    steps:
+      - name: Determine create tag or release tag
+        uses: haya14busa/action-cond@v1
+        id: option_creation
+        with:
+          cond: ${{ github.event.inputs.publish_release == 'true' }}
+          if_true: 'Tag'  # string value
+          if_false: 'Draft'
+
+      - name: Report Status
+        if: always()
+        uses: ravsamhq/notify-slack-action@v2
+        with:
+          status: ${{ job.status }}
+          notification_title: Create Release ${{ steps.option_creation.outputs.value }} ${{ needs.create-tag.outputs.tag }}, link ${{ needs.create-release.outputs.url }}
+          notify_when: 'success'
+          footer: ""
+
