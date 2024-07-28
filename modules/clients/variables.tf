@@ -119,3 +119,9 @@ variable "source_image_id" {
   description = "Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1"
   default     = ""
 }
+
+variable "use_vmss" {
+  type        = bool
+  description = "Use VMSS"
+  default     = false
+}
