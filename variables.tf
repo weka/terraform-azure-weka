@@ -552,6 +552,12 @@ variable "clients_custom_data" {
   default     = ""
 }
 
+variable "clients_use_vmss" {
+  type        = bool
+  default     = false
+  description = "Use VMSS for clients"
+}
+
 variable "placement_group_id" {
   type        = string
   default     = ""
