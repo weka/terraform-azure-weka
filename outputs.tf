@@ -1,7 +1,9 @@
 locals {
   vmss_name            = "${var.prefix}-${var.cluster_name}-vmss"
+  clients_vmss_name    = var.clients_number > 0 && var.clients_use_vmss ? module.clients[0].vmss_name : ""
   key_vault_name       = azurerm_key_vault.key_vault.name
   vm_ips               = local.assign_public_ip ? "az vmss list-instance-public-ips -g ${var.rg_name} --name ${local.vmss_name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n" : "az vmss nic list -g ${var.rg_name} --vmss-name ${local.vmss_name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress \n"
+  clients_vmss_ips     = local.assign_public_ip ? "az vmss list-instance-public-ips -g ${var.rg_name} --name ${local.clients_vmss_name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n" : "az vmss nic list -g ${var.rg_name} --vmss-name ${local.clients_vmss_name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress \n"
   ssh_keys_commands    = "########################################## Download ssh keys command from blob ###########################################################\n az keyvault secret download --file private.pem --encoding utf-8 --vault-name  ${local.key_vault_name} --name private-key --query \"value\" \n az keyvault secret download --file public.pub --encoding utf-8 --vault-name  ${local.key_vault_name} --name public-key --query \"value\"\n"
   blob_commands        = var.ssh_public_key == null ? local.ssh_keys_commands : ""
   private_ssh_key_path = var.ssh_public_key == null ? local.ssh_private_key_path : null
@@ -36,7 +38,6 @@ output "vmss_name" {
   value = local.vmss_name
 }
 
-
 output "function_app_name" {
   value       = local.function_app_name
   description = "Function app name"
@@ -57,8 +58,17 @@ output "backend_ips" {
   description = "If 'assign_public_ip' is set to true, it will output the public ips, If no it will output the private ips"
 }
 
+output "clients_vmss_name" {
+  value = local.clients_vmss_name != "" ? local.clients_vmss_name : null
+}
+
 output "client_ips" {
-  value       = var.clients_number > 0 ? module.clients[0].client_ips : null
+  value       = var.clients_number > 0 && !var.clients_use_vmss ? module.clients[0].client_ips : null
+  description = "If 'private_network' is set to false, it will output clients public ips, otherwise private ips."
+}
+
+output "client_vmss_ips" {
+  value       = var.clients_number > 0 && var.clients_use_vmss ? local.clients_vmss_ips : null
   description = "If 'private_network' is set to false, it will output clients public ips, otherwise private ips."
 }
 
@@ -140,7 +150,8 @@ function_key=$(az functionapp keys list --name ${local.function_app_name} --reso
 curl --fail https://${local.function_app_name}.azurewebsites.net/api/resize?code=$function_key -H "Content-Type:application/json" -d '{"value":ENTER_NEW_VALUE_HERE}'
 
 ########################################## pre-terraform destroy, cluster terminate function ################
-az vmss delete --name ${local.vmss_name} --resource-group ${var.rg_name} --force-deletion true --subscription ${var.subscription_id}
+backends_vmss_name=${local.vmss_name}
+az vmss delete --name <ENTER YOUR BACKENDS VMSS_NAME HERE> --resource-group ${var.rg_name} --force-deletion true --subscription ${var.subscription_id}
 
 EOT
   description = "Useful commands and script to interact with weka cluster"
