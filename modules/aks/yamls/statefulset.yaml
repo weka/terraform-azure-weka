@@ -1,0 +1,54 @@
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: fio-app
+  namespace: azureml
+spec:
+  serviceName: fio-app
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fio-app
+  template:
+    metadata:
+      labels:
+        app: fio-app
+    spec:
+      terminationGracePeriodSeconds: 1800
+      nodeSelector:
+        agentpool: clients
+      containers:
+      - name: fio-app
+        image: xridge/fio
+        volumeMounts:
+          - mountPath: "/mnt/weka"
+            name: fio-app-volume
+        command: ["fio"]
+        args: [ "--filename_format=$(NODE_NAME)-$(POD_NAME)-$jobnum",
+                "--directory=/mnt/weka/",
+                "--direct=1",
+                "--bs=1m",
+                "--numjobs=4",
+                "--time_based",
+                "--runtime=500",
+                "--group_reporting",
+                "--name=benchtest",
+                "--iodepth=1",
+                "--ioengine=posixaio",
+                "--max-jobs=100",
+                "--readwrite=randread",
+                "--size=1G",
+                "--filesize=10485760", "--rwmixread=70", "--clat_percentiles=1", "--invalidate=0", "--group_reporting","--nrfiles=50","--create_serialize=0", "--blocksize=1048576","--randrepeat=1" ]
+        env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+      volumes:
+        - name: fio-app-volume
+          persistentVolumeClaim:
+            claimName: ml-pvc # defined in pvc-wekafs-dir.yaml

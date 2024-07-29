@@ -845,3 +845,33 @@ variable "create_storage_account_private_links" {
   default     = true
   description = "Create private links for storage accounts (in case if public network access for the storage account is disabled)."
 }
+
+# ========================= aks clients ============================== #
+variable "aks_clients" {
+  type        = bool
+  description = "Create AKS clients"
+  default     = false
+}
+
+variable "aks_client_instance_type" {
+  type        = string
+  description = "The client virtual machine type (sku) to deploy."
+  default     = "Standard_L8s_v3"
+}
+
+variable "aks_client_frontend_cores" {
+  type        = number
+  description = "The client NICs number."
+  default     = 1
+}
+
+variable "aks_instances_number" {
+  type        = number
+  default     = 3
+  description = "The number of client nodepool to deploy."
+}
+
+variable "create_ml" {
+  type    = bool
+  default = false
+}

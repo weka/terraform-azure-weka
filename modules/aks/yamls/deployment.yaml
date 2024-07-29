@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: csi-app-fs-mountoptions
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: csi-app-fs-mountoptions
+  template:
+    metadata:
+      labels:
+        app: csi-app-fs-mountoptions
+    spec:
+      nodeSelector:
+        agentpool: clients
+      containers:
+        - name: csi-app-fs-mountoptions
+          image: xridge/fio
+          command: [ "fio" ]
+          args: [ "--filename_format=$(NODE_NAME)-$(POD_NAME)-$jobnum",
+                  "--directory=/mnt/weka/",
+                  "--direct=1",
+                  "--rw=randread",
+                  "--bs=1m",
+                  "--numjobs=4",
+                  "--time_based",
+                  "--runtime=500",
+                  "--group_reporting",
+                  "--name=benchtest",
+                  "--size=1G" ]
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          volumeMounts:
+            - mountPath: "/mnt/weka"
+              name: fio-app-volume
+      volumes:
+        - name: fio-app-volume
+          persistentVolumeClaim:
+            claimName: pvc-wekafs-dir

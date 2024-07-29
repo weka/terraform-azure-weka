@@ -1,0 +1,224 @@
+{
+  "additionalCapabilities": null,
+  "automaticRepairsPolicy": null,
+  "constrainedMaximumCapacity": null,
+  "doNotRunExtensionsOnOverprovisionedVMs": false,
+  "etag": "\"2\"",
+  "extendedLocation": null,
+  "hostGroup": null,
+  "id": "/subscriptions/d2f248b9-d054-477f-b7e8-413921532c2a/resourceGroups/MC_denise_aks-aks-cluster_eastus/providers/Microsoft.Compute/virtualMachineScaleSets/aks-weka-16319604-vmss",
+  "identity": {
+    "principalId": null,
+    "tenantId": null,
+    "type": "UserAssigned",
+    "userAssignedIdentities": {
+      "/subscriptions/d2f248b9-d054-477f-b7e8-413921532c2a/resourceGroups/MC_denise_aks-aks-cluster_eastus/providers/Microsoft.ManagedIdentity/userAssignedIdentities/aks-aks-cluster-agentpool": {
+        "clientId": "63d3e93a-e9c1-4d25-b07c-74a7c45ed641",
+        "principalId": "ef3ba43e-4f55-4585-949b-a75657db981c"
+      }
+    }
+  },
+  "location": "eastus",
+  "name": "aks-weka-16319604-vmss",
+  "orchestrationMode": "Uniform",
+  "overprovision": false,
+  "plan": null,
+  "platformFaultDomainCount": 1,
+  "priorityMixPolicy": null,
+  "provisioningState": "Succeeded",
+  "proximityPlacementGroup": null,
+  "resiliencyPolicy": null,
+  "resourceGroup": "MC_denise_aks-aks-cluster_eastus",
+  "scaleInPolicy": null,
+  "scheduledEventsPolicy": null,
+  "singlePlacementGroup": false,
+  "sku": {
+    "capacity": 0,
+    "name": "Standard_L8s_v3",
+    "tier": "Standard"
+  },
+  "spotRestorePolicy": null,
+  "tags": {
+    "aks-managed-azure-cni-overlay": "true",
+    "aks-managed-consolidated-additional-properties": "9cae9f04-4e2d-11ef-9cb9-1ad24d413edc",
+    "aks-managed-coordination": "true",
+    "aks-managed-createOperationID": "bb892a35-6d20-4cf9-865b-5cea09ad8fc9",
+    "aks-managed-creationSource": "vmssclient-aks-weka-16319604-vmss",
+    "aks-managed-enable-imds-restriction": "false",
+    "aks-managed-kubeletIdentityClientID": "63d3e93a-e9c1-4d25-b07c-74a7c45ed641",
+    "aks-managed-orchestrator": "Kubernetes:1.28.10",
+    "aks-managed-poolName": "weka",
+    "aks-managed-resourceNameSuffix": "41219021",
+    "aks-managed-ssh-access": "LocalUser"
+  },
+  "timeCreated": "2024-07-30T04:38:53.097446+00:00",
+  "type": "Microsoft.Compute/virtualMachineScaleSets",
+  "uniqueId": "6546419f-61d5-40a4-90f5-36b8abaf0e4d",
+  "upgradePolicy": {
+    "automaticOsUpgradePolicy": null,
+    "mode": "Manual",
+    "rollingUpgradePolicy": null
+  },
+  "virtualMachineProfile": {
+    "applicationProfile": null,
+    "billingProfile": null,
+    "capacityReservation": null,
+    "diagnosticsProfile": null,
+    "evictionPolicy": null,
+    "extensionProfile": {
+      "extensions": [
+        {
+          "autoUpgradeMinorVersion": true,
+          "enableAutomaticUpgrade": null,
+          "forceUpdateTag": null,
+          "id": null,
+          "name": "vmssCSE",
+          "protectedSettings": null,
+          "protectedSettingsFromKeyVault": null,
+          "provisionAfterExtensions": null,
+          "provisioningState": null,
+          "publisher": "Microsoft.Azure.Extensions",
+          "settings": {},
+          "suppressFailures": null,
+          "type": null,
+          "typeHandlerVersion": "2.0",
+          "typePropertiesType": "CustomScript"
+        },
+        {
+          "autoUpgradeMinorVersion": true,
+          "enableAutomaticUpgrade": null,
+          "forceUpdateTag": null,
+          "id": null,
+          "name": "aks-weka-16319604-vmss-AKSLinuxBilling",
+          "protectedSettings": null,
+          "protectedSettingsFromKeyVault": null,
+          "provisionAfterExtensions": null,
+          "provisioningState": null,
+          "publisher": "Microsoft.AKS",
+          "settings": {},
+          "suppressFailures": null,
+          "type": null,
+          "typeHandlerVersion": "1.0",
+          "typePropertiesType": "Compute.AKS.Linux.Billing"
+        }
+      ],
+      "extensionsTimeBudget": "PT16M"
+    },
+    "hardwareProfile": null,
+    "licenseType": null,
+    "networkProfile": {
+      "healthProbe": null,
+      "networkApiVersion": null,
+      "networkInterfaceConfigurations": [
+        {
+          "auxiliaryMode": null,
+          "auxiliarySku": null,
+          "deleteOption": null,
+          "disableTcpStateTracking": false,
+          "dnsSettings": {
+            "dnsServers": []
+          },
+          "enableAcceleratedNetworking": true,
+          "enableFpga": null,
+          "enableIpForwarding": true,
+          "ipConfigurations": [
+            {
+              "applicationGatewayBackendAddressPools": null,
+              "applicationSecurityGroups": null,
+              "loadBalancerBackendAddressPools": [
+                {
+                  "id": "/subscriptions/d2f248b9-d054-477f-b7e8-413921532c2a/resourceGroups/MC_denise_aks-aks-cluster_eastus/providers/Microsoft.Network/loadBalancers/kubernetes/backendAddressPools/kubernetes",
+                  "resourceGroup": "MC_denise_aks-aks-cluster_eastus"
+                },
+                {
+                  "id": "/subscriptions/d2f248b9-d054-477f-b7e8-413921532c2a/resourceGroups/MC_denise_aks-aks-cluster_eastus/providers/Microsoft.Network/loadBalancers/kubernetes/backendAddressPools/aksOutboundBackendPool",
+                  "resourceGroup": "MC_denise_aks-aks-cluster_eastus"
+                }
+              ],
+              "loadBalancerInboundNatPools": null,
+              "name": "ipconfig1",
+              "primary": true,
+              "privateIpAddressVersion": "IPv4",
+              "publicIpAddressConfiguration": null,
+              "subnet": {
+                "id": "/subscriptions/d2f248b9-d054-477f-b7e8-413921532c2a/resourceGroups/denise/providers/Microsoft.Network/virtualNetworks/aks-vnet/subnets/aks-subnet-0",
+                "resourceGroup": "denise"
+              }
+            }
+          ],
+          "name": "aks-weka-16319604-vmss",
+          "networkSecurityGroup": {
+            "id": "/subscriptions/d2f248b9-d054-477f-b7e8-413921532c2a/resourceGroups/MC_denise_aks-aks-cluster_eastus/providers/Microsoft.Network/networkSecurityGroups/aks-agentpool-41219021-nsg",
+            "resourceGroup": "MC_denise_aks-aks-cluster_eastus"
+          },
+          "primary": true
+        }
+      ]
+    },
+    "osProfile": {
+      "adminPassword": null,
+      "adminUsername": "weka",
+      "allowExtensionOperations": true,
+      "computerNamePrefix": "aks-weka-16319604-vmss",
+      "customData": null,
+      "linuxConfiguration": {
+        "disablePasswordAuthentication": true,
+        "enableVmAgentPlatformUpdates": null,
+        "patchSettings": null,
+        "provisionVmAgent": true,
+        "ssh": {
+          "publicKeys": [
+            {
+              "keyData": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQD6TYnVX7pJpbHxK5/dZdky+xlQEmcEOECGXlkn4hOv0cfjDr2AWLLANk6sSmOmiaP49HQd3NjI7YPoxGn+BLbX9I/SN54gBWXfZmzc9VZHoQjAoqSseNK6E3rUMkvti+HroQwP8rVGHTScQkO4pqh0tuePMZylgOEoN3i8pVkmDBnp/aYd3OKgVcB3pxQfxNbuQ3FwQ3DXDikjTjfseYuev/e7CSKAcRolRivnyW63UjRoQ62U54rWWjHEg+fGgFBgMm+dCJfI8aMRvSU9ugVz/sW6P7DickMo4aey/risBCujy6mmypXCuPP7J84NJwIFF/zlEwqmDauzpDrzYndUc6V1Kh6ft9waWbKc7IS290Idy3d02xqcWVNsAI0Dtv6s7Gi5uqNhUTRLN4X+ZriAEi0JR1zTbnRdYXOOlIgXNJ47t0MqRGn/918i+nqfSWevWBFb8YMqM3vnQkbC50j9UVDhdn66N9e39sMzEVq+kqg2Xfq5GFDG/t2etHLWPPL/4FeP+7g09ph3TFKkPViUnUHmQzwKvkw0BQhWSOU4sg249quSuU566aWc/q50o7P0SaK9kI/6YtMvhSUqlPDMiL1FMbpJzJCCMPWuAzAggOu/N7fvMdim6Z8z+52jonqy/sllTZksPPCTWPZOM6yeAnNPpcrULijkzppo2XG9Yw==\n",
+              "path": "/home/weka/.ssh/authorized_keys"
+            }
+          ]
+        }
+      },
+      "requireGuestProvisionSignal": true,
+      "secrets": [],
+      "windowsConfiguration": null
+    },
+    "priority": null,
+    "scheduledEventsProfile": null,
+    "securityPostureReference": null,
+    "securityProfile": null,
+    "serviceArtifactReference": null,
+    "storageProfile": {
+      "dataDisks": null,
+      "diskControllerType": "SCSI",
+      "imageReference": {
+        "communityGalleryImageId": null,
+        "exactVersion": null,
+        "id": "/subscriptions/109a5e88-712a-48ae-9078-9ca8b3c81345/resourceGroups/AKS-Ubuntu/providers/Microsoft.Compute/galleries/AKSUbuntu/images/2204gen2containerd/versions/202407.08.0",
+        "offer": null,
+        "publisher": null,
+        "resourceGroup": "AKS-Ubuntu",
+        "sharedGalleryImageId": null,
+        "sku": null,
+        "version": null
+      },
+      "osDisk": {
+        "caching": "ReadWrite",
+        "createOption": "FromImage",
+        "deleteOption": null,
+        "diffDiskSettings": null,
+        "diskSizeGb": 128,
+        "image": null,
+        "managedDisk": {
+          "diskEncryptionSet": null,
+          "securityProfile": null,
+          "storageAccountType": "Premium_LRS"
+        },
+        "name": null,
+        "osType": "Linux",
+        "vhdContainers": null,
+        "writeAcceleratorEnabled": null
+      }
+    },
+    "timeCreated": "2024-07-30T04:38:53.097446+00:00",
+    "userData": null
+  },
+  "zoneBalance": null,
+  "zones": null
+}
