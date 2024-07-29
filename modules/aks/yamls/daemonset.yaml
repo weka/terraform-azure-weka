@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: installer-init
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: installer
+  template:
+    metadata:
+      labels:
+        app: installer
+    spec:
+      hostPID: true
+      hostNetwork: true
+      restartPolicy: Always
+      nodeSelector:
+        agentpool: clients
+      containers:
+        - image: patnaikshekhar/node-installer:1.3
+          name: installer
+          env:
+            - name: NICS
+              value: "2"
+            - name: BACKEND_IP
+              value: "10.224.0.7"
+            - name: FRONTEND_CONTAINER_CORES_NUM
+              value: "1"
+            - name: OFED_VERSION
+              value: "5.8-5.1.1.2"
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: init-script
+              mountPath: /tmp
+            - name: host-mount
+              mountPath: /host
+      volumes:
+        - name: init-script
+          configMap:
+            name: installer-config
+            defaultMode: 0777
+        - name: host-mount
+          hostPath:
+            path: /tmp/install

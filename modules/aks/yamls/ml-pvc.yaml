@@ -1,0 +1,17 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ml-pvc
+  namespace: azureml
+  labels:
+    ml.azure.com/pvc: "true"
+  annotations:
+    ml.azure.com/mountpath: "/mnt/weka"
+spec:
+  storageClassName: storageclass-wekafs-dir-api
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
