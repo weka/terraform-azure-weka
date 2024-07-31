@@ -62,6 +62,7 @@ No modules.
 | <a name="input_obs_container_name"></a> [obs\_container\_name](#input\_obs\_container\_name) | The name of the container for the OBS. | `string` | n/a | yes |
 | <a name="input_prefix"></a> [prefix](#input\_prefix) | Prefix for all resources | `string` | n/a | yes |
 | <a name="input_rg_name"></a> [rg\_name](#input\_rg\_name) | A predefined resource group in the Azure subscription. | `string` | n/a | yes |
+| <a name="input_support_logic_app"></a> [support\_logic\_app](#input\_support\_logic\_app) | Enable support for logic app. | `bool` | `true` | no |
 | <a name="input_tiering_enable_obs_integration"></a> [tiering\_enable\_obs\_integration](#input\_tiering\_enable\_obs\_integration) | Enable OBS integration for tiering. | `bool` | n/a | yes |
 | <a name="input_tiering_obs_name"></a> [tiering\_obs\_name](#input\_tiering\_obs\_name) | Name of existing obs storage account. | `string` | `""` | no |
 | <a name="input_vmss_identity_name"></a> [vmss\_identity\_name](#input\_vmss\_identity\_name) | The user assigned identity name for the vmss instances (if empty - new one is created). | `string` | `""` | no |
