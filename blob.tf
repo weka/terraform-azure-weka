@@ -172,6 +172,43 @@ resource "azurerm_private_endpoint" "blob_endpoint" {
   }
 }
 
+data "azurerm_storage_account" "weka_obs" {
+  count               = var.tiering_obs_name != "" ? 1 : 0
+  name                = var.tiering_obs_name
+  resource_group_name = var.rg_name
+}
+
+resource "azurerm_private_endpoint" "weka_obs_blob_endpoint" {
+  count               = !var.allow_sa_public_network_access && var.create_storage_account_private_links && var.tiering_blob_obs_access_key != "" ? 1 : 0
+  name                = "${var.prefix}-${var.cluster_name}-obs-blob-endpoint"
+  location            = data.azurerm_resource_group.rg.location
+  resource_group_name = data.azurerm_resource_group.rg.name
+  subnet_id           = data.azurerm_subnet.subnet.id
+  tags                = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
+
+  private_dns_zone_group {
+    name                 = "${var.prefix}-${var.cluster_name}-dns-zone-group-obs-blob"
+    private_dns_zone_ids = [azurerm_private_dns_zone.blob[0].id]
+  }
+  private_service_connection {
+    name                           = "${var.prefix}-${var.cluster_name}-private-obs-BlobSvcCon"
+    is_manual_connection           = false
+    private_connection_resource_id = data.azurerm_storage_account.weka_obs[0].id
+    subresource_names              = ["blob"]
+  }
+
+  lifecycle {
+    precondition {
+      condition     = var.tiering_obs_name != ""
+      error_message = "Tiering OBS is not provided"
+    }
+    precondition {
+      condition     = var.tiering_obs_container_name != ""
+      error_message = "Tiering OBS container name is not provided"
+    }
+  }
+}
+
 data "azurerm_storage_account_blob_container_sas" "function_app_code_sas" {
   count             = var.allow_sa_public_network_access ? 0 : 1
   connection_string = local.deployment_sa_connection_string
