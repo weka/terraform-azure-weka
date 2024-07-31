@@ -157,3 +157,36 @@ resource "azurerm_storage_blob" "nfs_state" {
     ignore_changes = all
   }
 }
+
+resource "azurerm_private_dns_zone" "blob_privatelink" {
+  count  = 1
+  name                = "privatelink.blob.core.windows.net"
+  resource_group_name = local.resource_group_name
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "blob_privatelink" {
+  name                  = "${var.prefix}-${var.cluster_name}-blob-privatelink"
+  resource_group_name   = local.resource_group_name
+  private_dns_zone_name = azurerm_private_dns_zone.blob_privatelink[0].name
+  virtual_network_id    = data.azurerm_virtual_network.vnet.id
+}
+
+resource "azurerm_private_endpoint" "blob_endpoint" {
+  count               = 1
+  name                = "${var.prefix}-${var.cluster_name}-blob-endpoint"
+  location            = data.azurerm_resource_group.rg.location
+  resource_group_name = data.azurerm_resource_group.rg.name
+  subnet_id           = data.azurerm_subnet.subnet.id
+  tags                = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
+
+  private_dns_zone_group {
+    name                 = "${var.prefix}-${var.cluster_name}-dns-zone-group-blob"
+    private_dns_zone_ids = [azurerm_private_dns_zone.blob_privatelink[0].id]
+  }
+  private_service_connection {
+    name                           = "${var.prefix}-${var.cluster_name}-privateBlobSvcCon"
+    is_manual_connection           = false
+    private_connection_resource_id = local.deployment_storage_account_id
+    subresource_names              = ["blob"]
+  }
+}

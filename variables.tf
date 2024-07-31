@@ -407,6 +407,12 @@ variable "function_app_identity_name" {
   default     = ""
 }
 
+variable "function_app_zip_url" {
+  type        = string
+  description = "The URL of the function app zip file."
+  default     = null
+}
+
 variable "vmss_identity_name" {
   type        = string
   description = "The user assigned identity name for the vmss instances (if empty - new one is created)."
