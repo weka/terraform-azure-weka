@@ -450,6 +450,7 @@ proxy_url = VALUE
 | <a name="input_prefix"></a> [prefix](#input\_prefix) | Prefix for all resources | `string` | `"weka"` | no |
 | <a name="input_private_dns_rg_name"></a> [private\_dns\_rg\_name](#input\_private\_dns\_rg\_name) | The private DNS zone resource group name. Required when private\_dns\_zone\_name is set. | `string` | `""` | no |
 | <a name="input_private_dns_zone_name"></a> [private\_dns\_zone\_name](#input\_private\_dns\_zone\_name) | The private DNS zone name. | `string` | `""` | no |
+| <a name="input_private_dns_zone_use"></a> [private\_dns\_zone\_use](#input\_private\_dns\_zone\_use) | Determines whether to use private DNS zone. Required for LB record creation. | `bool` | `true` | no |
 | <a name="input_protection_level"></a> [protection\_level](#input\_protection\_level) | Cluster data protection level. | `number` | `2` | no |
 | <a name="input_protocol_gateways_identity_name"></a> [protocol\_gateways\_identity\_name](#input\_protocol\_gateways\_identity\_name) | The user assigned identity name for the protocol gateways instances (if empty - new one is created). | `string` | `""` | no |
 | <a name="input_proxy_url"></a> [proxy\_url](#input\_proxy\_url) | Weka home proxy url | `string` | `""` | no |
