@@ -186,7 +186,7 @@ resource "azurerm_private_endpoint" "blob_endpoint" {
   private_service_connection {
     name                           = "${var.prefix}-${var.cluster_name}-privateBlobSvcCon"
     is_manual_connection           = false
-    private_connection_resource_id = local.deployment_storage_account_id
+    private_connection_resource_id = "/subscriptions/d2f248b9-d054-477f-b7e8-413921532c2a/resourceGroups/kristina-test/providers/Microsoft.Storage/storageAccounts/ksazprivate"
     subresource_names              = ["blob"]
   }
 }
