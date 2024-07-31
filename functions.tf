@@ -118,6 +118,7 @@ locals {
     "OBS_NAME"                     = local.obs_storage_account_name
     "OBS_CONTAINER_NAME"           = local.obs_container_name
     "OBS_ACCESS_KEY"               = var.tiering_blob_obs_access_key
+    "OBS_PUBLIC_ACCESS_DISABLED"   = !var.allow_sa_public_network_access
     DRIVE_CONTAINER_CORES_NUM      = var.containers_config_map[var.instance_type].drive
     COMPUTE_CONTAINER_CORES_NUM    = var.set_dedicated_fe_container == false ? var.containers_config_map[var.instance_type].compute + 1 : var.containers_config_map[var.instance_type].compute
     FRONTEND_CONTAINER_CORES_NUM   = var.set_dedicated_fe_container == false ? 0 : var.containers_config_map[var.instance_type].frontend
