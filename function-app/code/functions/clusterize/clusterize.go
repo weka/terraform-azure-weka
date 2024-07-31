@@ -25,10 +25,11 @@ import (
 )
 
 type AzureObsParams struct {
-	Name              string
-	ContainerName     string
-	AccessKey         string
-	TieringSsdPercent string
+	Name                 string
+	ContainerName        string
+	AccessKey            string
+	TieringSsdPercent    string
+	PublicAccessDisabled bool
 }
 
 func GetObsScript(obsParams AzureObsParams) string {
@@ -93,6 +94,12 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 
 	if p.Cluster.SetObs {
 		if p.Obs.AccessKey == "" {
+			if p.Obs.PublicAccessDisabled {
+				err = fmt.Errorf("public access is disabled for the storage account, please provide pre-created storage account info in terraform")
+				logger.Error().Err(err).Send()
+				return
+			}
+
 			p.Obs.AccessKey, err = common.CreateStorageAccount(
 				ctx, p.SubscriptionId, p.ResourceGroupName, p.Obs.Name, p.Location,
 			)
@@ -348,6 +355,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	obsName := os.Getenv("OBS_NAME")
 	obsContainerName := os.Getenv("OBS_CONTAINER_NAME")
 	obsAccessKey := os.Getenv("OBS_ACCESS_KEY")
+	obsPublicAccessDisabled, _ := strconv.ParseBool(os.Getenv("OBS_PUBLIC_ACCESS_DISABLED"))
 	location := os.Getenv("LOCATION")
 	tieringSsdPercent := os.Getenv("TIERING_SSD_PERCENT")
 	tieringTargetSsdRetention, _ := strconv.Atoi(os.Getenv("TIERING_TARGET_SSD_RETENTION"))
@@ -429,10 +437,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			TieringStartDemote:        tieringStartDemote,
 		},
 		Obs: AzureObsParams{
-			Name:              obsName,
-			ContainerName:     obsContainerName,
-			AccessKey:         obsAccessKey,
-			TieringSsdPercent: tieringSsdPercent,
+			Name:                 obsName,
+			ContainerName:        obsContainerName,
+			AccessKey:            obsAccessKey,
+			TieringSsdPercent:    tieringSsdPercent,
+			PublicAccessDisabled: obsPublicAccessDisabled,
 		},
 		NFSStateParams:  common.BlobObjParams{StorageName: stateStorageName, ContainerName: nfsStateContainerName, BlobName: nfsStateBlobName},
 		FunctionAppName: functionAppName,

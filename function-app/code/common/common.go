@@ -235,24 +235,6 @@ func ReadBlobObject(ctx context.Context, bl BlobObjParams) (state []byte, err er
 
 }
 
-// func getStorageAccountKey(ctx context.Context, credential *azidentity.TokenCredential, subscriptionId, resourceGroupName, storageName string) (string, error) {
-// 	saClient, err := armstorage.NewAccountsClient(subscriptionId, credential, nil)
-// 	if err != nil {
-// 		err = fmt.Errorf("failed to create storage account client: %v", err)
-// 		return "", err
-// 	}
-// 	resp, err := saClient.ListKeys(ctx, resourceGroupName, storageName, nil)
-// 	if err != nil {
-// 		err = fmt.Errorf("failed to list storage account keys: %v", err)
-// 		return "", err
-// 	}
-// 	if len(resp.Keys) == 0 {
-// 		err = fmt.Errorf("no storage account keys found")
-// 		return "", err
-// 	}
-// 	return *resp.Keys[0].Value, nil
-// }
-
 func containerExists(ctx context.Context, containerClient *container.Client, storageName, containerName string) (bool, error) {
 	_, err := containerClient.GetProperties(ctx, nil)
 	if err != nil {
@@ -514,16 +496,16 @@ func CreateStorageAccount(ctx context.Context, subscriptionId, resourceGroupName
 	}
 	skuName := armstorage.SKUNameStandardZRS
 	kind := armstorage.KindStorageV2
-	publicAccessDisabled := armstorage.PublicNetworkAccessDisabled
+	// publicAccessDisabled := armstorage.PublicNetworkAccessDisabled
 	_, err = client.BeginCreate(ctx, resourceGroupName, obsName, armstorage.AccountCreateParameters{
 		Kind:     &kind,
 		Location: &location,
 		SKU: &armstorage.SKU{
 			Name: &skuName,
 		},
-		Properties: &armstorage.AccountPropertiesCreateParameters{
-			PublicNetworkAccess: &publicAccessDisabled,
-		},
+		// Properties: &armstorage.AccountPropertiesCreateParameters{
+		// 	PublicNetworkAccess: &publicAccessDisabled,
+		// },
 	}, nil)
 
 	if err != nil {
