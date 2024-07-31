@@ -20,6 +20,57 @@ resource "azurerm_storage_account" "deployment_sa" {
   }
 }
 
+resource "azurerm_storage_container" "deployment" {
+  count                 = var.deployment_container_name == "" && var.allow_sa_public_network_access ? 1 : 0
+  name                  = "${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}-deployment"
+  storage_account_name  = local.deployment_storage_account_name
+  container_access_type = "private"
+  depends_on            = [azurerm_storage_account.deployment_sa]
+}
+
+resource "azurerm_storage_blob" "state" {
+  count                  = var.allow_sa_public_network_access ? 1 : 0
+  name                   = "state"
+  storage_account_name   = local.deployment_storage_account_name
+  storage_container_name = local.deployment_container_name
+  type                   = "Block"
+  source_content         = "{\"initial_size\":${var.cluster_size}, \"desired_size\":${var.cluster_size}, \"instances\":[], \"clusterized\":false, \"clusterization_target\":${local.clusterization_target}}"
+  depends_on             = [azurerm_storage_container.deployment]
+
+  lifecycle {
+    ignore_changes = all
+  }
+}
+
+# state for protocols
+resource "azurerm_storage_container" "nfs_deployment" {
+  count                 = var.nfs_deployment_container_name == "" && var.allow_sa_public_network_access ? 1 : 0
+  name                  = "${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}-protocol-deployment"
+  storage_account_name  = local.deployment_storage_account_name
+  container_access_type = "private"
+  depends_on            = [azurerm_storage_account.deployment_sa]
+}
+
+resource "azurerm_storage_blob" "nfs_state" {
+  count                  = var.nfs_protocol_gateways_number > 0 && var.allow_sa_public_network_access ? 1 : 0
+  name                   = "nfs_state"
+  storage_account_name   = local.deployment_storage_account_name
+  storage_container_name = local.nfs_deployment_container_name
+  type                   = "Block"
+  source_content = jsonencode({
+    initial_size          = var.nfs_protocol_gateways_number
+    desired_size          = var.nfs_protocol_gateways_number
+    instances             = []
+    clusterized           = false
+    clusterization_target = var.nfs_protocol_gateways_number
+  })
+  depends_on = [azurerm_storage_container.nfs_deployment]
+
+  lifecycle {
+    ignore_changes = all
+  }
+}
+
 resource "azurerm_storage_account" "logicapp" {
   count                    = var.allow_sa_public_network_access ? 1 : 0
   name                     = substr("${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}logicappsa", 0, 24)
