@@ -69,6 +69,12 @@ variable "private_dns_zone_name" {
   default     = ""
 }
 
+variable "private_dns_zone_use" {
+  type        = bool
+  description = "Determines whether to use private DNS zone. Required for LB dns name."
+  default     = true
+}
+
 variable "sg_id" {
   type        = string
   description = "The security group id."

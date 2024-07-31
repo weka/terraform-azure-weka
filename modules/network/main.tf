@@ -142,7 +142,7 @@ resource "azurerm_subnet_network_security_group_association" "sg_association" {
 
 # ================== Private DNS ========================= #
 resource "azurerm_private_dns_zone" "dns" {
-  count               = var.private_dns_zone_name == "" ? 1 : 0
+  count               = var.private_dns_zone_name == "" && var.private_dns_zone_use ? 1 : 0
   name                = "${var.prefix}.private.net"
   resource_group_name = local.private_dns_rg_name
   tags                = merge(var.tags_map)
@@ -152,7 +152,7 @@ resource "azurerm_private_dns_zone" "dns" {
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "dns_vnet_link" {
-  count                 = var.private_dns_zone_name == "" ? 1 : 0
+  count                 = var.private_dns_zone_name == "" && var.private_dns_zone_use ? 1 : 0
   name                  = "${var.prefix}-private-network-link"
   resource_group_name   = data.azurerm_resource_group.rg.name
   private_dns_zone_name = azurerm_private_dns_zone.dns[0].name
