@@ -195,6 +195,12 @@ variable "private_dns_rg_name" {
   default     = ""
 }
 
+variable "private_dns_zone_use" {
+  type        = bool
+  description = "Determines whether to use private DNS zone. Required for LB record creation."
+  default     = true
+}
+
 variable "vnets_to_peer_to_deployment_vnet" {
   type = list(object({
     vnet = string
