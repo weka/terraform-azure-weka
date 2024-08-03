@@ -7,7 +7,7 @@ locals {
   disk_size                 = var.default_disk_size + var.traces_per_ionode * (var.containers_config_map[var.instance_type].compute + var.containers_config_map[var.instance_type].drive + var.containers_config_map[var.instance_type].frontend)
   alphanumeric_cluster_name = lower(replace(var.cluster_name, "/\\W|_|\\s/", ""))
   alphanumeric_prefix_name  = lower(replace(var.prefix, "/\\W|_|\\s/", ""))
-  subnet_range              = data.azurerm_subnet.subnet.address_prefix
+  subnet_range              = data.azurerm_subnet.subnet.address_prefixes[0]
   nics_numbers              = var.install_cluster_dpdk ? var.containers_config_map[var.instance_type].nics : 1
   placement_group_id        = var.placement_group_id != "" ? var.placement_group_id : var.vmss_single_placement_group ? azurerm_proximity_placement_group.ppg[0].id : null
 }

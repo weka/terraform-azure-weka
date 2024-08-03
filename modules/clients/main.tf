@@ -15,11 +15,11 @@ locals {
   preparation_script = templatefile("${path.module}/init.sh", {
     apt_repo_server = var.apt_repo_server
     nics_num        = local.nics_num
-    subnet_range    = data.azurerm_subnet.subnet.address_prefix
+    subnet_range    = data.azurerm_subnet.subnet.address_prefixes[0]
   })
 
   mount_wekafs_script = templatefile("${path.module}/mount_wekafs.sh", {
-    all_gateways                 = cidrhost(data.azurerm_subnet.subnet.address_prefix, 1)
+    all_gateways                 = cidrhost(data.azurerm_subnet.subnet.address_prefixes[0], 1)
     frontend_container_cores_num = var.frontend_container_cores_num
     backend_lb_ip                = var.backend_lb_ip
     clients_use_dpdk             = var.clients_use_dpdk
