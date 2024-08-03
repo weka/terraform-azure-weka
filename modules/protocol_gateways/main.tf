@@ -115,7 +115,7 @@ locals {
   init_script = templatefile("${path.module}/init.sh", {
     apt_repo_server          = var.apt_repo_server
     nics_num                 = local.nics_numbers
-    subnet_range             = data.azurerm_subnet.subnet.address_prefix
+    subnet_range             = data.azurerm_subnet.subnet.address_prefixes[0]
     disk_size                = local.disk_size
     deploy_url               = var.deploy_function_url
     report_url               = var.report_function_url
