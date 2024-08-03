@@ -176,10 +176,13 @@ locals {
     "WEBSITE_CONTENTSHARE"    = "${local.deployment_container_name}-share"
     "WEBSITE_CONTENTOVERVNET" = 1
     "WEBSITE_VNET_ROUTE_ALL"  = 1
-    "WEBSITE_DNS_SERVER"      = "168.63.129.16"
   }
+  dns_storgage_account_app_settings = {
+    "WEBSITE_DNS_SERVER" = "168.63.129.16"
+  }
+  merged_secured_storage_account_app_settings = var.create_storage_account_private_links ? merge(local.secured_storage_account_app_settings, local.dns_storgage_account_app_settings) : local.secured_storage_account_app_settings
 
-  app_settings = var.allow_sa_public_network_access ? local.initial_app_settings : merge(local.initial_app_settings, local.secured_storage_account_app_settings)
+  app_settings = var.allow_sa_public_network_access ? local.initial_app_settings : merge(local.initial_app_settings, local.merged_secured_storage_account_app_settings)
 }
 
 resource "azurerm_log_analytics_workspace" "la_workspace" {
