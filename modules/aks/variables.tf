@@ -76,3 +76,6 @@ variable "os_sku" {
   type = string
   default = "Ubuntu"
 }
+variable "cluster_name" {
+  type = string
+}

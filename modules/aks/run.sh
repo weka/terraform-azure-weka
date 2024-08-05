@@ -1,18 +1,28 @@
 set -ex
 
-rg_name=$1
-aks_cluster_name=$2
-vault_name=$3
-backend_vmss_name=$4
-subscription_id=$5
-nics=$6
-nodepool_number=$7
-frontend_container_cores_num=$8
-yamls_path=$9
-ml_name=$10
+rg_name=${rg_name}
+aks_cluster_name=${aks_cluster_name}
+vault_name=${key_vault_name}
+backend_vmss_name=${backend_vmss_name}
+subscription_id=${subscription_id}
+nics=${nics}
+node_count=${node_count}
+frontend_container_cores_num=${frontend_container_cores_num}
+yamls_path=${yamls_path}
 
-apt install yq -y || brew install yq || yum install yq -y || true
-apt install jq -y || brew install jq || yum install jq -y || true
+# install yq if not installed
+if ! command -v yq &> /dev/null
+then
+    echo "yq could not be found"
+    apt install yq -y || brew install yq || yum install yq -y || true
+fi
+
+# install jq if not installed
+if ! command -v jq &> /dev/null
+then
+    echo "jq could not be found"
+    apt install jq -y || brew install jq || yum install jq -y || true
+fi
 
 aks_rg_name=$(az aks show -n $aks_cluster_name -g $rg_name | jq -r ".nodeResourceGroup")
 aks_vmss_name=$(az vmss list -g $aks_rg_name | jq -r ".[].name" | grep clients)
@@ -50,43 +60,27 @@ while IFS= read -r ip; do
   endpoint+="$ip:14000,"
 done <<< "$backend_ips"
 
-endpoint=${endpoint%,}
+endpoint=$${endpoint%,}
 endpoint_base64=$(echo $endpoint | base64)
 
-sed -i "" "/^\([[:space:]]*password: \).*/s//\1${weka_password_base64}/" ${yamls_path}/yamls/secret.yaml
-sed -i "" "/^\([[:space:]]*endpoints: \).*/s//\1${endpoint_base64}/" ${yamls_path}/yamls/secret.yaml
+sed -i "" "/^\([[:space:]]*password: \).*/s//\1$${weka_password_base64}/" $yamls_path/yamls/secret.yaml
+sed -i "" "/^\([[:space:]]*endpoints: \).*/s//\1$${endpoint_base64}/" $yamls_path/yamls/secret.yaml
 
-yq eval --inplace ".spec.template.spec.containers[].env[] |= select(.name == \"NICS\").value = \"${nics}\"" ${yamls_path}/yamls/daemonset.yaml
-yq eval --inplace ".spec.template.spec.containers[].env[] |= select(.name == \"BACKEND_IP\").value = \"${backend_ip}\"" ${yamls_path}/yamls/daemonset.yaml
-yq eval --inplace ".spec.template.spec.containers[].env[] |= select(.name == \"FRONTEND_CONTAINER_CORES_NUM\").value = \"${frontend_container_cores_num}\"" ${yamls_path}/yamls/daemonset.yaml
+yq eval --inplace ".spec.template.spec.containers[].env[] |= select(.name == \"NICS\").value = \"$nics\"" $yamls_path/yamls/daemonset.yaml
+yq eval --inplace ".spec.template.spec.containers[].env[] |= select(.name == \"BACKEND_IP\").value = \"$backend_ip\"" $yamls_path/yamls/daemonset.yaml
+yq eval --inplace ".spec.template.spec.containers[].env[] |= select(.name == \"FRONTEND_CONTAINER_CORES_NUM\").value = \"$frontend_container_cores_num\"" $yamls_path/yamls/daemonset.yaml
 
 
-kubectl apply -f ${yamls_path}/yamls/configmap.yaml
-kubectl apply -f ${yamls_path}/yamls/daemonset.yaml
+kubectl apply -f $yamls_path/yamls/configmap.yaml
+kubectl apply -f $yamls_path/yamls/daemonset.yaml
 
 #scale up nodepool
-az vmss scale --new-capacity $nodepool_number --resource-group $aks_rg_name --name $aks_vmss_name
+az vmss scale --new-capacity $node_count --resource-group $aks_rg_name --name $aks_vmss_name
 
 #Install csi plugin
-helm repo add csi-wekafs https://weka.github.io/csi-wekafs
-helm install csi-wekafs csi-wekafs/csi-wekafsplugin --namespace csi-wekafs --create-namespace
-
-kubectl apply -f ${yamls_path}/yamls/secret.yaml
-kubectl apply -f ${yamls_path}/yamls/storageclass.yaml
-kubectl apply -f ${yamls_path}/yamls/deployment.yaml
-
-#aks_id=$(az aks show --name $aks_cluster_name --resource-group $rg_name | jq ".id")
-#region=$(az aks show --name $aks_cluster_name --resource-group $rg_name | jq -r ".location")
-
-#TOKEN=$(az account get-access-token --query accessToken -o tsv)
-#az rest --method GET --url "https://$region.api.azureml.ms/rp/workspaces/subscriptions/$subscription_id/resourceGroups/$rg_name/providers/Microsoft.MachineLearningServices/workspaces/$ml_name/outboundNetworkDependenciesEndpoints?api-version=2018-03-01-preview" --header Authorization="Bearer $TOKEN"
-
-#az k8s-extension create --name $ml_name --extension-type Microsoft.AzureML.Kubernetes \
-#--config nodeSelector.agentpool=clients enableTraining=True enableInference=True inferenceRouterServiceType=LoadBalancer allowInsecureConnections=True InferenceRouterHA=False \
-#--cluster-type managedClusters --cluster-name $aks_cluster_name --resource-group $rg_name --scope cluster --debug
-
-
-#az ml compute attach --resource-group $rg_name --workspace-name $ml_name --type Kubernetes --name k8s-compute --resource-id $aks_id --identity-type SystemAssigned --no-wait
-
-#kubectl apply -f ${yamls_path}/yamls/statefulset.yaml
-#kubectl apply -f ${yamls_path}/yamls/ml-pvs.yaml
+#helm repo add csi-wekafs https://weka.github.io/csi-wekafs
+#helm install csi-wekafs csi-wekafs/csi-wekafsplugin --namespace csi-wekafs --create-namespace
+#
+#kubectl apply -f $yamls_path/yamls/secret.yaml
+#kubectl apply -f $yamls_path/yamls/storageclass.yaml
+#kubectl apply -f $yamls_path/yamls/deployment.yaml

@@ -156,3 +156,11 @@ az vmss delete --name <ENTER YOUR BACKENDS VMSS_NAME HERE> --resource-group ${va
 EOT
   description = "Useful commands and script to interact with weka cluster"
 }
+
+output "weka_cluster_aks_node_pool_update_k8_yamls_path" {
+  value = var.aks_clients ? module.aks_clients[0].nodes_update_script.yamls_path: null
+}
+
+output "weka_cluster_aks_node_pool_update_script" {
+  value = var.aks_clients ? module.aks_clients[0].nodes_update_script.script_path: null
+}

@@ -14,5 +14,6 @@ module "aks_clients" {
   subscription_id              = var.subscription_id
   node_count                   = var.aks_instances_number
   create_ml                    = var.create_ml
+  cluster_name = var.cluster_name
   depends_on                   = [module.network, azurerm_linux_function_app.function_app]
 }

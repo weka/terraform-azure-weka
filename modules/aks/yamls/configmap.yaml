@@ -4,50 +4,37 @@ metadata:
   name: installer-config
   namespace: default
 data:
-  install.sh: >
+  install.sh: |
     #!/bin/bash
 
     set -ex
 
     nics_num=${NICS}
-
     backend_ip=${BACKEND_IP}
-
     frontend_container_cores_num=${FRONTEND_CONTAINER_CORES_NUM}
 
-    dpkg --configure -a
-
-    apt-get install -y --reinstall openvswitch-switch
-
-    apt-get -y install fio
-
+    apt install -y --reinstall openvswitch-switch
+    apt install -y fio
     apt install -y net-tools
-
-    OFED_NAME=ofed-${OFED_VERSION}
-
-    INSTALLATION_PATH=/tmp/weka
-
-    mkdir -p $INSTALLATION_PATH
-
-    wget https://content.mellanox.com/ofed/MLNX_OFED-${OFED_VERSION}/MLNX_OFED_LINUX-${OFED_VERSION}-ubuntu22.04-x86_64.tgz -O $INSTALLATION_PATH/$OFED_NAME.tgz
-
-    tar xf $INSTALLATION_PATH/$OFED_NAME.tgz --directory $INSTALLATION_PATH --one-top-level=$OFED_NAME
-
-    cd $INSTALLATION_PATH/$OFED_NAME/*/
-
-    ./mlnxofedinstall --without-fw-update --dpdk --force 2>&1 | tee /tmp/weka_ofed_installation
-
 
     for(( i=1; i<${nics_num}; i++ )); do
         ifconfig eth$i up
     done
 
+    OFED_NAME=ofed-${OFED_VERSION}
+    INSTALLATION_PATH=/tmp/weka
+    mkdir -p $INSTALLATION_PATH
+
+    wget https://content.mellanox.com/ofed/MLNX_OFED-${OFED_VERSION}/MLNX_OFED_LINUX-${OFED_VERSION}-ubuntu22.04-x86_64.tgz -O $INSTALLATION_PATH/$OFED_NAME.tgz
+    tar xf $INSTALLATION_PATH/$OFED_NAME.tgz --directory $INSTALLATION_PATH --one-top-level=$OFED_NAME
+    cd $INSTALLATION_PATH/$OFED_NAME/*/
+    ./mlnxofedinstall --without-fw-update --dpdk --force 2>&1 | tee /tmp/weka_ofed_installation
+    cd -
+    rm -rf $INSTALLATION_PATH
 
     cat <<-EOF | sed -i "/    eth0:/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
                 mtu: 3900
     EOF
-
-    netplan apply
 
     for(( i=1; i<${nics_num}; i++ )); do
         macaddress=$(cat /sys/class/net/eth$i/address)
@@ -66,126 +53,49 @@ data:
 
     netplan apply
 
-    sleep 6s
-
-
-    curl --fail -o install_script.sh $backend_ip:14000/dist/v1/install
-
-    chmod +x install_script.sh
-
-    ./install_script.sh
-
-    weka local stop
-
-    weka local rm -f --all
-
-    echo "$(date -u): weka agent installation complete"
-
-    gateway=$(ip r | grep default | awk '{print $3}')
-
-    FILESYSTEM_NAME=default
-
-    MOUNT_POINT=/mnt/weka
-
-    mkdir -p $MOUNT_POINT
-
-    eth0=$(ifconfig | grep eth0 -C2 | grep 'inet ' | awk '{print $2}')
-
-
-    function getNetStrForDpdk {
-
-    		i=$1
-
-    		j=$2
-
-    		gateways=$3
-
-    		net_option_name=$4
-
-    		if [ -n "$gateways" ]; then
-
-    			gateways=($gateways)
-
-    		fi
-
-    		net=" "
-
-    		for ((i; i<$j; i++)); do
-
-    			eth=eth$i
-
-    			subnet_inet=$(ifconfig $eth | grep 'inet ' | awk '{print $2}')
-
-    			if [ -z $subnet_inet ];then
-
-    				net=""
-
-    				break
-
-    			fi
-
-    			enp=$(ls -l /sys/class/net/$eth/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}')
-
-    			bits=$(ip -o -f inet addr show $eth | awk '{print $4}')
-
-    			IFS='/' read -ra netmask <<< "$bits"
-
-    			if [ -n "$gateways" ]; then
-
-    				gateway=${gateways[0]}
-
-    				net="$net $net_option_name$enp/$subnet_inet/${netmask[1]}/$gateway"
-
-    			fi
-
-    		done
-
-    }
-
     function retry {
-
       local retry_max=$1
-
       local retry_sleep=$2
-
       shift 2
-
       local count=$retry_max
-
       while [ $count -gt 0 ]; do
-
           "$@" && break
-
           count=$(($count - 1))
-
           echo "Retrying $* in $retry_sleep seconds..."
-
           sleep $retry_sleep
-
       done
 
       [ $count -eq 0 ] && {
-
           echo "Retry failed [$retry_max]: $*"
-
           echo "$(date -u): retry failed"
-
           return 1
-
       }
-
       return 0
-
     }
 
-    net_option_name="-o net="
+    retry 60 45 curl --fail -o install_script.sh $backend_ip:14000/dist/v1/install
+    chmod +x install_script.sh
+    ./install_script.sh
+    echo "$(date -u): weka agent installation complete"
 
-    getNetStrForDpdk 1 $nics_num "$gateway" "$net_option_name"
+    gateway=$(ip r | grep default | awk '{print $3}')
+    FILESYSTEM_NAME=default
+    MOUNT_POINT=/mnt/weka
+    mkdir -p $MOUNT_POINT
+    eth0=$(ifconfig | grep eth0 -C2 | grep 'inet ' | awk '{print $2}')
+    net=" "
+    for ((i=1; i<$nics_num; i++)); do
+        eth=eth$i
+        subnet_inet=$(ifconfig $eth | grep 'inet ' | awk '{print $2}')
+        enp=$(ls -l /sys/class/net/$eth/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}')
+        bits=$(ip -o -f inet addr show $eth | awk '{print $4}')
+        IFS='/' read -ra netmask <<< "$bits"
+        net="$net -o net=$enp/$subnet_inet/${netmask[1]}/$gateway"
+    done
 
     mount_command="mount -t wekafs $net -o num_cores=$frontend_container_cores_num -o mgmt_ip=$eth0 $backend_ip/$FILESYSTEM_NAME $MOUNT_POINT"
-
+    echo $(ifconfig) > /tmp/ifconfig_freeze
+    echo "$mount_command" > /tmp/mount_command
     retry 60 45 $mount_command
-
-    rm -rf $INSTALLATION_PATH
 
     echo "$(date -u): wekafs mount complete"

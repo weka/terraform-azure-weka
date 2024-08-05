@@ -1,5 +1,6 @@
 locals {
   nics = var.frontend_container_cores_num + 1
+  script_path = "/tmp/update_aks_node_pool_${var.prefix}_${var.cluster_name}.sh"
 }
 
 data "azurerm_resource_group" "rg" {
@@ -81,15 +82,15 @@ resource "local_file" "config_yaml" {
   depends_on = [azurerm_kubernetes_cluster.k8s]
 }
 
-resource "null_resource" "weka_fs" {
-  triggers = {
-    always_run = timestamp()
-  }
-  provisioner "local-exec" {
-    command = "${path.module}/run.sh ${var.rg_name} ${azurerm_kubernetes_cluster.k8s.name} ${var.key_vault_name} ${var.backend_vmss_name} ${var.subscription_id} ${local.nics} ${var.node_count} ${var.frontend_container_cores_num} ${path.module} \"${var.prefix}-workspace-ml2\""
-  }
-  depends_on = [azurerm_kubernetes_cluster_node_pool.pool]
-}
+# resource "null_resource" "weka_fs" {
+#   triggers = {
+#     always_run = timestamp()
+#   }
+#   provisioner "local-exec" {
+#     command = "${path.module}/run.sh ${var.rg_name} ${azurerm_kubernetes_cluster.k8s.name} ${var.key_vault_name} ${var.backend_vmss_name} ${var.subscription_id} ${local.nics} ${var.node_count} ${var.frontend_container_cores_num} ${path.module} \"${var.prefix}-workspace-ml2\""
+#   }
+#   depends_on = [azurerm_kubernetes_cluster_node_pool.pool]
+# }
 
 output "nodes_update_script" {
   value = {
@@ -102,6 +103,21 @@ output "nodes_update_script" {
     node_count = var.node_count
     frontend_container_cores_num= var.frontend_container_cores_num
     yamls_path= path.module
-    ml_name = "${var.prefix}-workspace-ml2"
+    script_path = local.script_path
   }
+}
+
+resource "local_file" "script" {
+  filename = local.script_path
+    content  = templatefile("${path.module}/run.sh", {
+        rg_name = var.rg_name
+        aks_cluster_name = azurerm_kubernetes_cluster.k8s.name
+        key_vault_name= var.key_vault_name
+        backend_vmss_name= var.backend_vmss_name
+        subscription_id= var.subscription_id
+        nics = local.nics
+        node_count = var.node_count
+        frontend_container_cores_num= var.frontend_container_cores_num
+        yamls_path= path.module
+    })
 }
