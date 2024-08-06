@@ -58,12 +58,12 @@ resource "azurerm_public_ip" "public_ip" {
 }
 
 resource "azurerm_network_interface" "public_first_nic" {
-  count                         = var.use_vmss ? 0 : var.assign_public_ip ? var.clients_number : 0
-  name                          = "${var.clients_name}-nic-${count.index}"
-  enable_accelerated_networking = var.clients_use_dpdk
-  resource_group_name           = var.rg_name
-  location                      = data.azurerm_resource_group.rg.location
-  tags                          = var.tags_map
+  count                          = var.use_vmss ? 0 : var.assign_public_ip ? var.clients_number : 0
+  name                           = "${var.clients_name}-nic-${count.index}"
+  accelerated_networking_enabled = var.clients_use_dpdk
+  resource_group_name            = var.rg_name
+  location                       = data.azurerm_resource_group.rg.location
+  tags                           = var.tags_map
   ip_configuration {
     name                          = "ipconfig0"
     subnet_id                     = data.azurerm_subnet.subnet.id
@@ -80,12 +80,12 @@ resource "azurerm_network_interface_security_group_association" "public_first" {
 }
 
 resource "azurerm_network_interface" "private_first_nic" {
-  count                         = var.use_vmss ? 0 : var.assign_public_ip ? 0 : var.clients_number
-  name                          = "${var.clients_name}-nic-${count.index}"
-  enable_accelerated_networking = var.clients_use_dpdk
-  resource_group_name           = var.rg_name
-  location                      = data.azurerm_resource_group.rg.location
-  tags                          = var.tags_map
+  count                          = var.use_vmss ? 0 : var.assign_public_ip ? 0 : var.clients_number
+  name                           = "${var.clients_name}-nic-${count.index}"
+  accelerated_networking_enabled = var.clients_use_dpdk
+  resource_group_name            = var.rg_name
+  location                       = data.azurerm_resource_group.rg.location
+  tags                           = var.tags_map
   ip_configuration {
     name                          = "ipconfig0"
     subnet_id                     = data.azurerm_subnet.subnet.id
@@ -101,12 +101,12 @@ resource "azurerm_network_interface_security_group_association" "private_first" 
 }
 
 resource "azurerm_network_interface" "private_nics" {
-  count                         = var.use_vmss ? 0 : (local.nics_num - 1) * var.clients_number
-  name                          = "${var.clients_name}-nic-${count.index + var.clients_number}"
-  enable_accelerated_networking = var.clients_use_dpdk
-  resource_group_name           = var.rg_name
-  location                      = data.azurerm_resource_group.rg.location
-  tags                          = var.tags_map
+  count                          = var.use_vmss ? 0 : (local.nics_num - 1) * var.clients_number
+  name                           = "${var.clients_name}-nic-${count.index + var.clients_number}"
+  accelerated_networking_enabled = var.clients_use_dpdk
+  resource_group_name            = var.rg_name
+  location                       = data.azurerm_resource_group.rg.location
+  tags                           = var.tags_map
   ip_configuration {
     name                          = "ipconfig${count.index + var.clients_number}"
     subnet_id                     = data.azurerm_subnet.subnet.id

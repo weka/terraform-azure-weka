@@ -834,14 +834,31 @@ variable "debug_down_backends_removal_timeout" {
   description = "Don't change this value without consulting weka support team. Timeout for removing down backends. Valid time units are ns, us (or µs), ms, s, m, h."
 }
 
-variable "allow_sa_public_network_access" {
-  type        = bool
-  default     = true
-  description = "Allow public network access to the storage account."
+variable "storage_account_public_network_access" {
+  type        = string
+  description = "Public network access to the storage accounts."
+  default     = "Enabled"
+
+  validation {
+    condition     = contains(["Enabled", "Disabled", "EnabledForVnet"], var.storage_account_public_network_access)
+    error_message = "Allowed values: [\"Enabled\", \"Disabled\", \"EnabledForVnet\"]."
+  }
+}
+
+variable "storage_account_allowed_ips" {
+  type        = list(string)
+  description = "IP ranges to allow access from the internet or your on-premises networks to storage accounts."
+  default     = []
 }
 
 variable "create_storage_account_private_links" {
   type        = bool
-  default     = true
-  description = "Create private links for storage accounts (in case if public network access for the storage account is disabled)."
+  default     = false
+  description = "Create private links for storage accounts (needed in case if public network access for the storage account is disabled)."
+}
+
+variable "key_vault_purge_protection_enabled" {
+  type        = bool
+  default     = false
+  description = "Enable purge protection for the key vault."
 }

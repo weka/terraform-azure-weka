@@ -3,6 +3,21 @@ variable "rg_name" {
   description = "A predefined resource group in the Azure subscription."
 }
 
+variable "vnet_rg_name" {
+  type        = string
+  description = "The name of the resource group for the VNet."
+}
+
+variable "vnet_name" {
+  type        = string
+  description = "The name of the virtual network."
+}
+
+variable "subnet_name" {
+  type        = string
+  description = "The name of the subnet."
+}
+
 variable "prefix" {
   type        = string
   description = "Prefix for all resources"

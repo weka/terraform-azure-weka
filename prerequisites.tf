@@ -25,11 +25,14 @@ module "iam" {
   rg_name                        = var.rg_name
   prefix                         = var.prefix
   cluster_name                   = var.cluster_name
+  vnet_rg_name                   = local.vnet_rg_name
+  vnet_name                      = local.vnet_name
+  subnet_name                    = local.subnet_name
   vmss_identity_name             = var.vmss_identity_name
   function_app_identity_name     = var.function_app_identity_name
-  support_logic_app              = var.allow_sa_public_network_access
+  support_logic_app              = local.create_logic_app
   logic_app_identity_name        = var.logic_app_identity_name
-  logic_app_storage_account_id   = var.allow_sa_public_network_access ? azurerm_storage_account.logicapp[0].id : ""
+  logic_app_storage_account_id   = local.create_logic_app ? azurerm_storage_account.logicapp[0].id : ""
   key_vault_id                   = azurerm_key_vault.key_vault.id
   weka_tar_storage_account_id    = var.weka_tar_storage_account_id
   deployment_storage_account_id  = local.deployment_storage_account_id
@@ -42,6 +45,7 @@ module "iam" {
 }
 
 locals {
+  create_logic_app      = local.create_sa_resources
   vnet_name             = var.vnet_name == "" ? module.network.vnet_name : var.vnet_name
   vnet_rg_name          = var.vnet_rg_name == "" ? module.network.vnet_rg_name : var.vnet_rg_name
   subnet_name           = var.subnet_name == "" ? module.network.subnet_name : var.subnet_name
@@ -67,31 +71,40 @@ module "peering" {
   depends_on                       = [module.network]
 }
 
+module "logic_app_subnet_delegation" {
+  count           = var.logic_app_subnet_delegation_id == "" && local.create_logic_app ? 1 : 0
+  source          = "./modules/subnet_delegation"
+  rg_name         = local.vnet_rg_name
+  vnet_name       = local.vnet_name
+  prefix          = var.prefix
+  cluster_name    = var.cluster_name
+  cidr_range      = var.logic_app_subnet_delegation_cidr
+  delegation_name = "logic-app-delegation"
 
-resource "azurerm_subnet" "logicapp_subnet_delegation" {
-  count                = var.logic_app_subnet_delegation_id == "" && var.allow_sa_public_network_access ? 1 : 0
-  name                 = "${var.prefix}-${var.cluster_name}-logicapp-delegation"
-  resource_group_name  = local.vnet_rg_name
-  virtual_network_name = local.vnet_name
-  address_prefixes     = [var.logic_app_subnet_delegation_cidr]
-  service_endpoints    = ["Microsoft.KeyVault", "Microsoft.Web"]
-  delegation {
-    name = "logic-delegation"
-    service_delegation {
-      name    = "Microsoft.Web/serverFarms"
-      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
-    }
-  }
+  depends_on = [module.network]
+}
+
+module "function_app_subnet_delegation" {
+  count           = var.function_app_subnet_delegation_id == "" ? 1 : 0
+  source          = "./modules/subnet_delegation"
+  rg_name         = local.vnet_rg_name
+  vnet_name       = local.vnet_name
+  prefix          = var.prefix
+  cluster_name    = var.cluster_name
+  cidr_range      = var.function_app_subnet_delegation_cidr
+  delegation_name = "function-app-delegation"
+
+  depends_on = [module.network]
 }
 
 module "logicapp" {
-  count                          = var.allow_sa_public_network_access ? 1 : 0
+  count                          = local.create_logic_app ? 1 : 0
   source                         = "./modules/logic_app"
   rg_name                        = var.rg_name
   location                       = local.location
   prefix                         = var.prefix
   cluster_name                   = var.cluster_name
-  logic_app_subnet_delegation_id = var.logic_app_subnet_delegation_id == "" ? azurerm_subnet.logicapp_subnet_delegation[0].id : var.logic_app_subnet_delegation_id
+  logic_app_subnet_delegation_id = var.logic_app_subnet_delegation_id == "" ? module.logic_app_subnet_delegation[0].id : var.logic_app_subnet_delegation_id
   storage_account_name           = azurerm_storage_account.logicapp[0].name
   logic_app_identity_id          = local.logic_app_identity_id
   logic_app_identity_principal   = local.logic_app_identity_principal
@@ -103,7 +116,7 @@ module "logicapp" {
   key_vault_id                   = azurerm_key_vault.key_vault.id
   key_vault_uri                  = azurerm_key_vault.key_vault.vault_uri
 
-  depends_on = [azurerm_storage_account.logicapp, module.network]
+  depends_on = [azurerm_storage_account.logicapp, module.logic_app_subnet_delegation, module.iam]
 }
 
 data "azurerm_subnet" "subnet" {
