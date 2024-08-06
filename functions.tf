@@ -3,10 +3,11 @@ locals {
   stripe_width_calculated  = var.cluster_size - var.protection_level - 1
   stripe_width             = local.stripe_width_calculated < 16 ? local.stripe_width_calculated : 16
   location                 = data.azurerm_resource_group.rg.location
-  function_app_zip_name    = var.allow_sa_public_network_access ? "${var.function_app_dist}/${var.function_app_version}.zip" : var.deployment_function_app_code_blob
-  weka_sa                  = var.allow_sa_public_network_access ? "${var.function_app_storage_account_prefix}${local.location}" : var.deployment_storage_account_name
-  weka_sa_container        = var.allow_sa_public_network_access ? "${var.function_app_storage_account_container_prefix}${local.location}" : var.deployment_container_name
-  function_app_blob_sas    = var.allow_sa_public_network_access ? "" : data.azurerm_storage_account_blob_container_sas.function_app_code_sas[0].sas
+  read_remote_function_zip = local.sa_public_access_enabled || local.sa_public_access_for_vnet && local.sa_allowed_ips_provided
+  function_app_zip_name    = local.read_remote_function_zip ? "${var.function_app_dist}/${var.function_app_version}.zip" : var.deployment_function_app_code_blob
+  weka_sa                  = local.read_remote_function_zip ? "${var.function_app_storage_account_prefix}${local.location}" : var.deployment_storage_account_name
+  weka_sa_container        = local.read_remote_function_zip ? "${var.function_app_storage_account_container_prefix}${local.location}" : var.deployment_container_name
+  function_app_blob_sas    = local.read_remote_function_zip ? "" : data.azurerm_storage_account_blob_container_sas.function_app_code_sas[0].sas
   function_code_path       = "${path.module}/function-app/code"
   function_app_code_hash   = md5(join("", [for f in fileset(local.function_code_path, "**") : filemd5("${local.function_code_path}/${f}")]))
   get_compute_memory_index = var.set_dedicated_fe_container ? 1 : 0
@@ -118,7 +119,7 @@ locals {
     "OBS_NAME"                     = local.obs_storage_account_name
     "OBS_CONTAINER_NAME"           = local.obs_container_name
     "OBS_ACCESS_KEY"               = var.tiering_blob_obs_access_key
-    "OBS_PUBLIC_ACCESS_DISABLED"   = !var.allow_sa_public_network_access
+    "OBS_PUBLIC_ACCESS_DISABLED"   = !local.sa_public_access_enabled
     DRIVE_CONTAINER_CORES_NUM      = var.containers_config_map[var.instance_type].drive
     COMPUTE_CONTAINER_CORES_NUM    = var.set_dedicated_fe_container == false ? var.containers_config_map[var.instance_type].compute + 1 : var.containers_config_map[var.instance_type].compute
     FRONTEND_CONTAINER_CORES_NUM   = var.set_dedicated_fe_container == false ? 0 : var.containers_config_map[var.instance_type].frontend
@@ -182,7 +183,9 @@ locals {
   }
   merged_secured_storage_account_app_settings = var.create_storage_account_private_links ? merge(local.secured_storage_account_app_settings, local.dns_storgage_account_app_settings) : local.secured_storage_account_app_settings
 
-  app_settings = var.allow_sa_public_network_access ? local.initial_app_settings : merge(local.initial_app_settings, local.merged_secured_storage_account_app_settings)
+  app_settings = local.sa_public_access_enabled ? local.initial_app_settings : merge(local.initial_app_settings, local.merged_secured_storage_account_app_settings)
+
+  function_app_subnet_delegation_id = var.function_app_subnet_delegation_id == "" ? module.function_app_subnet_delegation[0].id : var.function_app_subnet_delegation_id
 }
 
 resource "azurerm_log_analytics_workspace" "la_workspace" {
@@ -256,22 +259,6 @@ resource "azurerm_service_plan" "app_service_plan" {
   }
 }
 
-resource "azurerm_subnet" "subnet_delegation" {
-  count                = var.function_app_subnet_delegation_id == "" ? 1 : 0
-  name                 = "${var.prefix}-${var.cluster_name}-subnet-delegation"
-  resource_group_name  = local.vnet_rg_name
-  virtual_network_name = local.vnet_name
-  address_prefixes     = [var.function_app_subnet_delegation_cidr]
-  service_endpoints    = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.Web"]
-  delegation {
-    name = "subnet-delegation"
-    service_delegation {
-      name    = "Microsoft.Web/serverFarms"
-      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
-    }
-  }
-}
-
 resource "azurerm_linux_function_app" "function_app" {
   name                       = local.function_app_name
   resource_group_name        = data.azurerm_resource_group.rg.name
@@ -280,7 +267,7 @@ resource "azurerm_linux_function_app" "function_app" {
   storage_account_name       = local.deployment_storage_account_name
   storage_account_access_key = local.deployment_sa_access_key
   https_only                 = true
-  virtual_network_subnet_id  = var.function_app_subnet_delegation_id == "" ? azurerm_subnet.subnet_delegation[0].id : var.function_app_subnet_delegation_id
+  virtual_network_subnet_id  = local.function_app_subnet_delegation_id
 
   site_config {
     vnet_route_all_enabled   = true
@@ -298,9 +285,9 @@ resource "azurerm_linux_function_app" "function_app" {
       }
     }
     dynamic "ip_restriction" {
-      for_each = range(var.allow_sa_public_network_access ? local.create_private_function : 0)
+      for_each = range(local.sa_public_access_enabled ? local.create_private_function : 0)
       content {
-        virtual_network_subnet_id = var.logic_app_subnet_delegation_id == "" ? azurerm_subnet.logicapp_subnet_delegation[0].id : var.logic_app_subnet_delegation_id
+        virtual_network_subnet_id = var.logic_app_subnet_delegation_id == "" ? module.logic_app_subnet_delegation[0].id : var.logic_app_subnet_delegation_id
         action                    = "Allow"
         priority                  = 301
         name                      = "VirtualNetwork"
@@ -326,7 +313,12 @@ resource "azurerm_linux_function_app" "function_app" {
       condition     = contains(local.supported_regions, data.azurerm_resource_group.rg.location)
       error_message = "The region '${data.azurerm_resource_group.rg.location}' is not supported for the function_app_dist '${var.function_app_dist}'. Supported regions: ${join(", ", local.supported_regions)}"
     }
+
+    precondition {
+      condition     = local.sa_public_access_enabled || local.sa_public_access_for_vnet && local.sa_allowed_ips_provided || (local.sa_public_access_disabled || local.sa_public_access_for_vnet && !local.sa_allowed_ips_provided) && var.deployment_function_app_code_blob != "" && var.deployment_storage_account_name != "" && var.deployment_container_name != ""
+      error_message = "You shoud pick one of 3 options: 1. Public access enabled, 2. Public access enabled for VNET + public IPs whitelisted, 3. Public access disabled (or enabled for VNET without IPs whitelisted) and provide deployment_function_app_code_blob, deployment_storage_account_name and deployment_container_name"
+    }
   }
 
-  depends_on = [module.network, azurerm_storage_account.deployment_sa, azurerm_private_endpoint.file_endpoint, azurerm_private_endpoint.blob_endpoint]
+  depends_on = [module.network, module.iam, azurerm_storage_account.deployment_sa, azurerm_private_endpoint.file_endpoint, azurerm_private_endpoint.blob_endpoint]
 }

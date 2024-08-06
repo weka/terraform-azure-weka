@@ -6,7 +6,7 @@ resource "azurerm_key_vault" "key_vault" {
   resource_group_name      = var.rg_name
   enabled_for_deployment   = true
   tenant_id                = data.azurerm_client_config.current.tenant_id
-  purge_protection_enabled = false
+  purge_protection_enabled = var.key_vault_purge_protection_enabled
   sku_name                 = "standard"
   tags                     = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
   lifecycle {
