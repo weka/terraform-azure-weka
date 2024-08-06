@@ -105,10 +105,10 @@ resource "azurerm_virtual_machine" "apt_repo_vm_linux" {
 }
 
 resource "azurerm_network_interface" "vm_interface" {
-  name                          = "${var.prefix}-vm-nic"
-  location                      = azurerm_resource_group.rg.location
-  resource_group_name           = azurerm_resource_group.rg.name
-  enable_accelerated_networking = false
+  name                           = "${var.prefix}-vm-nic"
+  location                       = azurerm_resource_group.rg.location
+  resource_group_name            = azurerm_resource_group.rg.name
+  accelerated_networking_enabled = false
 
   ip_configuration {
     name                          = "ipconfig"

@@ -20,7 +20,7 @@ resource "azurerm_role_assignment" "reader" {
 
 resource "azurerm_role_assignment" "network_contributor" {
   count                = var.vmss_identity_name == "" ? 1 : 0
-  scope                = data.azurerm_resource_group.rg.id
+  scope                = data.azurerm_resource_group.vnet_rg.id
   role_definition_name = "Network Contributor"
   principal_id         = azurerm_user_assigned_identity.vmss[0].principal_id
 }
