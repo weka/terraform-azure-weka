@@ -127,6 +127,20 @@ output "weka_cluster_admin_password_secret_name" {
   description = "Weka cluster admin password secret name"
 }
 
+
+locals {
+  resize_helper_command   = var.storage_account_public_network_access != "Enabled" ? "" : <<EOT
+########################################## Resize cluster #################################################################################
+function_key=$(az functionapp keys list --name ${local.function_app_name} --resource-group ${local.resource_group_name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
+curl --fail https://${local.function_app_name}.azurewebsites.net/api/resize?code=$function_key -H "Content-Type:application/json" -d '{"value":ENTER_NEW_VALUE_HERE}'
+EOT
+  scale_up_helper_command = var.storage_account_public_network_access == "Enabled" ? "" : <<EOT
+########################################## Scale up cluster #################################################################################
+function_key=$(az functionapp keys list --name ${local.function_app_name} --resource-group ${local.resource_group_name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
+curl --fail https://${local.function_app_name}.azurewebsites.net/api/scale_up?code=$function_key
+EOT
+}
+
 output "cluster_helper_commands" {
   value       = <<EOT
 ########################################## Get function key #####################################################################
@@ -145,9 +159,8 @@ az keyvault secret show --vault-name ${local.key_vault_name} --name ${azurerm_ke
 
 ${local.blob_commands}
 
-########################################## Resize cluster #################################################################################
-function_key=$(az functionapp keys list --name ${local.function_app_name} --resource-group ${local.resource_group_name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
-curl --fail https://${local.function_app_name}.azurewebsites.net/api/resize?code=$function_key -H "Content-Type:application/json" -d '{"value":ENTER_NEW_VALUE_HERE}'
+${local.resize_helper_command}
+${local.scale_up_helper_command}
 
 ########################################## pre-terraform destroy, cluster terminate function ################
 backends_vmss_name=${local.vmss_name}

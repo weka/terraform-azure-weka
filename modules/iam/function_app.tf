@@ -91,3 +91,33 @@ resource "azurerm_role_assignment" "managed_identity_operator" {
   role_definition_name = "Managed Identity Operator"
   principal_id         = azurerm_user_assigned_identity.function_app[0].principal_id
 }
+
+data "azurerm_subnet" "subnet" {
+  name                 = var.subnet_name
+  virtual_network_name = var.vnet_name
+  resource_group_name  = var.vnet_rg_name
+}
+
+resource "azurerm_role_definition" "join_subnet" {
+  count       = var.function_app_identity_name == "" && var.rg_name != var.vnet_rg_name ? 1 : 0
+  name        = "${var.prefix}-${var.cluster_name}-join-subnet"
+  scope       = data.azurerm_subnet.subnet.id
+  description = "Can join subnet"
+
+  permissions {
+    actions = [
+      "Microsoft.Network/virtualNetworks/subnets/join/action",                   # for VMSS creation from function app
+      "Microsoft.Network/virtualNetworks/subnets/joinViaServiceEndpoint/action", # for using SA service endpoint (when network is in different RG)
+    ]
+    not_actions = []
+  }
+
+  assignable_scopes = [data.azurerm_subnet.subnet.id]
+}
+
+resource "azurerm_role_assignment" "join_subnet" {
+  count              = var.function_app_identity_name == "" && var.rg_name != var.vnet_rg_name ? 1 : 0
+  scope              = data.azurerm_subnet.subnet.id
+  role_definition_id = azurerm_role_definition.join_subnet[0].role_definition_resource_id
+  principal_id       = azurerm_user_assigned_identity.function_app[0].principal_id
+}
