@@ -450,6 +450,7 @@ proxy_url = VALUE
 | <a name="input_debug_down_backends_removal_timeout"></a> [debug\_down\_backends\_removal\_timeout](#input\_debug\_down\_backends\_removal\_timeout) | Don't change this value without consulting weka support team. Timeout for removing down backends. Valid time units are ns, us (or µs), ms, s, m, h. | `string` | `"3h"` | no |
 | <a name="input_default_disk_size"></a> [default\_disk\_size](#input\_default\_disk\_size) | The default disk size. | `number` | `48` | no |
 | <a name="input_deployment_container_name"></a> [deployment\_container\_name](#input\_deployment\_container\_name) | Name of exising deployment container | `string` | `""` | no |
+| <a name="input_deployment_file_share_name"></a> [deployment\_file\_share\_name](#input\_deployment\_file\_share\_name) | Name of exising deployment file share. Will use '<deployment\_storage\_account\_name>-share' name if not provided. | `string` | `""` | no |
 | <a name="input_deployment_function_app_code_blob"></a> [deployment\_function\_app\_code\_blob](#input\_deployment\_function\_app\_code\_blob) | The path to the function app code blob file. | `string` | `""` | no |
 | <a name="input_deployment_storage_account_name"></a> [deployment\_storage\_account\_name](#input\_deployment\_storage\_account\_name) | Name of exising deployment storage account | `string` | `""` | no |
 | <a name="input_enable_application_insights"></a> [enable\_application\_insights](#input\_enable\_application\_insights) | Enable Application Insights. | `bool` | `true` | no |
