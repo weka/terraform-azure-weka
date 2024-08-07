@@ -24,15 +24,7 @@ import (
 	"github.com/weka/go-cloud-lib/protocol"
 )
 
-type AzureObsParams struct {
-	Name                 string
-	ContainerName        string
-	AccessKey            string
-	TieringSsdPercent    string
-	PublicAccessDisabled bool
-}
-
-func GetObsScript(obsParams AzureObsParams) string {
+func GetObsScript(obsParams common.AzureObsParams) string {
 	template := `
 	TIERING_SSD_PERCENT=%s
 	OBS_NAME=%s
@@ -63,7 +55,7 @@ type ClusterizationParams struct {
 	Cluster        clusterize.ClusterParams
 	NFSParams      protocol.NFSParams
 	NFSStateParams common.BlobObjParams
-	Obs            AzureObsParams
+	Obs            common.AzureObsParams
 
 	FunctionAppName string
 }
@@ -94,14 +86,14 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 
 	if p.Cluster.SetObs {
 		if p.Obs.AccessKey == "" {
-			if p.Obs.PublicAccessDisabled {
+			if p.Obs.PublicAccessDisabled && len(p.Obs.AllowedSubnets) == 0 {
 				err = fmt.Errorf("public access is disabled for the storage account, please provide pre-created storage account info in terraform")
 				logger.Error().Err(err).Send()
 				return
 			}
 
 			p.Obs.AccessKey, err = common.CreateStorageAccount(
-				ctx, p.SubscriptionId, p.ResourceGroupName, p.Obs.Name, p.Location,
+				ctx, p.SubscriptionId, p.ResourceGroupName, p.Location, p.Obs,
 			)
 			if err != nil {
 				err = fmt.Errorf("failed to create storage account: %w", err)
@@ -356,6 +348,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	obsContainerName := os.Getenv("OBS_CONTAINER_NAME")
 	obsAccessKey := os.Getenv("OBS_ACCESS_KEY")
 	obsPublicAccessDisabled, _ := strconv.ParseBool(os.Getenv("OBS_PUBLIC_ACCESS_DISABLED"))
+	obsAllowedSubnets := strings.Split(os.Getenv("OBS_ALLOWED_SUBNETS"), ",")
+	obsAllowedPublicIps := strings.Split(os.Getenv("OBS_ALLOWED_PUBLIC_IPS"), ",")
 	location := os.Getenv("LOCATION")
 	tieringSsdPercent := os.Getenv("TIERING_SSD_PERCENT")
 	tieringTargetSsdRetention, _ := strconv.Atoi(os.Getenv("TIERING_TARGET_SSD_RETENTION"))
@@ -436,12 +430,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			TieringTargetSSDRetention: tieringTargetSsdRetention,
 			TieringStartDemote:        tieringStartDemote,
 		},
-		Obs: AzureObsParams{
+		Obs: common.AzureObsParams{
 			Name:                 obsName,
 			ContainerName:        obsContainerName,
 			AccessKey:            obsAccessKey,
 			TieringSsdPercent:    tieringSsdPercent,
 			PublicAccessDisabled: obsPublicAccessDisabled,
+			AllowedSubnets:       obsAllowedSubnets,
+			AllowedPublicIps:     obsAllowedPublicIps,
 		},
 		NFSStateParams:  common.BlobObjParams{StorageName: stateStorageName, ContainerName: nfsStateContainerName, BlobName: nfsStateBlobName},
 		FunctionAppName: functionAppName,

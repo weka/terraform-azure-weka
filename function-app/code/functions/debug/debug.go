@@ -116,7 +116,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 					},
 					SetObs: setObs,
 				},
-				Obs: clusterizeFunc.AzureObsParams{
+				Obs: common.AzureObsParams{
 					Name:              obsName,
 					ContainerName:     obsContainerName,
 					AccessKey:         obsAccessKey,

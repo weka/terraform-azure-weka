@@ -3,7 +3,7 @@ locals {
   stripe_width_calculated  = var.cluster_size - var.protection_level - 1
   stripe_width             = local.stripe_width_calculated < 16 ? local.stripe_width_calculated : 16
   location                 = data.azurerm_resource_group.rg.location
-  read_remote_function_zip = local.sa_public_access_enabled || local.sa_public_access_for_vnet && local.sa_allowed_ips_provided
+  read_remote_function_zip = !var.read_function_zip_from_storage_account
   function_app_zip_name    = local.read_remote_function_zip ? "${var.function_app_dist}/${var.function_app_version}.zip" : var.deployment_function_app_code_blob
   weka_sa                  = local.read_remote_function_zip ? "${var.function_app_storage_account_prefix}${local.location}" : var.deployment_storage_account_name
   weka_sa_container        = local.read_remote_function_zip ? "${var.function_app_storage_account_container_prefix}${local.location}" : var.deployment_container_name
@@ -120,6 +120,8 @@ locals {
     "OBS_CONTAINER_NAME"           = local.obs_container_name
     "OBS_ACCESS_KEY"               = var.tiering_blob_obs_access_key
     "OBS_PUBLIC_ACCESS_DISABLED"   = !local.sa_public_access_enabled
+    "OBS_ALLOWED_SUBNETS"          = join(",", local.sa_public_access_for_vnet ? [data.azurerm_subnet.subnet.id, local.function_app_subnet_delegation_id] : [])
+    "OBS_ALLOWED_PUBLIC_IPS"       = join(",", var.storage_account_allowed_ips)
     DRIVE_CONTAINER_CORES_NUM      = var.containers_config_map[var.instance_type].drive
     COMPUTE_CONTAINER_CORES_NUM    = var.set_dedicated_fe_container == false ? var.containers_config_map[var.instance_type].compute + 1 : var.containers_config_map[var.instance_type].compute
     FRONTEND_CONTAINER_CORES_NUM   = var.set_dedicated_fe_container == false ? 0 : var.containers_config_map[var.instance_type].frontend
@@ -315,8 +317,13 @@ resource "azurerm_linux_function_app" "function_app" {
     }
 
     precondition {
-      condition     = local.sa_public_access_enabled || local.sa_public_access_for_vnet && local.sa_allowed_ips_provided || (local.sa_public_access_disabled || local.sa_public_access_for_vnet && !local.sa_allowed_ips_provided) && var.deployment_function_app_code_blob != "" && var.deployment_storage_account_name != "" && var.deployment_container_name != ""
-      error_message = "You shoud pick one of 3 options: 1. Public access enabled, 2. Public access enabled for VNET + public IPs whitelisted, 3. Public access disabled (or enabled for VNET without IPs whitelisted) and provide deployment_function_app_code_blob, deployment_storage_account_name and deployment_container_name"
+      condition     = local.sa_public_access_enabled || local.sa_public_access_for_vnet && local.sa_allowed_ips_provided || (local.sa_public_access_disabled || local.sa_public_access_for_vnet && !local.sa_allowed_ips_provided) && var.deployment_storage_account_name != "" && var.deployment_container_name != ""
+      error_message = "You shoud pick one of 3 options: 1. Public access enabled, 2. Public access enabled for VNET + public IPs whitelisted, 3. Public access disabled (or enabled for VNET without IPs whitelisted) and provide, deployment_storage_account_name and deployment_container_name"
+    }
+
+    precondition {
+      condition     = local.read_remote_function_zip || var.deployment_function_app_code_blob != ""
+      error_message = "You should provide value for 'deployment_function_app_code_blob' or 'read_function_zip_from_storage_account' should be false"
     }
   }
 
