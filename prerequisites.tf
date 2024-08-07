@@ -42,6 +42,7 @@ module "iam" {
   tiering_enable_obs_integration = var.tiering_enable_obs_integration
   tiering_obs_name               = var.tiering_obs_name
   obs_container_name             = local.obs_container_name
+  depends_on                     = [module.network]
 }
 
 locals {
