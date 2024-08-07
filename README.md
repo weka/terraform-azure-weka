@@ -65,18 +65,39 @@ private_dns_rg_name               = "myResourceGroup"
 ```
 **If you don't pass these params, we will automatically create the network resources for you.**
 
-## Using pre-created storage account with disabled public access
-To use secured storage account with function app, user should create private storage account first, and then upload our function code zip file to the container `<deployment_container_name>`.
-Zip file is accessible in our public storage acccount by this url:
-https://wekaeastus.blob.core.windows.net/weka-tf-functions-deployment-eastus/dev/b0f19ab34890bf20ce6157c44f459b80.zip
+## Storage account
+### We create/use the following storage accounts
+- Logic app storage account - Stores the logic app configuration. Created by our module.
+- Deployment storage account - Stores the deployment states (cluster and also NFS if configured). Created by our module if not provided.
+- Weka OBS storage account - Created by our function app if OBS is configured and OBS storage account is not provided.
 
+### Storage account networking options
 ```hcl
-allow_sa_public_network_access    = false
-deployment_function_app_code_blob = "function_app_code.zip"
-deployment_storage_account_name   = "myprivatestorage"
-deployment_container_name         = "weka-deployment"
+variable "storage_account_public_network_access" {
+  type        = string
+  description = "Public network access to the storage accounts."
+  default     = "Enabled"
+
+  validation {
+    condition     = contains(["Enabled", "Disabled", "EnabledForVnet"], var.storage_account_public_network_access)
+    error_message = "Allowed values: [\"Enabled\", \"Disabled\", \"EnabledForVnet\"]."
+  }
+}
 ```
-User should also create file share in storage account with the name `${var.deployment_container_name}-share`.
+- `Enabled`: By default, the storage account is created with public network access enabled.
+- `EnabledForVnet`: The storage account is created with public network access enabled, but only for the specified virtual network.
+  - Access should be enabled for the vnet, function app subnet delegation.
+  - File share is required.
+  - `storage_account_allowed_ips`: required to allow creating the logic app storage account with the required config and function app file share.
+  - if `storage_account_allowed_ips` if not provided, scale down and autoscaling will not be supported and the file share needs to be created by the user.
+  - OBS storage account: if created by our module only the regular [OBS](#OBS) config is required. If provided by the user needs to have the Vnet enabled.
+- `Disabled`: The storage account is created with public network access disabled.
+  - Scale down and autoscaling is not supported.
+  - Pre created deployment storage account is required.
+  - File share is required.
+  - Blob and file endpoints and private links are required .It can be created by our module if `create_storage_account_private_links`  is provided or by the user.
+  - OBS storage account: if created by our module only the regular [OBS](#OBS) config is required. If provided by the user, blob and file endpoints and private links are required.
+They can be created by our module if `create_storage_account_private_links` is provided.
 
 ## Usage example
 ```hcl
