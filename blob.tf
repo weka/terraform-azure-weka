@@ -231,7 +231,7 @@ resource "azurerm_private_endpoint" "weka_obs_blob_endpoint" {
 }
 
 data "azurerm_storage_account_blob_container_sas" "function_app_code_sas" {
-  count             = local.sa_public_access_enabled || local.sa_public_access_for_vnet && local.sa_allowed_ips_provided ? 0 : 1
+  count             = local.sa_public_access_enabled ? 0 : 1
   connection_string = local.deployment_sa_connection_string
   container_name    = local.deployment_container_name
   start             = timestamp()
