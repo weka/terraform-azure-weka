@@ -14,14 +14,15 @@ locals {
 }
 
 resource "azurerm_storage_account" "deployment_sa" {
-  count                    = var.deployment_storage_account_name == "" && local.create_sa_resources ? 1 : 0
-  name                     = substr("${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}deployment", 0, 24)
-  location                 = local.location
-  resource_group_name      = var.rg_name
-  account_kind             = "StorageV2"
-  account_tier             = "Standard"
-  account_replication_type = "ZRS"
-  tags                     = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
+  count                           = var.deployment_storage_account_name == "" && local.create_sa_resources ? 1 : 0
+  name                            = substr("${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}deployment", 0, 24)
+  location                        = local.location
+  resource_group_name             = var.rg_name
+  account_kind                    = "StorageV2"
+  account_tier                    = "Standard"
+  account_replication_type        = "ZRS"
+  allow_nested_items_to_be_public = false
+  tags                            = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
   lifecycle {
     ignore_changes = [tags]
   }
@@ -98,12 +99,13 @@ resource "azurerm_storage_blob" "nfs_state" {
 }
 
 resource "azurerm_storage_account" "logicapp" {
-  count                    = local.create_sa_resources ? 1 : 0
-  name                     = substr("${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}logicappsa", 0, 24)
-  resource_group_name      = var.rg_name
-  location                 = local.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
+  count                           = local.create_sa_resources ? 1 : 0
+  name                            = substr("${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}logicappsa", 0, 24)
+  resource_group_name             = var.rg_name
+  location                        = local.location
+  account_tier                    = "Standard"
+  account_replication_type        = "LRS"
+  allow_nested_items_to_be_public = false
 
   dynamic "network_rules" {
     for_each = local.sa_public_access_for_vnet ? [1] : []
