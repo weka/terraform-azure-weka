@@ -75,11 +75,13 @@ resource "azurerm_key_vault_access_policy" "standard_logic_app_get_secret_permis
 resource "azurerm_storage_share_directory" "share_directory_scale_down" {
   name             = "site/wwwroot/scale-down"
   storage_share_id = azurerm_storage_share.storage_share.id
+  depends_on       = [azurerm_logic_app_standard.logic_app_standard]
 }
 
 resource "azurerm_storage_share_directory" "share_directory_scale_up" {
   name             = "site/wwwroot/scale-up"
   storage_share_id = azurerm_storage_share.storage_share.id
+  depends_on       = [azurerm_logic_app_standard.logic_app_standard]
 }
 
 locals {
