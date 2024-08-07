@@ -588,6 +588,12 @@ variable "deployment_container_name" {
   description = "Name of exising deployment container"
 }
 
+variable "deployment_file_share_name" {
+  type        = string
+  default     = ""
+  description = "Name of exising deployment file share. Will use '<deployment_storage_account_name>-share' name if not provided."
+}
+
 variable "deployment_function_app_code_blob" {
   type        = string
   description = "The path to the function app code blob file."
