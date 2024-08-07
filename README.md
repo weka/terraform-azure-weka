@@ -87,14 +87,14 @@ variable "storage_account_public_network_access" {
 - `Enabled`: By default, the storage account is created with public network access enabled.
 - `EnabledForVnet`: The storage account is created with public network access enabled, but only for the specified virtual network.
   - Access should be enabled for the vnet, function app subnet delegation.
-  - File share is required.
+  - File share is required (can provide existing via `deployment_file_share_name` or it will be auto-created in case if `storage_account_allowed_ips` are provided).
   - `storage_account_allowed_ips`: required to allow creating the logic app storage account with the required config and function app file share.
   - if `storage_account_allowed_ips` if not provided, scale down and autoscaling will not be supported and the file share needs to be created by the user.
   - OBS storage account: if created by our module only the regular [OBS](#OBS) config is required. If provided by the user needs to have the Vnet enabled.
 - `Disabled`: The storage account is created with public network access disabled.
   - Scale down and autoscaling is not supported.
   - Pre created deployment storage account is required.
-  - File share is required.
+  - File share is required (`deployment_file_share_name`).
   - Blob and file endpoints and private links are required .It can be created by our module if `create_storage_account_private_links`  is provided or by the user.
   - OBS storage account: if created by our module only the regular [OBS](#OBS) config is required. If provided by the user, blob and file endpoints and private links are required.
 They can be created by our module if `create_storage_account_private_links` is provided.

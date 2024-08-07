@@ -176,7 +176,7 @@ locals {
 
   secured_storage_account_app_settings = {
     # "AzureWebJobsStorage" and "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING" are not needed as we set storage_account_access_key
-    "WEBSITE_CONTENTSHARE"    = "${local.deployment_container_name}-share"
+    "WEBSITE_CONTENTSHARE"    = local.deployment_file_share_name
     "WEBSITE_CONTENTOVERVNET" = 1
     "WEBSITE_VNET_ROUTE_ALL"  = 1
   }
