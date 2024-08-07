@@ -393,7 +393,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "144dd946da08cb0cf72a8ce1947c1a71"
+  default     = "b0f19ab34890bf20ce6157c44f459b80"
 }
 
 variable "function_app_dist" {
@@ -591,7 +591,7 @@ variable "deployment_container_name" {
 variable "deployment_function_app_code_blob" {
   type        = string
   description = "The path to the function app code blob file."
-  default     = "function_app_code.zip"
+  default     = ""
 }
 
 variable "zone" {
@@ -855,6 +855,12 @@ variable "create_storage_account_private_links" {
   type        = bool
   default     = false
   description = "Create private links for storage accounts (needed in case if public network access for the storage account is disabled)."
+}
+
+variable "read_function_zip_from_storage_account" {
+  type        = bool
+  default     = false
+  description = "Read function app zip from storage account (is read from public distribution storage account by default)."
 }
 
 variable "key_vault_purge_protection_enabled" {

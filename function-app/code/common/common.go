@@ -62,6 +62,16 @@ type BlobObjParams struct {
 	BlobName      string
 }
 
+type AzureObsParams struct {
+	Name                 string
+	ContainerName        string
+	AccessKey            string
+	TieringSsdPercent    string
+	PublicAccessDisabled bool
+	AllowedSubnets       []string
+	AllowedPublicIps     []string
+}
+
 const FindDrivesScript = `
 import json
 import sys
@@ -480,9 +490,9 @@ func UpdateClusterized(ctx context.Context, subscriptionId, resourceGroupName st
 	return
 }
 
-func CreateStorageAccount(ctx context.Context, subscriptionId, resourceGroupName, obsName, location string) (accessKey string, err error) {
+func CreateStorageAccount(ctx context.Context, subscriptionId, resourceGroupName, location string, obsParams AzureObsParams) (accessKey string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
-	logger.Info().Msgf("creating storage account: %s", obsName)
+	logger.Info().Msgf("creating storage account: %v", obsParams)
 
 	credential, err := getCredential(ctx)
 	if err != nil {
@@ -496,22 +506,45 @@ func CreateStorageAccount(ctx context.Context, subscriptionId, resourceGroupName
 	}
 	skuName := armstorage.SKUNameStandardZRS
 	kind := armstorage.KindStorageV2
-	// publicAccessDisabled := armstorage.PublicNetworkAccessDisabled
-	_, err = client.BeginCreate(ctx, resourceGroupName, obsName, armstorage.AccountCreateParameters{
+	publicAccess := armstorage.PublicNetworkAccessEnabled
+	if obsParams.PublicAccessDisabled && len(obsParams.AllowedSubnets) == 0 {
+		publicAccess = armstorage.PublicNetworkAccessDisabled
+	}
+
+	var networkRuleSet *armstorage.NetworkRuleSet
+	if len(obsParams.AllowedSubnets) > 0 || len(obsParams.AllowedPublicIps) > 0 {
+		action := armstorage.DefaultActionDeny
+		bypass := armstorage.BypassAzureServices
+		networkRuleSet = &armstorage.NetworkRuleSet{
+			DefaultAction: &action,
+			Bypass:        &bypass,
+		}
+		for i := 0; i < len(obsParams.AllowedSubnets); i++ {
+			rule := &armstorage.VirtualNetworkRule{VirtualNetworkResourceID: &obsParams.AllowedSubnets[i]}
+			networkRuleSet.VirtualNetworkRules = append(networkRuleSet.VirtualNetworkRules, rule)
+		}
+		for i := 0; i < len(obsParams.AllowedPublicIps); i++ {
+			rule := &armstorage.IPRule{IPAddressOrRange: &obsParams.AllowedPublicIps[i]}
+			networkRuleSet.IPRules = append(networkRuleSet.IPRules, rule)
+		}
+	}
+
+	_, err = client.BeginCreate(ctx, resourceGroupName, obsParams.Name, armstorage.AccountCreateParameters{
 		Kind:     &kind,
 		Location: &location,
 		SKU: &armstorage.SKU{
 			Name: &skuName,
 		},
-		// Properties: &armstorage.AccountPropertiesCreateParameters{
-		// 	PublicNetworkAccess: &publicAccessDisabled,
-		// },
+		Properties: &armstorage.AccountPropertiesCreateParameters{
+			PublicNetworkAccess: &publicAccess,
+			NetworkRuleSet:      networkRuleSet,
+		},
 	}, nil)
 
 	if err != nil {
 		if azerr, ok := err.(*azcore.ResponseError); ok {
 			if azerr.ErrorCode == "StorageAccountAlreadyExists" {
-				logger.Debug().Msgf("storage account %s already exists", obsName)
+				logger.Debug().Msgf("storage account %s already exists", obsParams.Name)
 				err = nil
 			} else {
 				logger.Error().Msgf("storage creation failed: %s", err)
@@ -524,7 +557,7 @@ func CreateStorageAccount(ctx context.Context, subscriptionId, resourceGroupName
 	}
 
 	for i := 0; i < 10; i++ {
-		accessKey, err = getStorageAccountAccessKey(ctx, subscriptionId, resourceGroupName, obsName)
+		accessKey, err = getStorageAccountAccessKey(ctx, subscriptionId, resourceGroupName, obsParams.Name)
 
 		if err != nil {
 			if azerr, ok := err.(*azcore.ResponseError); ok {
@@ -540,7 +573,7 @@ func CreateStorageAccount(ctx context.Context, subscriptionId, resourceGroupName
 				return
 			}
 		} else {
-			logger.Debug().Msgf("storage account '%s' is ready for use", obsName)
+			logger.Debug().Msgf("storage account '%s' is ready for use", obsParams.Name)
 			break
 		}
 	}
