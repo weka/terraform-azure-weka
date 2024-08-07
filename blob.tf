@@ -3,6 +3,7 @@ locals {
   deployment_storage_account_name = var.deployment_storage_account_name == "" ? azurerm_storage_account.deployment_sa[0].name : var.deployment_storage_account_name
   deployment_sa_connection_string = var.deployment_storage_account_name == "" ? azurerm_storage_account.deployment_sa[0].primary_connection_string : data.azurerm_storage_account.deployment_blob[0].primary_connection_string
   deployment_container_name       = var.deployment_container_name == "" ? "${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}-deployment" : var.deployment_container_name
+  deployment_file_share_name      = var.deployment_file_share_name == "" ? "${local.deployment_storage_account_name}-share" : var.deployment_file_share_name
   deployment_sa_access_key        = var.deployment_storage_account_name == "" ? azurerm_storage_account.deployment_sa[0].primary_access_key : data.azurerm_storage_account.deployment_blob[0].primary_access_key
 
   sa_allowed_ips_provided   = length(var.storage_account_allowed_ips) > 0
@@ -59,8 +60,8 @@ resource "azurerm_storage_blob" "state" {
 }
 
 resource "azurerm_storage_share" "function_app_share" {
-  count                = local.sa_public_access_for_vnet && local.sa_allowed_ips_provided ? 1 : 0
-  name                 = "${local.deployment_container_name}-share"
+  count                = var.deployment_file_share_name == "" && local.sa_public_access_for_vnet && local.sa_allowed_ips_provided ? 1 : 0
+  name                 = local.deployment_file_share_name
   storage_account_name = local.deployment_storage_account_name
   quota                = 100
   depends_on           = [azurerm_storage_account.deployment_sa]
