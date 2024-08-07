@@ -96,6 +96,6 @@ data:
     mount_command="mount -t wekafs $net -o num_cores=$frontend_container_cores_num -o mgmt_ip=$eth0 $backend_ip/$FILESYSTEM_NAME $MOUNT_POINT"
     echo $(ifconfig) > /tmp/ifconfig_freeze
     echo "$mount_command" > /tmp/mount_command
-    retry 60 45 $mount_command
+    #retry 60 45 $mount_command
 
     echo "$(date -u): wekafs mount complete"
