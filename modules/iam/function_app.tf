@@ -107,7 +107,7 @@ resource "azurerm_role_definition" "join_subnet" {
   permissions {
     actions = [
       "Microsoft.Network/virtualNetworks/subnets/join/action",                   # for VMSS creation from function app
-      "Microsoft.Network/virtualNetworks/subnets/joinViaServiceEndpoint/action", # for using SA service endpoint (when network is in different RG)
+      "Microsoft.Network/virtualNetworks/subnets/joinViaServiceEndpoint/action", # for using SA service endpoint (when network is in different RG) - for weka obs
     ]
     not_actions = []
   }
