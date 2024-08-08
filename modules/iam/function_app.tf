@@ -144,3 +144,28 @@ resource "azurerm_role_assignment" "join_sg" {
   role_definition_id = azurerm_role_definition.join_sg[0].role_definition_resource_id
   principal_id       = azurerm_user_assigned_identity.function_app[0].principal_id
 }
+
+
+resource "azurerm_role_definition" "private_endpoint" {
+  count       = var.function_app_identity_name == "" && var.obs_create_private_endpoint ? 1 : 0
+  name        = "${var.prefix}-${var.cluster_name}-private-endpoint"
+  scope       = data.azurerm_resource_group.rg.id
+  description = "Can create private endpoint"
+
+  permissions {
+    actions = [
+      "Microsoft.Network/privateEndpoints/write",
+      "Microsoft.Network/privateEndpoints/privateDnsZoneGroups/write",
+      "Microsoft.Network/privateDnsZones/join/action",
+    ]
+    not_actions = []
+  }
+  assignable_scopes = [data.azurerm_resource_group.rg.id]
+}
+
+resource "azurerm_role_assignment" "private_endpoint" {
+  count              = var.function_app_identity_name == "" && var.obs_create_private_endpoint ? 1 : 0
+  scope              = data.azurerm_resource_group.rg.id
+  role_definition_id = azurerm_role_definition.private_endpoint[0].role_definition_resource_id
+  principal_id       = azurerm_user_assigned_identity.function_app[0].principal_id
+}
