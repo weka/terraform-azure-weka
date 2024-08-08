@@ -119,7 +119,7 @@ locals {
     "OBS_NAME"                     = local.obs_storage_account_name
     "OBS_CONTAINER_NAME"           = local.obs_container_name
     "OBS_ACCESS_KEY"               = var.tiering_blob_obs_access_key
-    "OBS_PUBLIC_ACCESS_DISABLED"   = !local.sa_public_access_enabled
+    "OBS_NETWORK_ACCESS"           = var.storage_account_public_network_access
     "OBS_ALLOWED_SUBNETS"          = join(",", local.sa_public_access_for_vnet ? [data.azurerm_subnet.subnet.id, local.function_app_subnet_delegation_id] : [])
     "OBS_ALLOWED_PUBLIC_IPS"       = join(",", var.storage_account_allowed_ips)
     DRIVE_CONTAINER_CORES_NUM      = var.containers_config_map[var.instance_type].drive
@@ -138,6 +138,8 @@ locals {
     "INSTALL_URL"                  = local.install_weka_url
     "LOG_LEVEL"                    = var.function_app_log_level
     "SUBNET"                       = local.subnet_range
+    "SUBNET_ID"                    = data.azurerm_subnet.subnet.id
+    "BLOB_PRIVATE_DNS_ZONE_ID"     = var.create_storage_account_private_links ? azurerm_private_dns_zone.blob[0].id : ""
     FUNCTION_APP_NAME              = local.function_app_name
     PROXY_URL                      = var.proxy_url
     WEKA_HOME_URL                  = var.weka_home_url
@@ -317,8 +319,8 @@ resource "azurerm_linux_function_app" "function_app" {
     }
 
     precondition {
-      condition     = local.sa_public_access_enabled || local.sa_public_access_for_vnet && local.sa_allowed_ips_provided || (local.sa_public_access_disabled || local.sa_public_access_for_vnet && !local.sa_allowed_ips_provided) && var.deployment_storage_account_name != "" && var.deployment_container_name != ""
-      error_message = "You shoud pick one of 3 options: 1. Public access enabled, 2. Public access enabled for VNET + public IPs whitelisted, 3. Public access disabled (or enabled for VNET without IPs whitelisted) and provide, deployment_storage_account_name and deployment_container_name"
+      condition     = local.sa_public_access_enabled || local.sa_public_access_for_vnet && local.sa_allowed_ips_provided || (local.sa_public_access_disabled || local.sa_public_access_for_vnet && !local.sa_allowed_ips_provided) && var.deployment_storage_account_name != ""
+      error_message = "You shoud pick one of 3 options: 1. Public access enabled, 2. Public access enabled for VNET + public IPs whitelisted, 3. Public access disabled (or enabled for VNET without IPs whitelisted) and deployment_storage_account_name provided"
     }
 
     precondition {

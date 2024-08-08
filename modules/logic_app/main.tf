@@ -71,17 +71,24 @@ resource "azurerm_key_vault_access_policy" "standard_logic_app_get_secret_permis
   ]
 }
 
+resource "azurerm_storage_share_directory" "site" {
+  name             = "site"
+  storage_share_id = azurerm_storage_share.storage_share.id
+}
+
+resource "azurerm_storage_share_directory" "site_root" {
+  name             = "${azurerm_storage_share_directory.site.name}/wwwroot"
+  storage_share_id = azurerm_storage_share.storage_share.id
+}
 
 resource "azurerm_storage_share_directory" "share_directory_scale_down" {
-  name             = "site/wwwroot/scale-down"
+  name             = "${azurerm_storage_share_directory.site_root.name}/scale-down"
   storage_share_id = azurerm_storage_share.storage_share.id
-  depends_on       = [azurerm_logic_app_standard.logic_app_standard]
 }
 
 resource "azurerm_storage_share_directory" "share_directory_scale_up" {
-  name             = "site/wwwroot/scale-up"
+  name             = "${azurerm_storage_share_directory.site_root.name}/scale-up"
   storage_share_id = azurerm_storage_share.storage_share.id
-  depends_on       = [azurerm_logic_app_standard.logic_app_standard]
 }
 
 locals {
