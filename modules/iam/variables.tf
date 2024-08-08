@@ -107,6 +107,12 @@ variable "obs_container_name" {
   description = "The name of the container for the OBS."
 }
 
+variable "obs_create_private_endpoint" {
+  type        = bool
+  description = "Create private endpoint for OBS."
+  default     = false
+}
+
 variable "nfs_protocol_gateways_number" {
   type        = number
   description = "The number of NFS protocol gateways."

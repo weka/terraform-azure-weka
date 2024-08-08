@@ -63,13 +63,13 @@ type BlobObjParams struct {
 }
 
 type AzureObsParams struct {
-	Name                 string
-	ContainerName        string
-	AccessKey            string
-	TieringSsdPercent    string
-	PublicAccessDisabled bool
-	AllowedSubnets       []string
-	AllowedPublicIps     []string
+	Name              string
+	ContainerName     string
+	AccessKey         string
+	TieringSsdPercent string
+	NetworkAccess     string
+	AllowedSubnets    []string
+	AllowedPublicIps  []string
 }
 
 const FindDrivesScript = `
@@ -490,6 +490,115 @@ func UpdateClusterized(ctx context.Context, subscriptionId, resourceGroupName st
 	return
 }
 
+func CreatePrivateDnsZoneGroup(ctx context.Context, subscriptionId, resourceGroupName, privateEndpointName, privateDNSZoneID string) (privateDNSZoneGroup *armnetwork.PrivateDNSZoneGroup, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	credential, err := getCredential(ctx)
+	if err != nil {
+		return
+	}
+
+	privateDNSZoneGroupName := fmt.Sprintf("%s-dns-group", privateEndpointName)
+
+	parameters := armnetwork.PrivateDNSZoneGroup{
+		Name: &privateDNSZoneGroupName,
+		Properties: &armnetwork.PrivateDNSZoneGroupPropertiesFormat{
+			PrivateDNSZoneConfigs: []*armnetwork.PrivateDNSZoneConfig{
+				{
+					Name: &privateDNSZoneGroupName,
+					Properties: &armnetwork.PrivateDNSZonePropertiesFormat{
+						PrivateDNSZoneID: &privateDNSZoneID,
+					},
+				},
+			},
+		},
+	}
+
+	client, err := armnetwork.NewPrivateDNSZoneGroupsClient(subscriptionId, credential, nil)
+	if err != nil {
+		err = fmt.Errorf("failed to create PrivateDNSZoneGroupsClient: %w", err)
+		return
+	}
+
+	poller, err := client.BeginCreateOrUpdate(ctx, resourceGroupName, privateEndpointName, privateDNSZoneGroupName, parameters, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	res, err := poller.PollUntilDone(ctx, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	privateDNSZoneGroup = &res.PrivateDNSZoneGroup
+	return
+}
+
+func CreateStorageAccountBlobPrivateEndpoint(ctx context.Context, subscriptionId, resourceGroupName, location, storageAccountName, privateEndpointName, subnetId, privateDnsZoneId string) (err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	credential, err := getCredential(ctx)
+	if err != nil {
+		return
+	}
+
+	client, err := armnetwork.NewPrivateEndpointsClient(subscriptionId, credential, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	storageAccountId := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s", subscriptionId, resourceGroupName, storageAccountName)
+	connectionName := fmt.Sprintf("%s-conn", privateEndpointName)
+	subresourceName := "blob"
+
+	privateServiceConnection := &armnetwork.PrivateLinkServiceConnection{
+		Name: &connectionName,
+		Properties: &armnetwork.PrivateLinkServiceConnectionProperties{
+			PrivateLinkServiceID: &storageAccountId,
+			GroupIDs:             []*string{&subresourceName},
+		},
+	}
+
+	privateEndpoint := armnetwork.PrivateEndpoint{
+		Location: &location,
+		Properties: &armnetwork.PrivateEndpointProperties{
+			Subnet: &armnetwork.Subnet{
+				ID: &subnetId,
+			},
+			PrivateLinkServiceConnections: []*armnetwork.PrivateLinkServiceConnection{
+				privateServiceConnection,
+			},
+		},
+	}
+
+	poller, err := client.BeginCreateOrUpdate(ctx, resourceGroupName, privateEndpointName, privateEndpoint, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	res, err := poller.PollUntilDone(ctx, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	logger.Info().Msgf("private endpoint %s created", *res.PrivateEndpoint.ID)
+
+	dnsZoneGroup, err := CreatePrivateDnsZoneGroup(ctx, subscriptionId, resourceGroupName, privateEndpointName, privateDnsZoneId)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	logger.Info().Msgf("private dns zone group %s created", *dnsZoneGroup.ID)
+
+	return
+}
+
 func CreateStorageAccount(ctx context.Context, subscriptionId, resourceGroupName, location string, obsParams AzureObsParams) (accessKey string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msgf("creating storage account: %v", obsParams)
@@ -507,7 +616,7 @@ func CreateStorageAccount(ctx context.Context, subscriptionId, resourceGroupName
 	skuName := armstorage.SKUNameStandardZRS
 	kind := armstorage.KindStorageV2
 	publicAccess := armstorage.PublicNetworkAccessEnabled
-	if obsParams.PublicAccessDisabled && len(obsParams.AllowedSubnets) == 0 {
+	if obsParams.NetworkAccess == "Disabled" {
 		publicAccess = armstorage.PublicNetworkAccessDisabled
 	}
 
