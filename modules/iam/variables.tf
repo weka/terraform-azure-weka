@@ -18,6 +18,12 @@ variable "subnet_name" {
   description = "The name of the subnet."
 }
 
+variable "sg_id" {
+  type        = string
+  description = "Security group id"
+  default     = ""
+}
+
 variable "prefix" {
   type        = string
   description = "Prefix for all resources"
