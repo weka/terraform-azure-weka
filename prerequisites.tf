@@ -28,6 +28,7 @@ module "iam" {
   vnet_rg_name                   = local.vnet_rg_name
   vnet_name                      = local.vnet_name
   subnet_name                    = local.subnet_name
+  sg_id                          = var.sg_id
   vmss_identity_name             = var.vmss_identity_name
   function_app_identity_name     = var.function_app_identity_name
   support_logic_app              = local.create_logic_app
