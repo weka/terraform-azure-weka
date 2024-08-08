@@ -348,8 +348,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	obsContainerName := os.Getenv("OBS_CONTAINER_NAME")
 	obsAccessKey := os.Getenv("OBS_ACCESS_KEY")
 	obsPublicAccessDisabled, _ := strconv.ParseBool(os.Getenv("OBS_PUBLIC_ACCESS_DISABLED"))
-	obsAllowedSubnets := strings.Split(os.Getenv("OBS_ALLOWED_SUBNETS"), ",")
-	obsAllowedPublicIps := strings.Split(os.Getenv("OBS_ALLOWED_PUBLIC_IPS"), ",")
+	obsAllowedSubnetsStr := os.Getenv("OBS_ALLOWED_SUBNETS")
+	obsAllowedSubnets := []string{}
+	obsAllowedPublicIpsStr := os.Getenv("OBS_ALLOWED_PUBLIC_IPS")
+	obsAllowedPublicIps := []string{}
 	location := os.Getenv("LOCATION")
 	tieringSsdPercent := os.Getenv("TIERING_SSD_PERCENT")
 	tieringTargetSsdRetention, _ := strconv.Atoi(os.Getenv("TIERING_TARGET_SSD_RETENTION"))
@@ -374,6 +376,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	addFrontend := false
 	if addFrontendNum > 0 {
 		addFrontend = true
+	}
+
+	if obsAllowedSubnetsStr != "" {
+		obsAllowedSubnets = strings.Split(obsAllowedSubnetsStr, ",")
+	}
+	if obsAllowedPublicIpsStr != "" {
+		obsAllowedPublicIps = strings.Split(obsAllowedPublicIpsStr, ",")
 	}
 
 	resData := make(map[string]interface{})
