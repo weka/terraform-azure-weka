@@ -121,3 +121,26 @@ resource "azurerm_role_assignment" "join_subnet" {
   role_definition_id = azurerm_role_definition.join_subnet[0].role_definition_resource_id
   principal_id       = azurerm_user_assigned_identity.function_app[0].principal_id
 }
+
+resource "azurerm_role_definition" "join_sg" {
+  count       = var.function_app_identity_name == "" && var.rg_name != var.vnet_rg_name && var.sg_id != "" ? 1 : 0
+  name        = "${var.prefix}-${var.cluster_name}-join-sg"
+  scope       = var.sg_id
+  description = "Can join security group"
+
+  permissions {
+    actions = [
+      "Microsoft.Network/networkSecurityGroups/join/action",
+    ]
+    not_actions = []
+  }
+
+  assignable_scopes = [var.sg_id]
+}
+
+resource "azurerm_role_assignment" "join_sg" {
+  count              = var.function_app_identity_name == "" && var.rg_name != var.vnet_rg_name && var.sg_id != "" ? 1 : 0
+  scope              = var.sg_id
+  role_definition_id = azurerm_role_definition.join_sg[0].role_definition_resource_id
+  principal_id       = azurerm_user_assigned_identity.function_app[0].principal_id
+}
