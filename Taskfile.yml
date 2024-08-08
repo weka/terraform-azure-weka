@@ -27,7 +27,7 @@ tasks:
 
   write_function_hash_to_variables:
     cmds:
-      - ./zip_function_app_creation/write_function_hash_to_variables.sh ${DIST} {{OS}} ${FUNCTION_CODE_PATH}
+      - ./zip_function_app_creation/write_function_hash_to_variables.sh {{OS}} ${FUNCTION_CODE_PATH}
 
   create_and_upload_zip:
     preconditions:
