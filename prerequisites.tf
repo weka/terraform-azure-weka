@@ -43,6 +43,7 @@ module "iam" {
   tiering_enable_obs_integration = var.tiering_enable_obs_integration
   tiering_obs_name               = var.tiering_obs_name
   obs_container_name             = local.obs_container_name
+  obs_create_private_endpoint    = var.create_storage_account_private_links && local.sa_public_access_disabled
   depends_on                     = [module.network]
 }
 
