@@ -71,24 +71,29 @@ resource "azurerm_key_vault_access_policy" "standard_logic_app_get_secret_permis
   ]
 }
 
-resource "azurerm_storage_share_directory" "site" {
-  name             = "site"
-  storage_share_id = azurerm_storage_share.storage_share.id
-}
+resource "null_resource" "wait_for_logic_app" {
+  triggers = {
+    logic_app_id = azurerm_logic_app_standard.logic_app_standard.id
+  }
 
-resource "azurerm_storage_share_directory" "site_root" {
-  name             = "${azurerm_storage_share_directory.site.name}/wwwroot"
-  storage_share_id = azurerm_storage_share.storage_share.id
+  provisioner "local-exec" {
+    # wait for "site/wwwroot" to be created in file share
+    command = "sleep 60"
+  }
+
+  depends_on = [azurerm_logic_app_standard.logic_app_standard]
 }
 
 resource "azurerm_storage_share_directory" "share_directory_scale_down" {
-  name             = "${azurerm_storage_share_directory.site_root.name}/scale-down"
+  name             = "site/wwwroot/scale-down"
   storage_share_id = azurerm_storage_share.storage_share.id
+  depends_on       = [null_resource.wait_for_logic_app]
 }
 
 resource "azurerm_storage_share_directory" "share_directory_scale_up" {
-  name             = "${azurerm_storage_share_directory.site_root.name}/scale-up"
+  name             = "site/wwwroot/scale-up"
   storage_share_id = azurerm_storage_share.storage_share.id
+  depends_on       = [null_resource.wait_for_logic_app]
 }
 
 locals {
