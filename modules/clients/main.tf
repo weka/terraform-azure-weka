@@ -159,7 +159,7 @@ resource "azurerm_linux_virtual_machine" "this" {
 }
 
 resource "azurerm_linux_virtual_machine_scale_set" "this" {
-  count               = var.use_vmss ? var.clients_number : 0
+  count               = var.use_vmss ? 1 : 0
   instances           = var.clients_number
   name                = var.clients_name
   location            = data.azurerm_resource_group.rg.location
