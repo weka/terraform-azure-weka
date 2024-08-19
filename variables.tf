@@ -863,6 +863,12 @@ variable "create_storage_account_private_links" {
   description = "Create private links for storage accounts (needed in case if public network access for the storage account is disabled)."
 }
 
+variable "storage_blob_private_dns_zone_name" {
+  type        = string
+  description = "The private DNS zone name for the storage account (blob)."
+  default     = "privatelink.blob.core.windows.net"
+}
+
 variable "read_function_zip_from_storage_account" {
   type        = bool
   default     = false
