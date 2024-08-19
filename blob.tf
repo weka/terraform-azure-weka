@@ -128,6 +128,11 @@ resource "azurerm_private_dns_zone" "blob" {
   resource_group_name = local.resource_group_name
 }
 
+data "azurerm_private_dns_zone" "blob" {
+  count = var.create_storage_account_private_links ? 0 : 1
+  name  = var.storage_blob_private_dns_zone_name
+}
+
 resource "azurerm_private_dns_zone" "file" {
   count               = var.create_storage_account_private_links ? 1 : 0
   name                = "privatelink.file.core.windows.net"
