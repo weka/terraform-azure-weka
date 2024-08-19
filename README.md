@@ -95,7 +95,7 @@ variable "storage_account_public_network_access" {
   - Scale down and autoscaling is not supported.
   - Pre created deployment storage account is required.
   - File share is required (`deployment_file_share_name`).
-  - Blob and file endpoints and private links are required .It can be created by our module if `create_storage_account_private_links`  is provided or by the user.
+  - Blob and file endpoints and private links are required. It can be created by our module if `create_storage_account_private_links` is provided or by the user. In case if there are existing private endpoints and `create_storage_account_private_links` is not set, `storage_blob_private_dns_zone_name` can be also set to specify private DNS zone for blob resource (uses Azure-recommended name as default value).
   - OBS storage account: if created by our module only the regular [OBS](#OBS) config is required. If provided by the user, blob and file endpoints and private links are required.
 They can be created by our module if `create_storage_account_private_links` is provided.
 
