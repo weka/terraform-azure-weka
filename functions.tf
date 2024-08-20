@@ -139,7 +139,7 @@ locals {
     "LOG_LEVEL"                    = var.function_app_log_level
     "SUBNET"                       = local.subnet_range
     "SUBNET_ID"                    = data.azurerm_subnet.subnet.id
-    "BLOB_PRIVATE_DNS_ZONE_ID"     = var.create_storage_account_private_links ? azurerm_private_dns_zone.blob[0].id : data.azurerm_private_dns_zone.blob[0].id
+    "BLOB_PRIVATE_DNS_ZONE_ID"     = var.create_storage_account_private_links ? azurerm_private_dns_zone.blob[0].id : local.sa_public_access_disabled ? data.azurerm_private_dns_zone.blob[0].id : ""
     FUNCTION_APP_NAME              = local.function_app_name
     PROXY_URL                      = var.proxy_url
     WEKA_HOME_URL                  = var.weka_home_url
