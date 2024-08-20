@@ -129,7 +129,7 @@ resource "azurerm_private_dns_zone" "blob" {
 }
 
 data "azurerm_private_dns_zone" "blob" {
-  count = var.create_storage_account_private_links ? 0 : 1
+  count = !var.create_storage_account_private_links && local.sa_public_access_disabled ? 1 : 0
   name  = var.storage_blob_private_dns_zone_name
 }
 
