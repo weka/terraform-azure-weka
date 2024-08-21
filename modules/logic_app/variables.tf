@@ -73,3 +73,9 @@ variable "key_vault_uri" {
   type        = string
   description = "The URI of the Azure Key Vault."
 }
+
+variable "use_secured_storage_account" {
+  type        = bool
+  description = "Use secured storage account with logic app."
+  default     = false
+}
