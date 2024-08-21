@@ -118,6 +118,7 @@ module "logicapp" {
   function_app_key               = data.azurerm_function_app_host_keys.function_keys.default_function_key
   key_vault_id                   = azurerm_key_vault.key_vault.id
   key_vault_uri                  = azurerm_key_vault.key_vault.vault_uri
+  use_secured_storage_account    = local.sa_public_access_enabled ? false : true
 
   depends_on = [azurerm_storage_account.logicapp, module.logic_app_subnet_delegation, module.iam]
 }
