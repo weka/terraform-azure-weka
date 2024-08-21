@@ -48,6 +48,8 @@ type ClusterizationParams struct {
 	KeyVaultUri       string
 	SubnetId          string
 	PrivateDNSZoneId  string
+	// if network access is disabled and private endpoints do not exist, create them with obs
+	CreateBlobPrivateEndpoint bool
 
 	StateParams common.BlobObjParams
 	InstallDpdk bool
@@ -79,39 +81,52 @@ func GetShutdownScript() string {
 	return dedent.Dedent(s)
 }
 
-func CreateWekaObs(ctx context.Context, p *ClusterizationParams) (err error) {
+func PrepareWekaObs(ctx context.Context, p *ClusterizationParams) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	if p.Obs.NetworkAccess == "Disabled" && p.PrivateDNSZoneId == "" {
-		ignoredErr := fmt.Errorf("private dns zone id is required for private endpoint creation when public access is disabled")
+	noExistingObs := p.Obs.AccessKey == ""
+
+	if p.Obs.NetworkAccess == "Disabled" && noExistingObs && !p.CreateBlobPrivateEndpoint {
+		ignoredErr := fmt.Errorf("private endpoint creation is required for obs when public access is disabled")
 		logger.Error().Err(ignoredErr).Send()
 
-		logger.Info().Msg("Skipping OBS creation")
+		common.ReportMsg(ctx, p.Vm.Name, p.StateParams, "error", ignoredErr.Error())
 		p.Cluster.SetObs = false
 		return nil
 	}
 
-	p.Obs.AccessKey, err = common.CreateStorageAccount(
-		ctx, p.SubscriptionId, p.ResourceGroupName, p.Location, p.Obs,
-	)
-	if err != nil {
-		err = fmt.Errorf("failed to create storage account: %w", err)
-		logger.Error().Err(err).Send()
-		return
+	if p.Obs.NetworkAccess == "Disabled" && p.CreateBlobPrivateEndpoint && p.PrivateDNSZoneId == "" {
+		ignoredErr := fmt.Errorf("private dns zone id is required for private endpoint creation when public access is disabled")
+		logger.Error().Err(ignoredErr).Send()
+
+		common.ReportMsg(ctx, p.Vm.Name, p.StateParams, "error", ignoredErr.Error())
+		p.Cluster.SetObs = false
+		return nil
 	}
 
-	if p.Obs.NetworkAccess == "Disabled" {
-		endpointName := fmt.Sprintf("%s-pe", p.Obs.Name)
-		logger.Info().Msgf("public access is disabled for the storage account, creating private endpoint %s", endpointName)
-
-		err = common.CreateStorageAccountBlobPrivateEndpoint(ctx, p.SubscriptionId, p.ResourceGroupName, p.Location, p.Obs.Name, endpointName, p.SubnetId, p.PrivateDNSZoneId)
+	if noExistingObs {
+		p.Obs.AccessKey, err = common.CreateStorageAccount(
+			ctx, p.SubscriptionId, p.ResourceGroupName, p.Location, p.Obs,
+		)
 		if err != nil {
-			err = fmt.Errorf("failed to create private endpoint: %w", err)
+			err = fmt.Errorf("failed to create storage account: %w", err)
 			logger.Error().Err(err).Send()
 			return
 		}
-	}
 
+		if p.Obs.NetworkAccess == "Disabled" && p.CreateBlobPrivateEndpoint {
+			endpointName := fmt.Sprintf("%s-pe", p.Obs.Name)
+			logger.Info().Msgf("public access is disabled for the storage account, creating private endpoint %s", endpointName)
+
+			err = common.CreateStorageAccountBlobPrivateEndpoint(ctx, p.SubscriptionId, p.ResourceGroupName, p.Location, p.Obs.Name, endpointName, p.SubnetId, p.PrivateDNSZoneId)
+			if err != nil {
+				err = fmt.Errorf("failed to create private endpoint: %w", err)
+				logger.Error().Err(err).Send()
+				return
+			}
+		}
+	}
+	// create container (if it doesn't exist)
 	err = common.CreateContainer(ctx, p.Obs.Name, p.Obs.ContainerName)
 	if err != nil {
 		err = fmt.Errorf("failed to create container: %w", err)
@@ -127,9 +142,10 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 
 	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName)
 
-	if p.Cluster.SetObs && p.Obs.AccessKey == "" {
-		err = CreateWekaObs(ctx, &p)
+	if p.Cluster.SetObs {
+		err = PrepareWekaObs(ctx, &p)
 		if err != nil {
+			logger.Error().Err(err).Send()
 			return
 		}
 	}
@@ -386,6 +402,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 	subnetId := os.Getenv("SUBNET_ID")
 	blobPrivateDnsZoneId := os.Getenv("BLOB_PRIVATE_DNS_ZONE_ID")
+	createblobPrivateEndpoint, _ := strconv.ParseBool(os.Getenv("CREATE_BLOB_PRIVATE_ENDPOINT"))
 	// data protection-related vars
 	stripeWidth, _ := strconv.Atoi(os.Getenv("STRIPE_WIDTH"))
 	protectionLevel, _ := strconv.Atoi(os.Getenv("PROTECTION_LEVEL"))
@@ -441,16 +458,17 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	params := ClusterizationParams{
-		SubscriptionId:    subscriptionId,
-		ResourceGroupName: resourceGroupName,
-		Location:          location,
-		Prefix:            prefix,
-		KeyVaultUri:       keyVaultUri,
-		SubnetId:          subnetId,
-		PrivateDNSZoneId:  blobPrivateDnsZoneId,
-		StateParams:       common.BlobObjParams{StorageName: stateStorageName, ContainerName: stateContainerName, BlobName: stateBlobName},
-		Vm:                vm,
-		InstallDpdk:       installDpdk,
+		SubscriptionId:            subscriptionId,
+		ResourceGroupName:         resourceGroupName,
+		Location:                  location,
+		Prefix:                    prefix,
+		KeyVaultUri:               keyVaultUri,
+		SubnetId:                  subnetId,
+		PrivateDNSZoneId:          blobPrivateDnsZoneId,
+		CreateBlobPrivateEndpoint: createblobPrivateEndpoint,
+		StateParams:               common.BlobObjParams{StorageName: stateStorageName, ContainerName: stateContainerName, BlobName: stateBlobName},
+		Vm:                        vm,
+		InstallDpdk:               installDpdk,
 		Cluster: clusterize.ClusterParams{
 			ClusterizationTarget: clusterizationTarget,
 			ClusterName:          clusterName,
