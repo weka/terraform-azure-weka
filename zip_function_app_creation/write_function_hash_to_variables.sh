@@ -12,6 +12,8 @@ old_function_app_zip_version=$(awk '/Function app code version/{getline;print $N
 echo "Replacing '$old_function_app_zip_version' function_app_version to '$new_function_app_zip_version'"
 if [ $os_name == "darwin" ]; then
     sed -i '' "s/$old_function_app_zip_version/$new_function_app_zip_version/" variables.tf
+    sed -i '' "s/$old_function_app_zip_version/$new_function_app_zip_version/" README.md
 else
     sed -i "s/$old_function_app_zip_version/$new_function_app_zip_version/" variables.tf
+    sed -i "s/$old_function_app_zip_version/$new_function_app_zip_version/" README.md
 fi

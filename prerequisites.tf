@@ -15,6 +15,7 @@ module "network" {
   allow_ssh_cidrs       = var.allow_ssh_cidrs
   allow_weka_api_cidrs  = var.allow_weka_api_cidrs
   private_dns_zone_name = var.private_dns_zone_name
+  private_dns_zone_use  = var.private_dns_zone_use
   sg_id                 = var.sg_id
   create_nat_gateway    = var.create_nat_gateway
 }
@@ -24,10 +25,15 @@ module "iam" {
   rg_name                        = var.rg_name
   prefix                         = var.prefix
   cluster_name                   = var.cluster_name
+  vnet_rg_name                   = local.vnet_rg_name
+  vnet_name                      = local.vnet_name
+  subnet_name                    = local.subnet_name
+  sg_id                          = var.sg_id
   vmss_identity_name             = var.vmss_identity_name
   function_app_identity_name     = var.function_app_identity_name
+  support_logic_app              = local.create_logic_app
   logic_app_identity_name        = var.logic_app_identity_name
-  logic_app_storage_account_id   = azurerm_storage_account.logicapp.id
+  logic_app_storage_account_id   = local.create_logic_app ? azurerm_storage_account.logicapp[0].id : ""
   key_vault_id                   = azurerm_key_vault.key_vault.id
   weka_tar_storage_account_id    = var.weka_tar_storage_account_id
   deployment_storage_account_id  = local.deployment_storage_account_id
@@ -37,9 +43,12 @@ module "iam" {
   tiering_enable_obs_integration = var.tiering_enable_obs_integration
   tiering_obs_name               = var.tiering_obs_name
   obs_container_name             = local.obs_container_name
+  obs_create_private_endpoint    = var.create_storage_account_private_links && local.sa_public_access_disabled
+  depends_on                     = [module.network]
 }
 
 locals {
+  create_logic_app      = local.create_sa_resources
   vnet_name             = var.vnet_name == "" ? module.network.vnet_name : var.vnet_name
   vnet_rg_name          = var.vnet_rg_name == "" ? module.network.vnet_rg_name : var.vnet_rg_name
   subnet_name           = var.subnet_name == "" ? module.network.subnet_name : var.subnet_name
@@ -63,6 +72,55 @@ module "peering" {
   vnet_name                        = local.vnet_name
   vnets_to_peer_to_deployment_vnet = var.vnets_to_peer_to_deployment_vnet
   depends_on                       = [module.network]
+}
+
+module "logic_app_subnet_delegation" {
+  count           = var.logic_app_subnet_delegation_id == "" && local.create_logic_app ? 1 : 0
+  source          = "./modules/subnet_delegation"
+  rg_name         = local.vnet_rg_name
+  vnet_name       = local.vnet_name
+  prefix          = var.prefix
+  cluster_name    = var.cluster_name
+  cidr_range      = var.logic_app_subnet_delegation_cidr
+  delegation_name = "logic-app-delegation"
+
+  depends_on = [module.network]
+}
+
+module "function_app_subnet_delegation" {
+  count           = var.function_app_subnet_delegation_id == "" ? 1 : 0
+  source          = "./modules/subnet_delegation"
+  rg_name         = local.vnet_rg_name
+  vnet_name       = local.vnet_name
+  prefix          = var.prefix
+  cluster_name    = var.cluster_name
+  cidr_range      = var.function_app_subnet_delegation_cidr
+  delegation_name = "function-app-delegation"
+
+  depends_on = [module.network]
+}
+
+module "logicapp" {
+  count                          = local.create_logic_app ? 1 : 0
+  source                         = "./modules/logic_app"
+  rg_name                        = var.rg_name
+  location                       = local.location
+  prefix                         = var.prefix
+  cluster_name                   = var.cluster_name
+  logic_app_subnet_delegation_id = var.logic_app_subnet_delegation_id == "" ? module.logic_app_subnet_delegation[0].id : var.logic_app_subnet_delegation_id
+  storage_account_name           = azurerm_storage_account.logicapp[0].name
+  logic_app_identity_id          = local.logic_app_identity_id
+  logic_app_identity_principal   = local.logic_app_identity_principal
+  restricted_inbound_access      = var.function_access_restriction_enabled
+  subnet_id                      = data.azurerm_subnet.subnet.id
+  function_app_id                = azurerm_linux_function_app.function_app.id
+  function_app_name              = azurerm_linux_function_app.function_app.name
+  function_app_key               = data.azurerm_function_app_host_keys.function_keys.default_function_key
+  key_vault_id                   = azurerm_key_vault.key_vault.id
+  key_vault_uri                  = azurerm_key_vault.key_vault.vault_uri
+  use_secured_storage_account    = local.sa_public_access_enabled ? false : true
+
+  depends_on = [azurerm_storage_account.logicapp, module.logic_app_subnet_delegation, module.iam]
 }
 
 data "azurerm_subnet" "subnet" {

@@ -2,12 +2,16 @@ package scale_up
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 	"weka-deployment/common"
+	"weka-deployment/functions/azure_functions_def"
 
+	"github.com/weka/go-cloud-lib/functions_def"
 	"github.com/weka/go-cloud-lib/logging"
 	"github.com/weka/go-cloud-lib/protocol"
 )
@@ -23,7 +27,50 @@ var (
 	nfsContainerName   = os.Getenv("NFS_STATE_CONTAINER_NAME")
 	nfsStateBlobName   = os.Getenv("NFS_STATE_BLOB_NAME")
 	nfsScaleSetName    = os.Getenv("NFS_VMSS_NAME")
+	vmssConfigStr      = os.Getenv("VMSS_CONFIG")
+	// initial state of the cluster
+	initialClusterSize, _ = strconv.Atoi(os.Getenv("INITIAL_CLUSTER_SIZE"))
+	clusterizeTarget, _   = strconv.Atoi(os.Getenv("CLUSTERIZATION_TARGET"))
+	initialNfsSize, _     = strconv.Atoi(os.Getenv("NFS_PROTOCOL_GATEWAYS_NUM"))
+	clusterInitialState   = protocol.ClusterState{
+		InitialSize:          initialClusterSize,
+		DesiredSize:          initialClusterSize,
+		ClusterizationTarget: clusterizeTarget,
+	}
+	nfsInitialState = protocol.ClusterState{
+		InitialSize:          initialNfsSize,
+		DesiredSize:          initialNfsSize,
+		ClusterizationTarget: initialNfsSize,
+	}
 )
+
+func getBackendCustomDataScript(ctx context.Context) (customData string, err error) {
+	functionAppName := os.Getenv("FUNCTION_APP_NAME")
+	keyVaultUri := os.Getenv("KEY_VAULT_URI")
+	diskSize, _ := strconv.Atoi(os.Getenv("DISK_SIZE"))
+	nicsNum, _ := strconv.Atoi(os.Getenv("NICS_NUM"))
+	subnet := os.Getenv("SUBNET")
+	aptRepo := os.Getenv("APT_REPO_SERVER")
+	userData := os.Getenv("USER_DATA")
+
+	logger := logging.LoggerFromCtx(ctx)
+
+	functionAppKey, err := common.GetKeyVaultValue(ctx, keyVaultUri, "function-app-default-key")
+	if err != nil {
+		logger.Error().Err(err).Msg("cannot get function app key")
+		return
+	}
+
+	baseFunctionUrl := fmt.Sprintf("https://%s.azurewebsites.net/api/", functionAppName)
+	funcDef := azure_functions_def.NewFuncDef(baseFunctionUrl, functionAppKey)
+	reportFunction := funcDef.GetFunctionCmdDefinition(functions_def.Report)
+	deployFunction := funcDef.GetFunctionCmdDefinition(functions_def.Deploy)
+
+	customDataStr := getInitScript(userData, diskSize, nicsNum, subnet, aptRepo, reportFunction, deployFunction)
+	// base64 encode the custom data
+	customData = base64.StdEncoding.EncodeToString([]byte(customDataStr))
+	return
+}
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -36,7 +83,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		BlobName:      stateBlobName,
 	}
 
-	state, err := common.ReadState(ctx, stateParams)
+	state, err := common.ReadStateOrCreateNew(ctx, stateParams, clusterInitialState)
 	if err != nil {
 		logger.Error().Err(err).Msg("cannot read state")
 		common.WriteErrorResponse(w, err)
@@ -58,7 +105,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// get expected vmss config
-	vmssConfig, err := common.ReadVmssConfig(ctx, stateStorageName, stateContainerName)
+	vmssConfig, err := common.ReadVmssConfig(ctx, vmssConfigStr)
 	if err != nil {
 		logger.Error().Err(err).Msgf("cannot read vmss config")
 		common.WriteErrorResponse(w, err)
@@ -138,7 +185,7 @@ func handleNFSScaleUp(ctx context.Context) (message string, err error) {
 		ContainerName: nfsContainerName,
 		BlobName:      nfsStateBlobName,
 	}
-	nfsState, err := common.ReadState(ctx, nfsStateParams)
+	nfsState, err := common.ReadStateOrCreateNew(ctx, nfsStateParams, nfsInitialState)
 	if err != nil {
 		logger.Error().Err(err).Msg("cannot read NFS state")
 		return
@@ -167,12 +214,18 @@ func handleNFSScaleUp(ctx context.Context) (message string, err error) {
 	return
 }
 
-func createVmss(ctx context.Context, vmssConfig *common.VMSSConfig, vmssName string, vmssSize int) error {
+func createVmss(ctx context.Context, vmssConfig *common.VMSSConfig, vmssName string, vmssSize int) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	vmssConfigHash := vmssConfig.ConfigHash
 
+	vmssConfig.CustomData, err = getBackendCustomDataScript(ctx)
+	if err != nil {
+		logger.Error().Err(err).Msg("cannot get custom data script")
+		return err
+	}
+
 	logger.Info().Msgf("creating new vmss %s of size %d", vmssName, vmssSize)
-	_, err := common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, vmssName, vmssConfigHash, *vmssConfig, vmssSize)
+	_, err = common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, vmssName, vmssConfigHash, *vmssConfig, vmssSize)
 	if err != nil {
 		return err
 	}
@@ -180,7 +233,7 @@ func createVmss(ctx context.Context, vmssConfig *common.VMSSConfig, vmssName str
 	return nil
 }
 
-func handleVmssUpdate(ctx context.Context, currentConfig, newConfig *common.VMSSConfig, stateParams common.BlobObjParams, desiredSize int) error {
+func handleVmssUpdate(ctx context.Context, currentConfig, newConfig *common.VMSSConfig, stateParams common.BlobObjParams, desiredSize int) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	newConfigHash := newConfig.ConfigHash
@@ -200,7 +253,13 @@ func handleVmssUpdate(ctx context.Context, currentConfig, newConfig *common.VMSS
 		return common.AddClusterUpdate(ctx, stateParams, update)
 	}
 
-	_, err := common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, currentConfig.Name, newConfigHash, *newConfig, desiredSize)
+	newConfig.CustomData, err = getBackendCustomDataScript(ctx)
+	if err != nil {
+		logger.Error().Err(err).Msg("cannot get custom data script")
+		return err
+	}
+
+	_, err = common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, currentConfig.Name, newConfigHash, *newConfig, desiredSize)
 	if err != nil {
 		logger.Error().Err(err).Msgf("cannot update vmss %s", currentConfig.Name)
 		errStr := err.Error()

@@ -86,12 +86,6 @@ func GetNfsDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, 
 		return
 	}
 
-	wekaPassword, err := common.GetWekaClusterPassword(ctx, p.KeyVaultUri)
-	if err != nil {
-		logger.Error().Err(err).Send()
-		return
-	}
-
 	var token string
 	token, err = getWekaIoToken(ctx, p.KeyVaultUri)
 	if err != nil {
@@ -107,10 +101,7 @@ func GetNfsDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, 
 		ProxyUrl:                  p.ProxyUrl,
 		Gateways:                  p.Gateways,
 		Protocol:                  protocol.NFS,
-		WekaUsername:              common.WekaAdminUsername,
-		WekaPassword:              wekaPassword,
 		NFSInterfaceGroupName:     p.NFSInterfaceGroupName,
-		NFSClientGroupName:        p.NFSClientGroupName,
 		NFSSecondaryIpsNum:        p.NFSSecondaryIpsNum,
 		ProtocolGatewayFeCoresNum: p.NFSGatewayFeCoresNum,
 		LoadBalancerIP:            p.BackendLbIp,
@@ -226,12 +217,6 @@ func GetDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, p A
 		}
 		bashScript = deployScriptGenerator.GetDeployScript()
 	} else {
-		wekaPassword, err := common.GetWekaClusterPassword(ctx, p.KeyVaultUri)
-		if err != nil {
-			logger.Error().Err(err).Send()
-			return "", err
-		}
-
 		vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.ClusterName)
 		vmssParams := &common.ScaleSetParams{
 			SubscriptionId:    p.SubscriptionId,
@@ -262,8 +247,6 @@ func GetDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, p A
 		}
 
 		joinParams := join.JoinParams{
-			WekaUsername:   common.WekaAdminUsername,
-			WekaPassword:   wekaPassword,
 			IPs:            ips,
 			InstallDpdk:    p.InstallDpdk,
 			InstanceParams: instanceParams,
@@ -331,7 +314,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	diskSize, _ := strconv.Atoi(os.Getenv("DISK_SIZE"))
 	// nfs params
 	nfsInterfaceGroupName := os.Getenv("NFS_INTERFACE_GROUP_NAME")
-	nfsClientGroupName := os.Getenv("NFS_CLIENT_GROUP_NAME")
 	nfsProtocolgwsNum, _ := strconv.Atoi(os.Getenv("NFS_PROTOCOL_GATEWAYS_NUM"))
 	nfsStateContainerName := os.Getenv("NFS_STATE_CONTAINER_NAME")
 	nfsStateBlobName := os.Getenv("NFS_STATE_BLOB_NAME")
@@ -401,7 +383,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		FunctionAppName:       functionAppName,
 		Gateways:              getGateways(subnet, nicsNumInt),
 		NFSInterfaceGroupName: nfsInterfaceGroupName,
-		NFSClientGroupName:    nfsClientGroupName,
 		NFSProtocolGWsNum:     nfsProtocolgwsNum,
 		NFSStateParams:        common.BlobObjParams{StorageName: stateStorageName, ContainerName: nfsStateContainerName, BlobName: nfsStateBlobName},
 		NFSSecondaryIpsNum:    nfsSecondaryIpsNum,

@@ -14,8 +14,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
 	github.com/lithammer/dedent v1.1.0
-	github.com/rs/zerolog v1.29.0
-	github.com/weka/go-cloud-lib v0.0.0-20240711150309-5e177acf14bf
+	github.com/weka/go-cloud-lib v0.0.0-20240730090621-daac1ef4a039
 )
 
 require (
@@ -30,6 +29,7 @@ require (
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/rs/xid v1.4.0 // indirect
+	github.com/rs/zerolog v1.29.0 // indirect
 	golang.org/x/crypto v0.24.0 // indirect
 	golang.org/x/net v0.26.0 // indirect
 	golang.org/x/oauth2 v0.6.0 // indirect

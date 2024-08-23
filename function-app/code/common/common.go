@@ -21,6 +21,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v4"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/lease"
 	"github.com/google/uuid"
@@ -31,7 +32,10 @@ import (
 )
 
 const (
-	WekaAdminUsername = "admin"
+	WekaAdminUsername         = "admin"
+	WekaAdminPasswordKey      = "weka-password"
+	WekaDeploymentUsername    = "weka-deployment"
+	WekaDeploymentPasswordKey = "weka-deployment-password"
 	// NFS VMs tag
 	NfsInterfaceGroupPortKey   = "nfs_interface_group_port"
 	NfsInterfaceGroupPortValue = "ready"
@@ -56,6 +60,16 @@ type BlobObjParams struct {
 	StorageName   string
 	ContainerName string
 	BlobName      string
+}
+
+type AzureObsParams struct {
+	Name              string
+	ContainerName     string
+	AccessKey         string
+	TieringSsdPercent string
+	NetworkAccess     string
+	AllowedSubnets    []string
+	AllowedPublicIps  []string
 }
 
 const FindDrivesScript = `
@@ -231,6 +245,120 @@ func ReadBlobObject(ctx context.Context, bl BlobObjParams) (state []byte, err er
 
 }
 
+func containerExists(ctx context.Context, containerClient *container.Client, storageName, containerName string) (bool, error) {
+	_, err := containerClient.GetProperties(ctx, nil)
+	if err != nil {
+		var responseErr *azcore.ResponseError
+		if errors.As(err, &responseErr) && responseErr.ErrorCode == "ContainerNotFound" {
+			return false, nil
+		}
+		err = fmt.Errorf("failed to get container properties: %w", err)
+		return false, err
+	}
+	return true, nil
+}
+
+func ensureStorageContainer(ctx context.Context, storageAccountName, containerName string) (err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	credential, err := getCredential(ctx)
+	if err != nil {
+		return
+	}
+
+	containerUrl := getContainerUrl(storageAccountName, containerName)
+	containerClient, err := container.NewClient(containerUrl, credential, nil)
+	if err != nil {
+		err = fmt.Errorf("failed to create container client: %v", err)
+		return err
+	}
+
+	exists, err := containerExists(ctx, containerClient, storageAccountName, containerName)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	if exists {
+		logger.Info().Str("container", containerName).Msg("container already exists")
+		return
+	}
+
+	logger.Info().Str("container", containerName).Msg("container does not exist, creating new container")
+
+	_, err = containerClient.Create(ctx, nil)
+	if err != nil {
+		err = fmt.Errorf("failed to create container: %v", err)
+		logger.Error().Err(err).Send()
+	}
+	return
+}
+
+func blobExists(ctx context.Context, blobClient *blob.Client) (bool, error) {
+	_, err := blobClient.GetProperties(ctx, nil)
+	if err != nil {
+		var responseErr *azcore.ResponseError
+		if errors.As(err, &responseErr) && responseErr.ErrorCode == "BlobNotFound" {
+			return false, nil
+		}
+		err = fmt.Errorf("failed to get blob properties: %w", err)
+		return false, err
+	}
+	return true, nil
+}
+
+func EnsureStateIsCreated(ctx context.Context, p BlobObjParams, initialState protocol.ClusterState) (exists bool, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	err = ensureStorageContainer(ctx, p.StorageName, p.ContainerName)
+	if err != nil {
+		return
+	}
+
+	credential, err := getCredential(ctx)
+	if err != nil {
+		return
+	}
+
+	url := getBlobFileUrl(p.StorageName, p.ContainerName, p.BlobName)
+	blobClient, err := blob.NewClient(url, credential, nil)
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to create blob client")
+		return
+	}
+
+	exists, err = blobExists(ctx, blobClient)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	if exists {
+		logger.Info().Msg("state already exists")
+		return
+	}
+
+	logger.Info().Msg("state does not exist, creating new state")
+
+	err = WriteState(ctx, p, initialState)
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to write initial state")
+	}
+	return
+}
+
+func ReadStateOrCreateNew(ctx context.Context, p BlobObjParams, initialState protocol.ClusterState) (state protocol.ClusterState, err error) {
+	exists, err := EnsureStateIsCreated(ctx, p, initialState)
+	if err != nil {
+		return
+	}
+
+	if exists {
+		return ReadState(ctx, p)
+	}
+	return initialState, nil
+}
+
 func ReadState(ctx context.Context, stateParams BlobObjParams) (state protocol.ClusterState, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
@@ -282,6 +410,10 @@ func WriteState(ctx context.Context, stateParams BlobObjParams, state protocol.C
 
 func getBlobUrl(storageName string) string {
 	return fmt.Sprintf("https://%s.blob.core.windows.net/", storageName)
+}
+
+func getBlobFileUrl(storageName, containerName, blobName string) string {
+	return fmt.Sprintf("https://%s.blob.core.windows.net/%s/%s", storageName, containerName, blobName)
 }
 
 func getContainerUrl(storageName, containerName string) string {
@@ -358,9 +490,118 @@ func UpdateClusterized(ctx context.Context, subscriptionId, resourceGroupName st
 	return
 }
 
-func CreateStorageAccount(ctx context.Context, subscriptionId, resourceGroupName, obsName, location string) (accessKey string, err error) {
+func CreatePrivateDnsZoneGroup(ctx context.Context, subscriptionId, resourceGroupName, privateEndpointName, privateDNSZoneID string) (privateDNSZoneGroup *armnetwork.PrivateDNSZoneGroup, err error) {
 	logger := logging.LoggerFromCtx(ctx)
-	logger.Info().Msgf("creating storage account: %s", obsName)
+
+	credential, err := getCredential(ctx)
+	if err != nil {
+		return
+	}
+
+	privateDNSZoneGroupName := fmt.Sprintf("%s-dns-group", privateEndpointName)
+
+	parameters := armnetwork.PrivateDNSZoneGroup{
+		Name: &privateDNSZoneGroupName,
+		Properties: &armnetwork.PrivateDNSZoneGroupPropertiesFormat{
+			PrivateDNSZoneConfigs: []*armnetwork.PrivateDNSZoneConfig{
+				{
+					Name: &privateDNSZoneGroupName,
+					Properties: &armnetwork.PrivateDNSZonePropertiesFormat{
+						PrivateDNSZoneID: &privateDNSZoneID,
+					},
+				},
+			},
+		},
+	}
+
+	client, err := armnetwork.NewPrivateDNSZoneGroupsClient(subscriptionId, credential, nil)
+	if err != nil {
+		err = fmt.Errorf("failed to create PrivateDNSZoneGroupsClient: %w", err)
+		return
+	}
+
+	poller, err := client.BeginCreateOrUpdate(ctx, resourceGroupName, privateEndpointName, privateDNSZoneGroupName, parameters, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	res, err := poller.PollUntilDone(ctx, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	privateDNSZoneGroup = &res.PrivateDNSZoneGroup
+	return
+}
+
+func CreateStorageAccountBlobPrivateEndpoint(ctx context.Context, subscriptionId, resourceGroupName, location, storageAccountName, privateEndpointName, subnetId, privateDnsZoneId string) (err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	credential, err := getCredential(ctx)
+	if err != nil {
+		return
+	}
+
+	client, err := armnetwork.NewPrivateEndpointsClient(subscriptionId, credential, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	storageAccountId := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s", subscriptionId, resourceGroupName, storageAccountName)
+	connectionName := fmt.Sprintf("%s-conn", privateEndpointName)
+	subresourceName := "blob"
+
+	privateServiceConnection := &armnetwork.PrivateLinkServiceConnection{
+		Name: &connectionName,
+		Properties: &armnetwork.PrivateLinkServiceConnectionProperties{
+			PrivateLinkServiceID: &storageAccountId,
+			GroupIDs:             []*string{&subresourceName},
+		},
+	}
+
+	privateEndpoint := armnetwork.PrivateEndpoint{
+		Location: &location,
+		Properties: &armnetwork.PrivateEndpointProperties{
+			Subnet: &armnetwork.Subnet{
+				ID: &subnetId,
+			},
+			PrivateLinkServiceConnections: []*armnetwork.PrivateLinkServiceConnection{
+				privateServiceConnection,
+			},
+		},
+	}
+
+	poller, err := client.BeginCreateOrUpdate(ctx, resourceGroupName, privateEndpointName, privateEndpoint, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	res, err := poller.PollUntilDone(ctx, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	logger.Info().Msgf("private endpoint %s created", *res.PrivateEndpoint.ID)
+
+	dnsZoneGroup, err := CreatePrivateDnsZoneGroup(ctx, subscriptionId, resourceGroupName, privateEndpointName, privateDnsZoneId)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	logger.Info().Msgf("private dns zone group %s created", *dnsZoneGroup.ID)
+
+	return
+}
+
+func CreateStorageAccount(ctx context.Context, subscriptionId, resourceGroupName, location string, obsParams AzureObsParams) (accessKey string, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msgf("creating storage account: %v", obsParams)
 
 	credential, err := getCredential(ctx)
 	if err != nil {
@@ -374,18 +615,45 @@ func CreateStorageAccount(ctx context.Context, subscriptionId, resourceGroupName
 	}
 	skuName := armstorage.SKUNameStandardZRS
 	kind := armstorage.KindStorageV2
-	_, err = client.BeginCreate(ctx, resourceGroupName, obsName, armstorage.AccountCreateParameters{
+	publicAccess := armstorage.PublicNetworkAccessEnabled
+	if obsParams.NetworkAccess == "Disabled" {
+		publicAccess = armstorage.PublicNetworkAccessDisabled
+	}
+
+	var networkRuleSet *armstorage.NetworkRuleSet
+	if len(obsParams.AllowedSubnets) > 0 || len(obsParams.AllowedPublicIps) > 0 {
+		action := armstorage.DefaultActionDeny
+		bypass := armstorage.BypassAzureServices
+		networkRuleSet = &armstorage.NetworkRuleSet{
+			DefaultAction: &action,
+			Bypass:        &bypass,
+		}
+		for i := 0; i < len(obsParams.AllowedSubnets); i++ {
+			rule := &armstorage.VirtualNetworkRule{VirtualNetworkResourceID: &obsParams.AllowedSubnets[i]}
+			networkRuleSet.VirtualNetworkRules = append(networkRuleSet.VirtualNetworkRules, rule)
+		}
+		for i := 0; i < len(obsParams.AllowedPublicIps); i++ {
+			rule := &armstorage.IPRule{IPAddressOrRange: &obsParams.AllowedPublicIps[i]}
+			networkRuleSet.IPRules = append(networkRuleSet.IPRules, rule)
+		}
+	}
+
+	_, err = client.BeginCreate(ctx, resourceGroupName, obsParams.Name, armstorage.AccountCreateParameters{
 		Kind:     &kind,
 		Location: &location,
 		SKU: &armstorage.SKU{
 			Name: &skuName,
+		},
+		Properties: &armstorage.AccountPropertiesCreateParameters{
+			PublicNetworkAccess: &publicAccess,
+			NetworkRuleSet:      networkRuleSet,
 		},
 	}, nil)
 
 	if err != nil {
 		if azerr, ok := err.(*azcore.ResponseError); ok {
 			if azerr.ErrorCode == "StorageAccountAlreadyExists" {
-				logger.Debug().Msgf("storage account %s already exists", obsName)
+				logger.Debug().Msgf("storage account %s already exists", obsParams.Name)
 				err = nil
 			} else {
 				logger.Error().Msgf("storage creation failed: %s", err)
@@ -398,7 +666,7 @@ func CreateStorageAccount(ctx context.Context, subscriptionId, resourceGroupName
 	}
 
 	for i := 0; i < 10; i++ {
-		accessKey, err = getStorageAccountAccessKey(ctx, subscriptionId, resourceGroupName, obsName)
+		accessKey, err = getStorageAccountAccessKey(ctx, subscriptionId, resourceGroupName, obsParams.Name)
 
 		if err != nil {
 			if azerr, ok := err.(*azcore.ResponseError); ok {
@@ -414,7 +682,7 @@ func CreateStorageAccount(ctx context.Context, subscriptionId, resourceGroupName
 				return
 			}
 		} else {
-			logger.Debug().Msgf("storage account '%s' is ready for use", obsName)
+			logger.Debug().Msgf("storage account '%s' is ready for use", obsParams.Name)
 			break
 		}
 	}
@@ -489,12 +757,38 @@ func GetKeyVaultValue(ctx context.Context, keyVaultUri, secretName string) (secr
 	}
 	resp, err := client.GetSecret(ctx, secretName, "", nil)
 	if err != nil {
-		logger.Error().Err(err).Send()
+		logger.Info().Err(err).Send()
 		return
 	}
 
 	secret = *resp.Value
 
+	return
+}
+
+func SetKeyVaultValue(ctx context.Context, keyVaultUri, secretName, secretValue string) (err error) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msgf("setting key vault secret: %s", secretName)
+
+	credential, err := getCredential(ctx)
+	if err != nil {
+		return
+	}
+
+	client, err := azsecrets.NewClient(keyVaultUri, credential, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	params := azsecrets.SetSecretParameters{
+		Value: &secretValue,
+	}
+
+	_, err = client.SetSecret(ctx, secretName, params, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+	}
 	return
 }
 
@@ -855,15 +1149,6 @@ func AssignStorageBlobDataContributorRoleToScaleSet(
 	return &res.RoleAssignment, nil
 }
 
-type ScaleSetInfo struct {
-	Id            string
-	Name          string
-	AdminUsername string
-	AdminPassword string
-	Capacity      int
-	VMSize        string
-}
-
 // Gets scale set
 // see https://learn.microsoft.com/en-us/rest/api/compute/virtual-machine-scale-sets/get
 func getScaleSet(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string) (*armcompute.VirtualMachineScaleSet, error) {
@@ -902,33 +1187,6 @@ func GetScaleSetOrNil(ctx context.Context, subscriptionId, resourceGroupName, vm
 		return nil, err
 	}
 	return scaleSet, nil
-}
-
-// Gets single scale set info
-func GetScaleSetInfo(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, keyVaultUri string) (*ScaleSetInfo, error) {
-	logger := logging.LoggerFromCtx(ctx)
-
-	scaleSet, err := getScaleSet(ctx, subscriptionId, resourceGroupName, vmScaleSetName)
-	if err != nil {
-		logger.Error().Err(err).Send()
-		return nil, err
-	}
-
-	wekaPassword, err := GetWekaClusterPassword(ctx, keyVaultUri)
-	if err != nil {
-		logger.Error().Err(err).Send()
-		return nil, err
-	}
-
-	scaleSetInfo := ScaleSetInfo{
-		Id:            *scaleSet.ID,
-		Name:          *scaleSet.Name,
-		AdminUsername: WekaAdminUsername,
-		AdminPassword: wekaPassword,
-		Capacity:      int(*scaleSet.SKU.Capacity),
-		VMSize:        *scaleSet.SKU.Name,
-	}
-	return &scaleSetInfo, err
 }
 
 func GetScaleSetInstances(ctx context.Context, vmssParams *ScaleSetParams) (vms []*VMInfoSummary, err error) {
@@ -1209,8 +1467,38 @@ func ReportMsg(ctx context.Context, hostName string, stateParams BlobObjParams, 
 	_ = UpdateStateReporting(ctx, stateParams, reportObj)
 }
 
-func GetWekaClusterPassword(ctx context.Context, keyVaultUri string) (password string, err error) {
-	return GetKeyVaultValue(ctx, keyVaultUri, "weka-password")
+func GetWekaAdminPassword(ctx context.Context, keyVaultUri string) (password string, err error) {
+	return GetKeyVaultValue(ctx, keyVaultUri, WekaAdminPasswordKey)
+}
+
+func GetWekaDeploymentPassword(ctx context.Context, keyVaultUri string) (password string, err error) {
+	return GetKeyVaultValue(ctx, keyVaultUri, WekaDeploymentPasswordKey)
+}
+
+// Get Weka deployment password if exists, otherwise get admin password
+func GetWekaClusterCredentials(ctx context.Context, keyVaultUri string) (protocol.ClusterCreds, error) {
+	usename := WekaDeploymentUsername
+	password, err := GetWekaDeploymentPassword(ctx, keyVaultUri)
+
+	var responseErr *azcore.ResponseError
+	if err != nil && errors.As(err, &responseErr) && responseErr.ErrorCode == "SecretNotFound" || err == nil && password == "" {
+		usename = WekaAdminUsername
+		password, err = GetWekaAdminPassword(ctx, keyVaultUri)
+	}
+
+	credentials := protocol.ClusterCreds{
+		Username: usename,
+		Password: password,
+	}
+	return credentials, err
+}
+
+func SetWekaDeploymentPassword(ctx context.Context, keyVaultUri, password string) (err error) {
+	return SetKeyVaultValue(ctx, keyVaultUri, WekaDeploymentPasswordKey, password)
+}
+
+func SetWekaAdminPassword(ctx context.Context, keyVaultUri, password string) (err error) {
+	return SetKeyVaultValue(ctx, keyVaultUri, WekaAdminPasswordKey, password)
 }
 
 func GetVmScaleSetName(prefix, clusterName string) string {
@@ -1432,28 +1720,25 @@ func GetAzureInstanceNameCmd() string {
 	return "curl -s -H Metadata:true --noproxy * http://169.254.169.254/metadata/instance?api-version=2021-02-01 | jq '.compute.name' | cut -c2- | rev | cut -c2- | rev"
 }
 
-func ReadVmssConfig(ctx context.Context, storageName, containerName string) (vmssConfig VMSSConfig, err error) {
+func ReadVmssConfig(ctx context.Context, vmssConfigStr string) (vmssConfig VMSSConfig, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	params := BlobObjParams{
-		StorageName:   storageName,
-		ContainerName: containerName,
-		BlobName:      "vmss-config",
+	if vmssConfigStr == "" {
+		err = fmt.Errorf("vmss config is not set")
+		logger.Error().Err(err).Msg("cannot read vmss config")
+		return
 	}
-	asByteArray, err := ReadBlobObject(ctx, params)
+
+	asByteArray := []byte(vmssConfigStr)
+	err = json.Unmarshal(asByteArray, &vmssConfig)
 	if err != nil {
+		logger.Error().Err(err).Msg("cannot unmarshal vmss config")
 		return
 	}
 
 	// calculate hash of the config (used to identify vmss config changes)
 	hash := sha256.Sum256(asByteArray)
 	hashStr := fmt.Sprintf("%x", hash)
-
-	err = json.Unmarshal(asByteArray, &vmssConfig)
-	if err != nil {
-		logger.Error().Err(err).Send()
-		return
-	}
 
 	// take first 16 characters of the hash
 	vmssConfig.ConfigHash = hashStr[:16]

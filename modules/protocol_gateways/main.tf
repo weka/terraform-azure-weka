@@ -19,11 +19,11 @@ resource "azurerm_public_ip" "this" {
 }
 
 resource "azurerm_network_interface" "primary_gateway_nic_public" {
-  count                         = var.assign_public_ip && var.protocol != "NFS" ? var.gateways_number : 0
-  name                          = "${var.gateways_name}-primary-nic-${count.index}"
-  location                      = var.location
-  resource_group_name           = var.rg_name
-  enable_accelerated_networking = true
+  count                          = var.assign_public_ip && var.protocol != "NFS" ? var.gateways_number : 0
+  name                           = "${var.gateways_name}-primary-nic-${count.index}"
+  location                       = var.location
+  resource_group_name            = var.rg_name
+  accelerated_networking_enabled = true
 
   ip_configuration {
     primary                       = true
@@ -51,11 +51,11 @@ resource "azurerm_network_interface_security_group_association" "primary_gateway
 }
 
 resource "azurerm_network_interface" "primary_gateway_nic_private" {
-  count                         = var.assign_public_ip || var.protocol == "NFS" ? 0 : var.gateways_number
-  name                          = "${var.gateways_name}-primary-nic-${count.index}"
-  location                      = var.location
-  resource_group_name           = var.rg_name
-  enable_accelerated_networking = true
+  count                          = var.assign_public_ip || var.protocol == "NFS" ? 0 : var.gateways_number
+  name                           = "${var.gateways_name}-primary-nic-${count.index}"
+  location                       = var.location
+  resource_group_name            = var.rg_name
+  accelerated_networking_enabled = true
 
   ip_configuration {
     primary                       = true
@@ -86,11 +86,11 @@ locals {
 }
 
 resource "azurerm_network_interface" "secondary_gateway_nic" {
-  count                         = var.protocol != "NFS" ? local.secondary_nics_num : 0
-  name                          = "${var.gateways_name}-secondary-nic-${count.index + var.gateways_number}"
-  location                      = var.location
-  resource_group_name           = var.rg_name
-  enable_accelerated_networking = true
+  count                          = var.protocol != "NFS" ? local.secondary_nics_num : 0
+  name                           = "${var.gateways_name}-secondary-nic-${count.index + var.gateways_number}"
+  location                       = var.location
+  resource_group_name            = var.rg_name
+  accelerated_networking_enabled = true
 
   ip_configuration {
     primary                       = true
@@ -115,7 +115,7 @@ locals {
   init_script = templatefile("${path.module}/init.sh", {
     apt_repo_server          = var.apt_repo_server
     nics_num                 = local.nics_numbers
-    subnet_range             = data.azurerm_subnet.subnet.address_prefix
+    subnet_range             = data.azurerm_subnet.subnet.address_prefixes[0]
     disk_size                = local.disk_size
     deploy_url               = var.deploy_function_url
     report_url               = var.report_function_url

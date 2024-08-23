@@ -14,7 +14,7 @@ output "sg_id" {
 }
 
 output "private_dns_zone_name" {
-  value       = var.private_dns_zone_name == "" ? azurerm_private_dns_zone.dns[0].name : var.private_dns_zone_name
+  value       = var.private_dns_zone_use ? var.private_dns_zone_name == "" ? azurerm_private_dns_zone.dns[0].name : var.private_dns_zone_name : null
   description = "Displays the private DNS zone name."
 }
 

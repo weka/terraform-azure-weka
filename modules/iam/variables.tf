@@ -3,6 +3,27 @@ variable "rg_name" {
   description = "A predefined resource group in the Azure subscription."
 }
 
+variable "vnet_rg_name" {
+  type        = string
+  description = "The name of the resource group for the VNet."
+}
+
+variable "vnet_name" {
+  type        = string
+  description = "The name of the virtual network."
+}
+
+variable "subnet_name" {
+  type        = string
+  description = "The name of the subnet."
+}
+
+variable "sg_id" {
+  type        = string
+  description = "Security group id"
+  default     = ""
+}
+
 variable "prefix" {
   type        = string
   description = "Prefix for all resources"
@@ -31,6 +52,12 @@ variable "function_app_identity_name" {
   type        = string
   description = "The user assigned identity name for the function app (if empty - new one is created)."
   default     = ""
+}
+
+variable "support_logic_app" {
+  type        = bool
+  description = "Enable support for logic app."
+  default     = true
 }
 
 variable "logic_app_identity_name" {
@@ -78,6 +105,12 @@ variable "tiering_obs_name" {
 variable "obs_container_name" {
   type        = string
   description = "The name of the container for the OBS."
+}
+
+variable "obs_create_private_endpoint" {
+  type        = bool
+  description = "Create private endpoint for OBS."
+  default     = false
 }
 
 variable "nfs_protocol_gateways_number" {

@@ -2,6 +2,7 @@ package fetch
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -38,6 +39,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	logger := logging.LoggerFromCtx(ctx)
 
+	fetchRequest, err := parseFetchRequest(r)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
 	backendsStateParams := common.BlobObjParams{
 		StorageName:   stateStorageName,
 		ContainerName: stateContainerName,
@@ -58,12 +66,36 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wekaAdminPassword, err := common.GetWekaClusterPassword(ctx, keyVaultUri)
-	if err != nil {
-		err = fmt.Errorf("cannot get weka admin password: %v", err)
-		logger.Error().Err(err).Send()
-		common.WriteErrorResponse(w, err)
-		return
+	var wekaPassword string
+	var adminPassword string
+	username := common.WekaDeploymentUsername
+
+	if fetchRequest.ShowAdminPassword {
+		adminPassword, err = common.GetWekaAdminPassword(ctx, keyVaultUri)
+		if err != nil {
+			err = fmt.Errorf("cannot get weka admin password: %w", err)
+			logger.Error().Err(err).Send()
+			common.WriteErrorResponse(w, err)
+			return
+		}
+
+		wekaPassword, err = common.GetWekaDeploymentPassword(ctx, keyVaultUri)
+		if err != nil {
+			err = fmt.Errorf("cannot get weka deployment password: %w", err)
+			logger.Error().Err(err).Send()
+			common.WriteErrorResponse(w, err)
+			return
+		}
+	} else {
+		credentials, err := common.GetWekaClusterCredentials(ctx, keyVaultUri)
+		if err != nil {
+			err = fmt.Errorf("cannot get weka cluster password: %v", err)
+			logger.Error().Err(err).Send()
+			common.WriteErrorResponse(w, err)
+			return
+		}
+		wekaPassword = credentials.Password
+		username = credentials.Username
 	}
 
 	desiredCapacity, err := getCapacity(ctx, backendsStateParams)
@@ -74,8 +106,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := protocol.HostGroupInfoResponse{
-		Username:                    common.WekaAdminUsername,
-		Password:                    wekaAdminPassword,
+		Username:                    username,
+		Password:                    wekaPassword,
+		AdminPassword:               adminPassword,
 		WekaBackendsDesiredCapacity: desiredCapacity,
 		WekaBackendInstances:        instances,
 		DownBackendsRemovalTimeout:  downBackendsRemovalTimeout,
@@ -160,5 +193,33 @@ func getCapacity(ctx context.Context, stateParams common.BlobObjParams) (desired
 		return
 	}
 	desired = state.DesiredSize
+	return
+}
+
+func parseFetchRequest(r *http.Request) (fetchRequest protocol.FetchRequest, err error) {
+	var invokeRequest common.InvokeRequest
+
+	if err = json.NewDecoder(r.Body).Decode(&invokeRequest); err != nil {
+		err = fmt.Errorf("cannot decode the request: %w", err)
+		return
+	}
+
+	var reqData map[string]interface{}
+	err = json.Unmarshal(invokeRequest.Data["req"], &reqData)
+	if err != nil {
+		err = fmt.Errorf("cannot unmarshal the request data: %w", err)
+		return
+	}
+
+	if reqData["Body"] == nil {
+		return
+	}
+
+	err = json.Unmarshal([]byte(reqData["Body"].(string)), &fetchRequest)
+	if err != nil {
+		err = fmt.Errorf("cannot unmarshal the request body: %w", err)
+		return
+	}
+
 	return
 }

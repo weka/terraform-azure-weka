@@ -195,6 +195,12 @@ variable "private_dns_rg_name" {
   default     = ""
 }
 
+variable "private_dns_zone_use" {
+  type        = bool
+  description = "Determines whether to use private DNS zone. Required for LB record creation."
+  default     = true
+}
+
 variable "vnets_to_peer_to_deployment_vnet" {
   type = list(object({
     vnet = string
@@ -387,13 +393,13 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "5464597f9be93b3c954324b1811ace7a"
+  default     = "70129b9f8d813e6f87aeed9be4764327"
 }
 
 variable "function_app_dist" {
   type        = string
   description = "Function app code dist"
-  default     = "release"
+  default     = "dev"
 
   validation {
     condition     = contains(["dev", "release"], var.function_app_dist)
@@ -552,6 +558,12 @@ variable "clients_custom_data" {
   default     = ""
 }
 
+variable "clients_use_vmss" {
+  type        = bool
+  default     = false
+  description = "Use VMSS for clients"
+}
+
 variable "placement_group_id" {
   type        = string
   default     = ""
@@ -576,10 +588,15 @@ variable "deployment_container_name" {
   description = "Name of exising deployment container"
 }
 
-variable "deployment_storage_account_access_key" {
+variable "deployment_file_share_name" {
   type        = string
-  description = "The access key of the existing Blob object store container."
-  sensitive   = true
+  default     = ""
+  description = "Name of exising deployment file share. Will use '<deployment_storage_account_name>-share' name if not provided."
+}
+
+variable "deployment_function_app_code_blob" {
+  type        = string
+  description = "The path to the function app code blob file."
   default     = ""
 }
 
@@ -641,12 +658,6 @@ variable "nfs_setup_protocol" {
   type        = bool
   description = "Config protocol, default if false"
   default     = false
-}
-
-variable "nfs_client_group_name" {
-  type        = string
-  description = "Client access group name."
-  default     = "weka-cg"
 }
 
 variable "nfs_interface_group_name" {
@@ -827,4 +838,45 @@ variable "debug_down_backends_removal_timeout" {
   type        = string
   default     = "3h"
   description = "Don't change this value without consulting weka support team. Timeout for removing down backends. Valid time units are ns, us (or µs), ms, s, m, h."
+}
+
+variable "storage_account_public_network_access" {
+  type        = string
+  description = "Public network access to the storage accounts."
+  default     = "Enabled"
+
+  validation {
+    condition     = contains(["Enabled", "Disabled", "EnabledForVnet"], var.storage_account_public_network_access)
+    error_message = "Allowed values: [\"Enabled\", \"Disabled\", \"EnabledForVnet\"]."
+  }
+}
+
+variable "storage_account_allowed_ips" {
+  type        = list(string)
+  description = "IP ranges to allow access from the internet or your on-premises networks to storage accounts."
+  default     = []
+}
+
+variable "create_storage_account_private_links" {
+  type        = bool
+  default     = false
+  description = "Create private links for storage accounts (needed in case if public network access for the storage account is disabled)."
+}
+
+variable "storage_blob_private_dns_zone_name" {
+  type        = string
+  description = "The private DNS zone name for the storage account (blob)."
+  default     = "privatelink.blob.core.windows.net"
+}
+
+variable "read_function_zip_from_storage_account" {
+  type        = bool
+  default     = false
+  description = "Read function app zip from storage account (is read from public distribution storage account by default)."
+}
+
+variable "key_vault_purge_protection_enabled" {
+  type        = bool
+  default     = false
+  description = "Enable purge protection for the key vault."
 }

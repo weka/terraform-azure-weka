@@ -9,16 +9,17 @@ data "azurerm_subnet" "subnet" {
 }
 
 locals {
-  first_nic_ids = var.assign_public_ip ? azurerm_network_interface.public_first_nic[*].id : azurerm_network_interface.private_first_nic[*].id
-  nics_num      = var.frontend_container_cores_num + 1
+  first_nic_ids           = var.assign_public_ip ? azurerm_network_interface.public_first_nic[*].id : azurerm_network_interface.private_first_nic[*].id
+  private_nic_first_index = var.assign_public_ip ? 1 : 0
+  nics_num                = var.frontend_container_cores_num + 1
   preparation_script = templatefile("${path.module}/init.sh", {
     apt_repo_server = var.apt_repo_server
     nics_num        = local.nics_num
-    subnet_range    = data.azurerm_subnet.subnet.address_prefix
+    subnet_range    = data.azurerm_subnet.subnet.address_prefixes[0]
   })
 
   mount_wekafs_script = templatefile("${path.module}/mount_wekafs.sh", {
-    all_gateways                 = cidrhost(data.azurerm_subnet.subnet.address_prefix, 1)
+    all_gateways                 = cidrhost(data.azurerm_subnet.subnet.address_prefixes[0], 1)
     frontend_container_cores_num = var.frontend_container_cores_num
     backend_lb_ip                = var.backend_lb_ip
     clients_use_dpdk             = var.clients_use_dpdk
@@ -47,7 +48,7 @@ locals {
 }
 
 resource "azurerm_public_ip" "public_ip" {
-  count               = var.assign_public_ip ? var.clients_number : 0
+  count               = var.use_vmss ? 0 : var.assign_public_ip ? var.clients_number : 0
   name                = "${var.clients_name}-public-ip-${count.index}"
   resource_group_name = var.rg_name
   location            = data.azurerm_resource_group.rg.location
@@ -57,12 +58,12 @@ resource "azurerm_public_ip" "public_ip" {
 }
 
 resource "azurerm_network_interface" "public_first_nic" {
-  count                         = var.assign_public_ip ? var.clients_number : 0
-  name                          = "${var.clients_name}-backend-nic-${count.index}"
-  enable_accelerated_networking = var.clients_use_dpdk
-  resource_group_name           = var.rg_name
-  location                      = data.azurerm_resource_group.rg.location
-  tags                          = var.tags_map
+  count                          = var.use_vmss ? 0 : var.assign_public_ip ? var.clients_number : 0
+  name                           = "${var.clients_name}-nic-${count.index}"
+  accelerated_networking_enabled = var.clients_use_dpdk
+  resource_group_name            = var.rg_name
+  location                       = data.azurerm_resource_group.rg.location
+  tags                           = var.tags_map
   ip_configuration {
     name                          = "ipconfig0"
     subnet_id                     = data.azurerm_subnet.subnet.id
@@ -73,18 +74,18 @@ resource "azurerm_network_interface" "public_first_nic" {
 }
 
 resource "azurerm_network_interface_security_group_association" "public_first" {
-  count                     = var.assign_public_ip ? var.clients_number : 0
+  count                     = var.use_vmss ? 0 : var.assign_public_ip ? var.clients_number : 0
   network_interface_id      = azurerm_network_interface.public_first_nic[count.index].id
   network_security_group_id = var.sg_id
 }
 
 resource "azurerm_network_interface" "private_first_nic" {
-  count                         = var.assign_public_ip ? 0 : var.clients_number
-  name                          = "${var.clients_name}-backend-nic-${count.index}"
-  enable_accelerated_networking = var.clients_use_dpdk
-  resource_group_name           = var.rg_name
-  location                      = data.azurerm_resource_group.rg.location
-  tags                          = var.tags_map
+  count                          = var.use_vmss ? 0 : var.assign_public_ip ? 0 : var.clients_number
+  name                           = "${var.clients_name}-nic-${count.index}"
+  accelerated_networking_enabled = var.clients_use_dpdk
+  resource_group_name            = var.rg_name
+  location                       = data.azurerm_resource_group.rg.location
+  tags                           = var.tags_map
   ip_configuration {
     name                          = "ipconfig0"
     subnet_id                     = data.azurerm_subnet.subnet.id
@@ -94,18 +95,18 @@ resource "azurerm_network_interface" "private_first_nic" {
 }
 
 resource "azurerm_network_interface_security_group_association" "private_first" {
-  count                     = var.assign_public_ip ? 0 : var.clients_number
+  count                     = var.use_vmss ? 0 : var.assign_public_ip ? 0 : var.clients_number
   network_interface_id      = azurerm_network_interface.private_first_nic[count.index].id
   network_security_group_id = var.sg_id
 }
 
 resource "azurerm_network_interface" "private_nics" {
-  count                         = (local.nics_num - 1) * var.clients_number
-  name                          = "${var.clients_name}-backend-nic-${count.index + var.clients_number}"
-  enable_accelerated_networking = var.clients_use_dpdk
-  resource_group_name           = var.rg_name
-  location                      = data.azurerm_resource_group.rg.location
-  tags                          = var.tags_map
+  count                          = var.use_vmss ? 0 : (local.nics_num - 1) * var.clients_number
+  name                           = "${var.clients_name}-nic-${count.index + var.clients_number}"
+  accelerated_networking_enabled = var.clients_use_dpdk
+  resource_group_name            = var.rg_name
+  location                       = data.azurerm_resource_group.rg.location
+  tags                           = var.tags_map
   ip_configuration {
     name                          = "ipconfig${count.index + var.clients_number}"
     subnet_id                     = data.azurerm_subnet.subnet.id
@@ -114,13 +115,13 @@ resource "azurerm_network_interface" "private_nics" {
 }
 
 resource "azurerm_network_interface_security_group_association" "private" {
-  count                     = (local.nics_num - 1) * var.clients_number
+  count                     = var.use_vmss ? 0 : (local.nics_num - 1) * var.clients_number
   network_interface_id      = azurerm_network_interface.private_nics[count.index].id
   network_security_group_id = var.sg_id
 }
 
 resource "azurerm_linux_virtual_machine" "this" {
-  count               = var.clients_number
+  count               = var.use_vmss ? 0 : var.clients_number
   name                = "${var.clients_name}-vm-${count.index}"
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = var.rg_name
@@ -144,6 +145,88 @@ resource "azurerm_linux_virtual_machine" "this" {
   os_disk {
     caching              = "ReadWrite"
     name                 = "${var.clients_name}-os-disk-${count.index}"
+    storage_account_type = "StandardSSD_LRS"
+  }
+
+  admin_ssh_key {
+    public_key = var.ssh_public_key
+    username   = var.vm_username
+  }
+  lifecycle {
+    ignore_changes = [tags, custom_data]
+  }
+  depends_on = [azurerm_network_interface.private_first_nic, azurerm_network_interface.private_nics, azurerm_network_interface.public_first_nic]
+}
+
+resource "azurerm_linux_virtual_machine_scale_set" "this" {
+  count               = var.use_vmss ? 1 : 0
+  instances           = var.clients_number
+  name                = var.clients_name
+  location            = data.azurerm_resource_group.rg.location
+  resource_group_name = var.rg_name
+  admin_username      = var.vm_username
+  tags                = merge({ "weka_cluster_client" : var.clients_name }, var.tags_map)
+  custom_data         = local.vms_custom_data
+  source_image_id     = local.source_image_id
+  sku                 = local.instance_type
+
+  dynamic "network_interface" {
+    for_each = range(local.private_nic_first_index)
+    content {
+      name                          = "${var.clients_name}-clients-nic-0"
+      network_security_group_id     = var.sg_id
+      primary                       = true
+      enable_accelerated_networking = var.clients_use_dpdk
+      ip_configuration {
+        primary   = true
+        name      = "ipconfig0"
+        subnet_id = data.azurerm_subnet.subnet.id
+        public_ip_address {
+          name              = "${var.clients_name}-public-ip"
+          domain_name_label = var.clients_name
+        }
+      }
+    }
+  }
+  dynamic "network_interface" {
+    for_each = range(local.private_nic_first_index, 1)
+    content {
+      name                          = "${var.clients_name}-nic-0"
+      network_security_group_id     = var.sg_id
+      primary                       = true
+      enable_accelerated_networking = var.clients_use_dpdk
+      ip_configuration {
+        primary   = true
+        name      = "ipconfig0"
+        subnet_id = data.azurerm_subnet.subnet.id
+      }
+    }
+  }
+  dynamic "network_interface" {
+    for_each = range(1, local.nics_num)
+    content {
+      name                          = "${var.clients_name}-nic-${network_interface.value}"
+      network_security_group_id     = var.sg_id
+      primary                       = false
+      enable_accelerated_networking = var.clients_use_dpdk
+      ip_configuration {
+        primary   = false
+        name      = "ipconfig${network_interface.value}"
+        subnet_id = data.azurerm_subnet.subnet.id
+      }
+    }
+  }
+
+  proximity_placement_group_id    = var.ppg_id
+  disable_password_authentication = true
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [local.client_identity_id]
+  }
+
+  os_disk {
+    caching              = "ReadWrite"
     storage_account_type = "StandardSSD_LRS"
   }
 

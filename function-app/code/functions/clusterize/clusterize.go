@@ -11,8 +11,8 @@ import (
 	"weka-deployment/common"
 	"weka-deployment/functions/azure_functions_def"
 
-	"github.com/rs/zerolog/log"
 	"github.com/weka/go-cloud-lib/join"
+	"github.com/weka/go-cloud-lib/utils"
 
 	"github.com/lithammer/dedent"
 
@@ -23,14 +23,7 @@ import (
 	"github.com/weka/go-cloud-lib/protocol"
 )
 
-type AzureObsParams struct {
-	Name              string
-	ContainerName     string
-	AccessKey         string
-	TieringSsdPercent string
-}
-
-func GetObsScript(obsParams AzureObsParams) string {
+func GetObsScript(obsParams common.AzureObsParams) string {
 	template := `
 	TIERING_SSD_PERCENT=%s
 	OBS_NAME=%s
@@ -53,6 +46,10 @@ type ClusterizationParams struct {
 	Location          string
 	Prefix            string
 	KeyVaultUri       string
+	SubnetId          string
+	PrivateDNSZoneId  string
+	// if network access is disabled and private endpoints do not exist, create them with obs
+	CreateBlobPrivateEndpoint bool
 
 	StateParams common.BlobObjParams
 	InstallDpdk bool
@@ -61,7 +58,7 @@ type ClusterizationParams struct {
 	Cluster        clusterize.ClusterParams
 	NFSParams      protocol.NFSParams
 	NFSStateParams common.BlobObjParams
-	Obs            AzureObsParams
+	Obs            common.AzureObsParams
 
 	FunctionAppName string
 }
@@ -84,6 +81,61 @@ func GetShutdownScript() string {
 	return dedent.Dedent(s)
 }
 
+func PrepareWekaObs(ctx context.Context, p *ClusterizationParams) (err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	noExistingObs := p.Obs.AccessKey == ""
+
+	if p.Obs.NetworkAccess == "Disabled" && noExistingObs && !p.CreateBlobPrivateEndpoint {
+		ignoredErr := fmt.Errorf("private endpoint creation is required for obs when public access is disabled")
+		logger.Error().Err(ignoredErr).Send()
+
+		common.ReportMsg(ctx, p.Vm.Name, p.StateParams, "error", ignoredErr.Error())
+		p.Cluster.SetObs = false
+		return nil
+	}
+
+	if p.Obs.NetworkAccess == "Disabled" && p.CreateBlobPrivateEndpoint && p.PrivateDNSZoneId == "" {
+		ignoredErr := fmt.Errorf("private dns zone id is required for private endpoint creation when public access is disabled")
+		logger.Error().Err(ignoredErr).Send()
+
+		common.ReportMsg(ctx, p.Vm.Name, p.StateParams, "error", ignoredErr.Error())
+		p.Cluster.SetObs = false
+		return nil
+	}
+
+	if noExistingObs {
+		p.Obs.AccessKey, err = common.CreateStorageAccount(
+			ctx, p.SubscriptionId, p.ResourceGroupName, p.Location, p.Obs,
+		)
+		if err != nil {
+			err = fmt.Errorf("failed to create storage account: %w", err)
+			logger.Error().Err(err).Send()
+			return
+		}
+
+		if p.Obs.NetworkAccess == "Disabled" && p.CreateBlobPrivateEndpoint {
+			endpointName := fmt.Sprintf("%s-pe", p.Obs.Name)
+			logger.Info().Msgf("public access is disabled for the storage account, creating private endpoint %s", endpointName)
+
+			err = common.CreateStorageAccountBlobPrivateEndpoint(ctx, p.SubscriptionId, p.ResourceGroupName, p.Location, p.Obs.Name, endpointName, p.SubnetId, p.PrivateDNSZoneId)
+			if err != nil {
+				err = fmt.Errorf("failed to create private endpoint: %w", err)
+				logger.Error().Err(err).Send()
+				return
+			}
+		}
+	}
+	// create container (if it doesn't exist)
+	err = common.CreateContainer(ctx, p.Obs.Name, p.Obs.ContainerName)
+	if err != nil {
+		err = fmt.Errorf("failed to create container: %w", err)
+		logger.Error().Err(err).Send()
+		return
+	}
+	return
+}
+
 func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p ClusterizationParams, funcDef functions_def.FunctionDef) (clusterizeScript string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("This is the last instance in the cluster, creating obs and clusterization script")
@@ -91,28 +143,26 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 	vmScaleSetName := common.GetVmScaleSetName(p.Prefix, p.Cluster.ClusterName)
 
 	if p.Cluster.SetObs {
-		if p.Obs.AccessKey == "" {
-			p.Obs.AccessKey, err = common.CreateStorageAccount(
-				ctx, p.SubscriptionId, p.ResourceGroupName, p.Obs.Name, p.Location,
-			)
-			if err != nil {
-				err = fmt.Errorf("failed to create storage account: %w", err)
-				logger.Error().Err(err).Send()
-				return
-			}
-
-			err = common.CreateContainer(ctx, p.Obs.Name, p.Obs.ContainerName)
-			if err != nil {
-				err = fmt.Errorf("failed to create container: %w", err)
-				logger.Error().Err(err).Send()
-				return
-			}
+		err = PrepareWekaObs(ctx, &p)
+		if err != nil {
+			logger.Error().Err(err).Send()
+			return
 		}
 	}
 
-	wekaPassword, err := common.GetWekaClusterPassword(ctx, p.KeyVaultUri)
+	logger.Info().Msg("setting weka admin password in secrets manager")
+	adminPassword := utils.GeneratePassword(16, 1, 1, 1)
+	err = common.SetWekaAdminPassword(ctx, p.KeyVaultUri, adminPassword)
 	if err != nil {
-		err = fmt.Errorf("failed to get weka cluster password: %w", err)
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	logger.Info().Msg("setting weka deployment password in key vault")
+	wekaServicePassword := utils.GeneratePassword(16, 1, 1, 1)
+	err = common.SetWekaDeploymentPassword(ctx, p.KeyVaultUri, wekaServicePassword)
+	if err != nil {
+		err = fmt.Errorf("failed to set weka service password: %w", err)
 		logger.Error().Err(err).Send()
 		return
 	}
@@ -145,8 +195,6 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 	clusterParams.VMNames = vmNamesList
 	clusterParams.IPs = ipsList
 	clusterParams.ObsScript = GetObsScript(p.Obs)
-	clusterParams.WekaPassword = wekaPassword
-	clusterParams.WekaUsername = common.WekaAdminUsername
 	clusterParams.InstallDpdk = p.InstallDpdk
 	clusterParams.FindDrivesScript = common.FindDrivesScript
 	clusterParams.ClusterizationTarget = state.ClusterizationTarget
@@ -194,20 +242,21 @@ func Clusterize(ctx context.Context, p ClusterizationParams) (clusterizeScript s
 
 func doNFSClusterize(ctx context.Context, p ClusterizationParams, funcDef functions_def.FunctionDef) (clusterizeScript string, err error) {
 	nfsInterfaceGroupName := os.Getenv("NFS_INTERFACE_GROUP_NAME")
-	nfsClientGroupName := os.Getenv("NFS_CLIENT_GROUP_NAME")
 	nfsProtocolgwsNum, _ := strconv.Atoi(os.Getenv("NFS_PROTOCOL_GATEWAYS_NUM"))
 	nfsSecondaryIpsNum, _ := strconv.Atoi(os.Getenv("NFS_SECONDARY_IPS_NUM"))
 	nfsVmssName := os.Getenv("NFS_VMSS_NAME")
 	backendLbIp := os.Getenv("BACKEND_LB_IP")
 
+	logger := logging.LoggerFromCtx(ctx)
+
 	state, err := common.AddInstanceToState(ctx, p.SubscriptionId, p.ResourceGroupName, p.NFSStateParams, p.Vm)
 	if err != nil {
-		log.Error().Err(err).Send()
+		logger.Error().Err(err).Send()
 		return
 	}
 
 	msg := fmt.Sprintf("This (%s) is nfs instance %d/%d that is ready for joining the interface group", p.Vm.Name, len(state.Instances), nfsProtocolgwsNum)
-	log.Info().Msgf(msg)
+	logger.Info().Msgf(msg)
 	if len(state.Instances) != nfsProtocolgwsNum {
 		clusterizeScript = cloudCommon.GetScriptWithReport(msg, funcDef.GetFunctionCmdDefinition(functions_def.Report), p.Vm.Protocol)
 		return
@@ -229,19 +278,18 @@ func doNFSClusterize(ctx context.Context, p ClusterizationParams, funcDef functi
 	secondaryIps, err := common.GetScaleSetSecondaryIps(ctx, vmssParams)
 	if err != nil {
 		err = fmt.Errorf("failed to get scale set secondary ips: %w", err)
-		log.Error().Err(err).Send()
+		logger.Error().Err(err).Send()
 		return
 	}
 
 	if len(secondaryIps) < nfsSecondaryIpsNum {
 		err = fmt.Errorf("not enough secondary ips in vmss %s: %d/%d", nfsVmssName, len(secondaryIps), nfsSecondaryIpsNum)
-		log.Error().Err(err).Send()
+		logger.Error().Err(err).Send()
 		return
 	}
 
 	nfsParams := protocol.NFSParams{
 		InterfaceGroupName: nfsInterfaceGroupName,
-		ClientGroupName:    nfsClientGroupName,
 		SecondaryIps:       secondaryIps,
 		ContainersUid:      containersUid,
 		NicNames:           nicNames,
@@ -256,7 +304,7 @@ func doNFSClusterize(ctx context.Context, p ClusterizationParams, funcDef functi
 	}
 
 	clusterizeScript = scriptGenerator.GetNFSSetupScript()
-	log.Info().Msg("Clusterization script for NFS generated")
+	logger.Info().Msg("Clusterization script for NFS generated")
 	return
 }
 
@@ -300,12 +348,6 @@ func doClusterize(ctx context.Context, p ClusterizationParams, funcDef functions
 			clusterizeScript = cloudCommon.GetErrorScript(err, reportFunction, p.Vm.Protocol)
 		}
 	} else {
-		wekaPassword, err2 := common.GetWekaClusterPassword(ctx, p.KeyVaultUri)
-		if err2 != nil {
-			logger.Error().Err(err2).Send()
-			return
-		}
-
 		vmsPrivateIps, err2 := common.GetVmsPrivateIps(ctx, vmssParams)
 		if err2 != nil {
 			err = fmt.Errorf("failed to get vms private ips: %w", err)
@@ -320,9 +362,7 @@ func doClusterize(ctx context.Context, p ClusterizationParams, funcDef functions
 		}
 
 		joinParams := join.JoinParams{
-			WekaUsername: common.WekaAdminUsername,
-			WekaPassword: wekaPassword,
-			IPs:          ipsList,
+			IPs: ipsList,
 		}
 
 		joinScriptGenerator := join.JoinScriptGenerator{
@@ -349,12 +389,20 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	obsName := os.Getenv("OBS_NAME")
 	obsContainerName := os.Getenv("OBS_CONTAINER_NAME")
 	obsAccessKey := os.Getenv("OBS_ACCESS_KEY")
+	obsNetworkAccess := os.Getenv("OBS_NETWORK_ACCESS")
+	obsAllowedSubnetsStr := os.Getenv("OBS_ALLOWED_SUBNETS")
+	obsAllowedSubnets := []string{}
+	obsAllowedPublicIpsStr := os.Getenv("OBS_ALLOWED_PUBLIC_IPS")
+	obsAllowedPublicIps := []string{}
 	location := os.Getenv("LOCATION")
 	tieringSsdPercent := os.Getenv("TIERING_SSD_PERCENT")
 	tieringTargetSsdRetention, _ := strconv.Atoi(os.Getenv("TIERING_TARGET_SSD_RETENTION"))
 	tieringStartDemote, _ := strconv.Atoi(os.Getenv("TIERING_START_DEMOTE"))
 	prefix := os.Getenv("PREFIX")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
+	subnetId := os.Getenv("SUBNET_ID")
+	blobPrivateDnsZoneId := os.Getenv("BLOB_PRIVATE_DNS_ZONE_ID")
+	createblobPrivateEndpoint, _ := strconv.ParseBool(os.Getenv("CREATE_BLOB_PRIVATE_ENDPOINT"))
 	// data protection-related vars
 	stripeWidth, _ := strconv.Atoi(os.Getenv("STRIPE_WIDTH"))
 	protectionLevel, _ := strconv.Atoi(os.Getenv("PROTECTION_LEVEL"))
@@ -373,6 +421,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	addFrontend := false
 	if addFrontendNum > 0 {
 		addFrontend = true
+	}
+
+	if obsAllowedSubnetsStr != "" {
+		obsAllowedSubnets = strings.Split(obsAllowedSubnetsStr, ",")
+	}
+	if obsAllowedPublicIpsStr != "" {
+		obsAllowedPublicIps = strings.Split(obsAllowedPublicIpsStr, ",")
 	}
 
 	resData := make(map[string]interface{})
@@ -403,14 +458,17 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	params := ClusterizationParams{
-		SubscriptionId:    subscriptionId,
-		ResourceGroupName: resourceGroupName,
-		Location:          location,
-		Prefix:            prefix,
-		KeyVaultUri:       keyVaultUri,
-		StateParams:       common.BlobObjParams{StorageName: stateStorageName, ContainerName: stateContainerName, BlobName: stateBlobName},
-		Vm:                vm,
-		InstallDpdk:       installDpdk,
+		SubscriptionId:            subscriptionId,
+		ResourceGroupName:         resourceGroupName,
+		Location:                  location,
+		Prefix:                    prefix,
+		KeyVaultUri:               keyVaultUri,
+		SubnetId:                  subnetId,
+		PrivateDNSZoneId:          blobPrivateDnsZoneId,
+		CreateBlobPrivateEndpoint: createblobPrivateEndpoint,
+		StateParams:               common.BlobObjParams{StorageName: stateStorageName, ContainerName: stateContainerName, BlobName: stateBlobName},
+		Vm:                        vm,
+		InstallDpdk:               installDpdk,
 		Cluster: clusterize.ClusterParams{
 			ClusterizationTarget: clusterizationTarget,
 			ClusterName:          clusterName,
@@ -429,11 +487,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			TieringTargetSSDRetention: tieringTargetSsdRetention,
 			TieringStartDemote:        tieringStartDemote,
 		},
-		Obs: AzureObsParams{
+		Obs: common.AzureObsParams{
 			Name:              obsName,
 			ContainerName:     obsContainerName,
 			AccessKey:         obsAccessKey,
 			TieringSsdPercent: tieringSsdPercent,
+			NetworkAccess:     obsNetworkAccess,
+			AllowedSubnets:    obsAllowedSubnets,
+			AllowedPublicIps:  obsAllowedPublicIps,
 		},
 		NFSStateParams:  common.BlobObjParams{StorageName: stateStorageName, ContainerName: nfsStateContainerName, BlobName: nfsStateBlobName},
 		FunctionAppName: functionAppName,

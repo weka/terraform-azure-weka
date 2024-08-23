@@ -4,13 +4,13 @@
 | Name | Version |
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.4.6 |
-| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~>3.75.0 |
+| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~>3.114.0 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | ~>3.75.0 |
+| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | ~>3.114.0 |
 
 ## Modules
 
@@ -21,6 +21,7 @@ No modules.
 | Name | Type |
 |------|------|
 | [azurerm_linux_virtual_machine.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/linux_virtual_machine) | resource |
+| [azurerm_linux_virtual_machine_scale_set.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/linux_virtual_machine_scale_set) | resource |
 | [azurerm_network_interface.private_first_nic](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/network_interface) | resource |
 | [azurerm_network_interface.private_nics](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/network_interface) | resource |
 | [azurerm_network_interface.public_first_nic](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/network_interface) | resource |
@@ -56,6 +57,7 @@ No modules.
 | <a name="input_ssh_public_key"></a> [ssh\_public\_key](#input\_ssh\_public\_key) | Ssh public key to pass to vms. | `string` | n/a | yes |
 | <a name="input_subnet_name"></a> [subnet\_name](#input\_subnet\_name) | The subnet names. | `string` | n/a | yes |
 | <a name="input_tags_map"></a> [tags\_map](#input\_tags\_map) | A map of tags to assign the same metadata to all resources in the environment. Format: key:value. | `map(string)` | `{}` | no |
+| <a name="input_use_vmss"></a> [use\_vmss](#input\_use\_vmss) | Use VMSS | `bool` | `false` | no |
 | <a name="input_vm_identity_name"></a> [vm\_identity\_name](#input\_vm\_identity\_name) | The name of the user assigned identity for the client VMs. | `string` | `""` | no |
 | <a name="input_vm_username"></a> [vm\_username](#input\_vm\_username) | The user name for logging in to the virtual machines. | `string` | `"weka"` | no |
 | <a name="input_vmss_name"></a> [vmss\_name](#input\_vmss\_name) | The name of the backends virtual machine scale set. | `string` | n/a | yes |
@@ -68,4 +70,5 @@ No modules.
 |------|-------------|
 | <a name="output_client_ips"></a> [client\_ips](#output\_client\_ips) | n/a |
 | <a name="output_client_names"></a> [client\_names](#output\_client\_names) | n/a |
+| <a name="output_vmss_name"></a> [vmss\_name](#output\_vmss\_name) | n/a |
 <!-- END_TF_DOCS -->
