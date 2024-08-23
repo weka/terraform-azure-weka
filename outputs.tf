@@ -63,7 +63,11 @@ output "clients_vmss_name" {
 }
 
 output "client_ips" {
-  value       = var.clients_number > 0 && !var.clients_use_vmss ? module.clients[0].client_ips : null
+  value = (
+    var.clients_number > 0 && !var.clients_use_vmss ? module.clients[0].client_ips :
+    var.clients_number > 0 && var.clients_use_vmss ? local.clients_vmss_ips :
+    null
+  )
   description = "If 'private_network' is set to false, it will output clients public ips, otherwise private ips."
 }
 
