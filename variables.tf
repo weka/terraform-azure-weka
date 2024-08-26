@@ -129,7 +129,6 @@ variable "logic_app_identity_name" {
 variable "weka_version" {
   type        = string
   description = "The Weka version to deploy."
-  default     = "4.2.12.87"
 }
 
 variable "get_weka_io_token" {
