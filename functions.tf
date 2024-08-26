@@ -328,6 +328,11 @@ resource "azurerm_linux_function_app" "function_app" {
       condition     = local.read_remote_function_zip || var.deployment_function_app_code_blob != ""
       error_message = "You should provide value for 'deployment_function_app_code_blob' or 'read_function_zip_from_storage_account' should be false"
     }
+
+    precondition {
+      condition     = var.install_weka_url != "" || var.weka_version != ""
+      error_message = "Please provide either 'install_weka_url' or 'weka_version' variables."
+    }
   }
 
   depends_on = [module.network, module.iam, azurerm_storage_account.deployment_sa, azurerm_private_endpoint.file_endpoint, azurerm_private_endpoint.blob_endpoint]
