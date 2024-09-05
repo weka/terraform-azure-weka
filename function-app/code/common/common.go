@@ -299,7 +299,7 @@ func AddInstanceToState(ctx context.Context, subscriptionId, resourceGroupName, 
 		return
 	}
 
-	if len(state.Instances) >= state.InitialSize {
+	if len(state.Instances) >= state.ClusterizationTarget {
 		message := "cluster size is already satisfied"
 		err = &ShutdownRequired{
 			Message: message,
