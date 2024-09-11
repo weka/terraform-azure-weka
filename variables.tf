@@ -86,7 +86,7 @@ variable "cluster_size" {
 
 variable "source_image_id" {
   type        = string
-  default     = "/communityGalleries/WekaIO-d7d3f308-d5a1-4c45-8e8a-818aed57375a/images/ubuntu20.04/versions/latest"
+  default     = "/communityGalleries/WekaIO-ddbef83d-dec1-42d0-998a-3c083f1450b7/images/weka_custom_image/versions/1.0.1"
   description = "Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1"
 }
 
