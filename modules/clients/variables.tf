@@ -116,7 +116,7 @@ variable "arch" {
 
 variable "source_image_id" {
   type        = string
-  description = "Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1"
+  description = "Use weka custom image, ubuntu 22.04 with kernel 6.2 and ofed 23.10-0.5.5.0"
   default     = ""
 }
 
