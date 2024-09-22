@@ -86,8 +86,8 @@ variable "cluster_size" {
 
 variable "source_image_id" {
   type        = string
-  default     = "/communityGalleries/WekaIO-ddbef83d-dec1-42d0-998a-3c083f1450b7/images/weka_custom_image/versions/1.0.1"
-  description = "Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1"
+  default     = "/communityGalleries/WekaIO-ddbef83d-dec1-42d0-998a-3c083f1450b7/images/weka_custom_image/versions/2.0.0"
+  description = "Use weka custom image, ubuntu 22.04 with kernel 6.2 and ofed 23.10-0.5.5.0"
 }
 
 variable "sg_id" {
@@ -514,7 +514,7 @@ variable "client_instance_type" {
 
 variable "client_source_image_id" {
   type        = string
-  description = "Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1 / ubuntu arm 20.04 with kernel 5.4 and ofed 5.9-0.5.6.0"
+  description = "Use weka custom image, ubuntu 22.04 with kernel 6.2 and ofed 23.10-0.5.5.0 / ubuntu arm 22.04 with kernel 6.2 and ofed 23.10-0.5.5.0"
   default     = ""
 }
 
