@@ -41,8 +41,8 @@ locals {
   }
   instance_type = var.instance_type != "" ? var.instance_type : local.default_client_instance_type[local.arch]
   default_source_image_id = {
-    x86_64 = "/communityGalleries/WekaIO-ddbef83d-dec1-42d0-998a-3c083f1450b7/images/weka_custom_image/versions/1.0.1"
-    arm64  = "/communityGalleries/WekaIO-ddbef83d-dec1-42d0-998a-3c083f1450b7/images/weka_custom_image_arm/versions/1.0.0"
+    x86_64 = "/communityGalleries/WekaIO-ddbef83d-dec1-42d0-998a-3c083f1450b7/images/weka_custom_image/versions/2.0.0"
+    arm64  = "/communityGalleries/WekaIO-ddbef83d-dec1-42d0-998a-3c083f1450b7/images/weka_custom_image_arm/versions/2.0.0"
   }
   source_image_id = var.source_image_id != "" ? var.source_image_id : local.default_source_image_id[local.arch]
 }
