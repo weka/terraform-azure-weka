@@ -880,3 +880,13 @@ variable "key_vault_purge_protection_enabled" {
   default     = false
   description = "Enable purge protection for the key vault."
 }
+
+variable "os_disk" {
+  type    = string
+  default = "Premium_LRS"
+}
+
+variable "data_disk" {
+  type    = string
+  default = "Premium_LRS"
+}

@@ -53,7 +53,7 @@ locals {
 
     os_disk = {
       caching              = "ReadWrite"
-      storage_account_type = "Premium_LRS"
+      storage_account_type = var.os_disk
     }
 
     data_disk = {
@@ -61,7 +61,7 @@ locals {
       caching              = "None"
       create_option        = "Empty"
       disk_size_gb         = local.disk_size
-      storage_account_type = "Premium_LRS"
+      storage_account_type = var.data_disk
     }
 
     identity = {
