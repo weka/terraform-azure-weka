@@ -317,6 +317,30 @@ variable "containers_config_map" {
       nics     = 8
       memory   = ["384GB", "384GB"]
     }
+    Standard_L16aos_v4 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 6
+      nics     = 8
+      memory   = ["76GB", "76GB"]
+    }
+    Standard_L24aos_v4 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 9
+      nics     = 8
+      memory   = ["138GB", "135GB"]
+    }
+    Standard_L32aos_v4 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 12
+      nics     = 8
+      memory   = ["193GB", "193GB"]
+    }
   }
   validation {
     condition     = alltrue([for m in flatten([for i in values(var.containers_config_map) : (flatten(i.memory))]) : tonumber(trimsuffix(m, "GB")) <= 384])
@@ -393,13 +417,13 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "4d7685ed85e7112b8c9f23687d386a73"
+  default     = "9900e76633d458baea642f0de5307632"
 }
 
 variable "function_app_dist" {
   type        = string
   description = "Function app code dist"
-  default     = "release"
+  default     = "dev"
 
   validation {
     condition     = contains(["dev", "release"], var.function_app_dist)
