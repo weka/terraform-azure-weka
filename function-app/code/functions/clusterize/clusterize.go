@@ -181,18 +181,24 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 	}
 
 	var vmNamesList []string
+	var vmNamesToDevicePaths []string
 	// we make the ips list compatible to vmNames
 	var ipsList []string
 	for _, instance := range state.Instances {
 		vm := strings.Split(instance.Name, ":")
 		ipsList = append(ipsList, vmsPrivateIps[vm[0]])
 		vmNamesList = append(vmNamesList, vm[1])
+
+		devicePaths := strings.Join(instance.DevicePaths, ",")
+		nameToDevicePaths := fmt.Sprintf("%s:%s", vm[1], devicePaths)
+		vmNamesToDevicePaths = append(vmNamesToDevicePaths, nameToDevicePaths)
 	}
 
 	logger.Info().Msg("Generating clusterization script")
 
 	clusterParams := p.Cluster
 	clusterParams.VMNames = vmNamesList
+	clusterParams.VMNamesToDevicePaths = vmNamesToDevicePaths
 	clusterParams.IPs = ipsList
 	clusterParams.ObsScript = GetObsScript(p.Obs)
 	clusterParams.InstallDpdk = p.InstallDpdk
