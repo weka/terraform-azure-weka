@@ -88,7 +88,7 @@ resource "azurerm_subnet_nat_gateway_association" "subnet_nat_gateway_associatio
   depends_on     = [azurerm_subnet.subnet, azurerm_nat_gateway.nat_gateway, data.azurerm_subnet.subnet_data]
 }
 
-# ====================== sg ssh ========================== #
+# ====================== ssh sg ========================== #
 resource "azurerm_network_security_rule" "sg_public_ssh" {
   count                       = var.sg_id == "" ? length(var.allow_ssh_cidrs) : 0
   name                        = "${var.prefix}-ssh-sg-${count.index}"
@@ -104,7 +104,7 @@ resource "azurerm_network_security_rule" "sg_public_ssh" {
   network_security_group_name = azurerm_network_security_group.sg[0].name
 }
 
-# ====================== sg  ========================== #
+# ====================== ui sg ========================== #
 resource "azurerm_network_security_rule" "sg_weka_ui" {
   count                       = var.sg_id == "" ? length(var.allow_weka_api_cidrs) : 0
   name                        = "${var.prefix}-ui-sg-${count.index}"
@@ -116,6 +116,22 @@ resource "azurerm_network_security_rule" "sg_weka_ui" {
   source_port_range           = "*"
   destination_port_range      = "14000"
   source_address_prefix       = element(var.allow_weka_api_cidrs, count.index)
+  destination_address_prefix  = "*"
+  network_security_group_name = azurerm_network_security_group.sg[0].name
+}
+
+# ====================== custom sg ========================== #
+resource "azurerm_network_security_rule" "sg_custom" {
+  count                       = var.sg_id == "" ? length(var.sg_custom_ingress_rules) : 0
+  name                        = "${var.prefix}-custom-sg-${count.index}"
+  resource_group_name         = data.azurerm_resource_group.rg.name
+  priority                    = 300 + (count.index + 1)
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = var.sg_custom_ingress_rules[count.index].protocol
+  source_port_range           = var.sg_custom_ingress_rules[count.index].from_port
+  destination_port_range      = var.sg_custom_ingress_rules[count.index].to_port
+  source_address_prefix       = var.sg_custom_ingress_rules[count.index].cidr_block
   destination_address_prefix  = "*"
   network_security_group_name = azurerm_network_security_group.sg[0].name
 }
