@@ -329,7 +329,7 @@ proxy_url = VALUE
 | Name | Version |
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.4.6 |
-| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~>3.114.0 |
+| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~>4.6.0 |
 | <a name="requirement_local"></a> [local](#requirement\_local) | ~>2.4.0 |
 | <a name="requirement_tls"></a> [tls](#requirement\_tls) | ~>4.0.4 |
 
@@ -337,7 +337,7 @@ proxy_url = VALUE
 
 | Name | Version |
 |------|---------|
-| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | ~>3.114.0 |
+| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | ~>4.6.0 |
 | <a name="provider_local"></a> [local](#provider\_local) | ~>2.4.0 |
 | <a name="provider_tls"></a> [tls](#provider\_tls) | ~>4.0.4 |
 
