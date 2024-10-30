@@ -500,6 +500,7 @@ proxy_url = VALUE
 | <a name="input_script_post_cluster_creation"></a> [script\_post\_cluster\_creation](#input\_script\_post\_cluster\_creation) | Script to run after cluster creation | `string` | `""` | no |
 | <a name="input_script_pre_start_io"></a> [script\_pre\_start\_io](#input\_script\_pre\_start\_io) | Script to run before starting IO | `string` | `""` | no |
 | <a name="input_set_dedicated_fe_container"></a> [set\_dedicated\_fe\_container](#input\_set\_dedicated\_fe\_container) | Create cluster with FE containers | `bool` | `false` | no |
+| <a name="input_sg_custom_ingress_rules"></a> [sg\_custom\_ingress\_rules](#input\_sg\_custom\_ingress\_rules) | Custom inbound rules to be added to the security group. | <pre>list(object({<br>    from_port  = string<br>    to_port    = string<br>    protocol   = string<br>    cidr_block = string<br>  }))</pre> | `[]` | no |
 | <a name="input_sg_id"></a> [sg\_id](#input\_sg\_id) | The security group id. | `string` | `""` | no |
 | <a name="input_smb_cluster_name"></a> [smb\_cluster\_name](#input\_smb\_cluster\_name) | The name of the SMB setup. | `string` | `"Weka-SMB"` | no |
 | <a name="input_smb_create_private_dns_resolver"></a> [smb\_create\_private\_dns\_resolver](#input\_smb\_create\_private\_dns\_resolver) | Create dns resolver for smb with outbound rule | `bool` | `false` | no |

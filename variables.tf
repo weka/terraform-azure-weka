@@ -43,6 +43,17 @@ variable "allow_weka_api_cidrs" {
   default     = []
 }
 
+variable "sg_custom_ingress_rules" {
+  type = list(object({
+    from_port  = string
+    to_port    = string
+    protocol   = string
+    cidr_block = string
+  }))
+  default     = []
+  description = "Custom inbound rules to be added to the security group."
+}
+
 variable "address_space" {
   type        = string
   description = "The range of IP addresses the virtual network uses."
