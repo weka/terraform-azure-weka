@@ -4,8 +4,8 @@ locals {
   key_vault_name       = azurerm_key_vault.key_vault.name
   vm_ips               = local.assign_public_ip ? "az vmss list-instance-public-ips -g ${var.rg_name} --name ${local.vmss_name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n" : "az vmss nic list -g ${var.rg_name} --vmss-name ${local.vmss_name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress \n"
   clients_vmss_ips     = local.assign_public_ip ? "az vmss list-instance-public-ips -g ${var.rg_name} --name ${local.clients_vmss_name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n" : "az vmss nic list -g ${var.rg_name} --vmss-name ${local.clients_vmss_name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress \n"
-  ssh_keys_commands    = "########################################## Download ssh keys command from blob ###########################################################\n az keyvault secret download --file private.pem --encoding utf-8 --vault-name  ${local.key_vault_name} --name private-key --query \"value\" \n az keyvault secret download --file public.pub --encoding utf-8 --vault-name  ${local.key_vault_name} --name public-key --query \"value\"\n"
-  blob_commands        = var.ssh_public_key == null ? local.ssh_keys_commands : ""
+  ssh_keys_commands    = "az keyvault secret download --file private.pem --encoding utf-8 --vault-name  ${local.key_vault_name} --name private-key --query \"value\" \n az keyvault secret download --file public.pub --encoding utf-8 --vault-name  ${local.key_vault_name} --name public-key --query \"value\"\n"
+  download_ssh_key     = var.ssh_public_key == null ? local.ssh_keys_commands : ""
   private_ssh_key_path = var.ssh_public_key == null ? local.ssh_private_key_path : null
   resource_group_name  = data.azurerm_resource_group.rg.name
   functions_url = {
@@ -129,43 +129,24 @@ output "weka_cluster_admin_password_secret_name" {
 
 
 locals {
-  resize_helper_command   = !local.create_logic_app ? "" : <<EOT
-########################################## Resize cluster #################################################################################
+  resize_helper_command = !local.create_logic_app ? "" : <<EOT
 function_key=$(az functionapp keys list --name ${local.function_app_name} --resource-group ${local.resource_group_name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
 curl --fail https://${local.function_app_name}.azurewebsites.net/api/resize?code=$function_key -H "Content-Type:application/json" -d '{"value":ENTER_NEW_VALUE_HERE}'
-EOT
-  scale_up_helper_command = local.create_logic_app ? "" : <<EOT
-########################################## Scale up cluster #################################################################################
-function_key=$(az functionapp keys list --name ${local.function_app_name} --resource-group ${local.resource_group_name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
-curl --fail https://${local.function_app_name}.azurewebsites.net/api/scale_up?code=$function_key
 EOT
 }
 
 output "cluster_helper_commands" {
-  value       = <<EOT
-########################################## Get function key #####################################################################
-az functionapp keys list --name ${local.function_app_name} --resource-group ${local.resource_group_name} --subscription ${var.subscription_id} --query functionKeys -o tsv
-
-########################################## Get clusterization status #####################################################################
+  value = {
+    get_function_key      = "az functionapp keys list --name ${local.function_app_name} --resource-group ${local.resource_group_name} --subscription ${var.subscription_id} --query functionKeys -o tsv"
+    get_status            = <<EOT
 function_key=$(az functionapp keys list --name ${local.function_app_name} --resource-group ${local.resource_group_name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
+# for weka staus pass "status" instead of "progress"
 curl --fail https://${local.function_app_name}.azurewebsites.net/api/status?code=$function_key -H "Content-Type:application/json" -d '{"type": "progress"}'
-
-########################################## Get cluster status ############################################################################
-function_key=$(az functionapp keys list --name ${local.function_app_name} --resource-group ${local.resource_group_name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
-curl --fail https://${local.function_app_name}.azurewebsites.net/api/status?code=$function_key
-
-######################################### Fetch weka cluster password ####################################################################
-az keyvault secret show --vault-name ${local.key_vault_name} --name ${azurerm_key_vault_secret.weka_password_secret.name} | jq .value
-
-${local.blob_commands}
-
-${local.resize_helper_command}
-${local.scale_up_helper_command}
-
-########################################## pre-terraform destroy, cluster terminate function ################
-backends_vmss_name=${local.vmss_name}
-az vmss delete --name <ENTER YOUR BACKENDS VMSS_NAME HERE> --resource-group ${var.rg_name} --force-deletion true --subscription ${var.subscription_id}
-
 EOT
+    get_password          = "az keyvault secret show --vault-name ${local.key_vault_name} --name ${azurerm_key_vault_secret.weka_password_secret.name} | jq .value"
+    resize_cluster        = local.resize_helper_command
+    download_ssh_key      = local.download_ssh_key
+    pre_terraform_destroy = "az vmss delete --name <ENTER YOUR BACKENDS VMSS_NAME HERE> --resource-group ${var.rg_name} --force-deletion true --subscription ${var.subscription_id}"
+  }
   description = "Useful commands and script to interact with weka cluster"
 }
