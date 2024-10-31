@@ -14,7 +14,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
 	github.com/lithammer/dedent v1.1.0
-	github.com/weka/go-cloud-lib v0.0.0-20240925210243-4d37183d36eb
+	github.com/weka/go-cloud-lib v0.0.0-20241030124057-ec13a72a73b2
 )
 
 require (

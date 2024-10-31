@@ -166,6 +166,8 @@ locals {
     SMB_PROTOCOL_GATEWAY_FE_CORES_NUM = var.smb_protocol_gateway_fe_cores_num
     S3_PROTOCOL_GATEWAY_FE_CORES_NUM  = var.s3_protocol_gateway_fe_cores_num
     TRACES_PER_FRONTEND               = var.traces_per_ionode
+    SET_DEFAULT_FS                    = var.set_default_fs
+    POST_CLUSTER_SETUP_SCRIPT         = var.post_cluster_setup_script
 
     BACKEND_LB_IP = var.create_lb ? azurerm_lb.backend_lb[0].private_ip_address : ""
     # state

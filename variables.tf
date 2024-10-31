@@ -404,13 +404,13 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "f574113c680e317e7bca869159e0d168"
+  default     = "6668fae0609d33c3364957cf3e3bccf6"
 }
 
 variable "function_app_dist" {
   type        = string
   description = "Function app code dist"
-  default     = "release"
+  default     = "dev"
 
   validation {
     condition     = contains(["dev", "release"], var.function_app_dist)
@@ -890,4 +890,16 @@ variable "key_vault_purge_protection_enabled" {
   type        = bool
   default     = false
   description = "Enable purge protection for the key vault."
+}
+
+variable "set_default_fs" {
+  type        = bool
+  description = "Set the default filesystem which will use the full available capacity"
+  default     = true
+}
+
+variable "post_cluster_setup_script" {
+  type        = string
+  description = "A script to run after the cluster is up"
+  default     = ""
 }
