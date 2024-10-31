@@ -417,6 +417,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	// NFS state
 	nfsStateContainerName := os.Getenv("NFS_STATE_CONTAINER_NAME")
 	nfsStateBlobName := os.Getenv("NFS_STATE_BLOB_NAME")
+	setDefaultFs, _ := strconv.ParseBool(os.Getenv("SET_DEFAULT_FS"))
+	postClusterSetupScript := os.Getenv("POST_CLUSTER_SETUP_SCRIPT")
 
 	addFrontend := false
 	if addFrontendNum > 0 {
@@ -486,6 +488,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			PostClusterCreationScript: postClusterCreationScript,
 			TieringTargetSSDRetention: tieringTargetSsdRetention,
 			TieringStartDemote:        tieringStartDemote,
+			SetDefaultFs:              setDefaultFs,
+			PostClusterSetupScript:    postClusterSetupScript,
 		},
 		Obs: common.AzureObsParams{
 			Name:              obsName,
