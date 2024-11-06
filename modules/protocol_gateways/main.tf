@@ -16,6 +16,7 @@ resource "azurerm_public_ip" "this" {
   location            = var.location
   resource_group_name = var.rg_name
   allocation_method   = "Dynamic"
+  sku                 = "Basic"
 }
 
 resource "azurerm_network_interface" "primary_gateway_nic_public" {
