@@ -17,9 +17,10 @@ locals {
   install_weka_url         = var.install_weka_url != "" ? var.install_weka_url : "https://$TOKEN@get.weka.io/dist/v1/install/${var.weka_version}/${var.weka_version}"
   supported_regions        = split("\n", replace(chomp(file("${path.module}/supported_regions/${var.function_app_dist}.txt")), "\r", ""))
   # log analytics for function app
-  log_analytics_workspace_id  = var.enable_application_insights ? var.log_analytics_workspace_id == "" ? azurerm_log_analytics_workspace.la_workspace[0].id : var.log_analytics_workspace_id : ""
-  application_insights_id     = var.enable_application_insights ? var.application_insights_name == "" ? azurerm_application_insights.application_insights[0].id : data.azurerm_application_insights.application_insights[0].id : ""
-  insights_instrumenation_key = var.enable_application_insights ? var.application_insights_name == "" ? azurerm_application_insights.application_insights[0].instrumentation_key : data.azurerm_application_insights.application_insights[0].instrumentation_key : ""
+  log_analytics_workspace_id   = var.enable_application_insights ? var.log_analytics_workspace_id == "" ? azurerm_log_analytics_workspace.la_workspace[0].id : var.log_analytics_workspace_id : ""
+  application_insights_id      = var.enable_application_insights ? var.application_insights_name == "" ? azurerm_application_insights.application_insights[0].id : data.azurerm_application_insights.application_insights[0].id : ""
+  application_insights_rg_name = var.application_insights_rg_name == "" ? var.rg_name : var.application_insights_rg_name
+  insights_instrumenation_key  = var.enable_application_insights ? var.application_insights_name == "" ? azurerm_application_insights.application_insights[0].instrumentation_key : data.azurerm_application_insights.application_insights[0].instrumentation_key : ""
   # nfs autoscaling
   nfs_deployment_container_name = var.nfs_deployment_container_name == "" ? "${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}-protocol-deployment" : var.nfs_deployment_container_name
 
@@ -199,7 +200,7 @@ resource "azurerm_log_analytics_workspace" "la_workspace" {
   count               = var.log_analytics_workspace_id == "" && var.enable_application_insights ? 1 : 0
   name                = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-workspace"
   location            = data.azurerm_resource_group.rg.location
-  resource_group_name = data.azurerm_resource_group.rg.name
+  resource_group_name = var.rg_name
   sku                 = "PerGB2018"
   retention_in_days   = 30
   lifecycle {
@@ -210,14 +211,14 @@ resource "azurerm_log_analytics_workspace" "la_workspace" {
 data "azurerm_application_insights" "application_insights" {
   count               = var.application_insights_name != "" && var.enable_application_insights ? 1 : 0
   name                = var.application_insights_name
-  resource_group_name = data.azurerm_resource_group.rg.name
+  resource_group_name = local.application_insights_rg_name
 }
 
 resource "azurerm_application_insights" "application_insights" {
   count               = var.application_insights_name == "" && var.enable_application_insights ? 1 : 0
   name                = "${var.prefix}-${var.cluster_name}-application-insights"
   location            = data.azurerm_resource_group.rg.location
-  resource_group_name = data.azurerm_resource_group.rg.name
+  resource_group_name = local.application_insights_rg_name
   workspace_id        = local.log_analytics_workspace_id
   application_type    = "web"
   lifecycle {

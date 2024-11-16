@@ -454,6 +454,12 @@ variable "application_insights_name" {
   default     = ""
 }
 
+variable "application_insights_rg_name" {
+  type        = string
+  description = "The Application Insights resource group name."
+  default     = ""
+}
+
 variable "enable_application_insights" {
   type        = bool
   default     = true
