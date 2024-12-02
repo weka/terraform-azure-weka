@@ -215,13 +215,14 @@ data "azurerm_application_insights" "application_insights" {
 }
 
 data "azurerm_resource_group" "application_insights_rg" {
-  name = local.application_insights_rg_name
+  count = var.application_insights_name == "" && var.enable_application_insights ? 1 : 0
+  name  = local.application_insights_rg_name
 }
 
 resource "azurerm_application_insights" "application_insights" {
   count               = var.application_insights_name == "" && var.enable_application_insights ? 1 : 0
   name                = "${var.prefix}-${var.cluster_name}-application-insights"
-  location            = data.azurerm_resource_group.application_insights_rg.location
+  location            = data.azurerm_resource_group.application_insights_rg[0].location
   resource_group_name = local.application_insights_rg_name
   workspace_id        = local.log_analytics_workspace_id
   application_type    = "web"
