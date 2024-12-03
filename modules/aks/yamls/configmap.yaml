@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: installer-config
+  namespace: default
+data:
+  install.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    nics_num=${NICS}
+    backend_ip=${BACKEND_IP}
+    frontend_container_cores_num=${FRONTEND_CONTAINER_CORES_NUM}
+
+    apt install -y --reinstall openvswitch-switch
+    apt install -y fio
+    apt install -y net-tools
+
+    cat <<-EOF | sed -i "/    eth0:/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
+                mtu: 3900
+    EOF
+
+    netplan apply
+
+    function retry {
+      local retry_max=$1
+      local retry_sleep=$2
+      shift 2
+      local count=$retry_max
+      while [ $count -gt 0 ]; do
+          "$@" && break
+          count=$(($count - 1))
+          echo "Retrying $* in $retry_sleep seconds..."
+          sleep $retry_sleep
+      done
+
+      [ $count -eq 0 ] && {
+          echo "Retry failed [$retry_max]: $*"
+          echo "$(date -u): retry failed"
+          return 1
+      }
+      return 0
+    }
+
+    retry 60 45 curl --fail -o install_script.sh $backend_ip:14000/dist/v1/install
+    chmod +x install_script.sh
+    ./install_script.sh
+    echo "$(date -u): weka agent installation complete"
+
+    gateway=$(ip r | grep default | awk '{print $3}')
+    FILESYSTEM_NAME=default
+    MOUNT_POINT=/mnt/weka
+    mkdir -p $MOUNT_POINT
+
+    mount_command="mount -t wekafs -o net=udp $backend_ip/$FILESYSTEM_NAME $MOUNT_POINT"
+    echo "$mount_command" > /tmp/mount_command
+    retry 60 45 $mount_command
+
+    echo "$(date -u): wekafs mount complete"

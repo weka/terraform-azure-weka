@@ -909,3 +909,33 @@ variable "post_cluster_setup_script" {
   description = "A script to run after the cluster is up"
   default     = ""
 }
+
+# ========================= aks clients ============================== #
+variable "aks_clients" {
+  type        = bool
+  description = "Create AKS clients"
+  default     = false
+}
+
+variable "aks_client_instance_type" {
+  type        = string
+  description = "The client virtual machine type (sku) to deploy."
+  default     = "Standard_L8s_v3"
+}
+
+variable "aks_client_frontend_cores" {
+  type        = number
+  description = "The client NICs number."
+  default     = 1
+}
+
+variable "aks_instances_number" {
+  type        = number
+  default     = 3
+  description = "The number of client nodepool to deploy."
+}
+
+variable "create_ml" {
+  type    = bool
+  default = false
+}

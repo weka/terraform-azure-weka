@@ -1,0 +1,37 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: azureml-fe
+  namespace: azureml
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /
+            backend:
+              service:
+                name: azureml-fe
+                port:
+                  number: 80
+            pathType: Prefix
+
+---
+# Azure Application Gateway example
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: azureml-fe
+  namespace: azureml
+spec:
+  ingressClassName: azure-application-gateway
+  rules:
+    - http:
+        paths:
+          - path: /
+            backend:
+              service:
+                name: azureml-fe
+                port:
+                  number: 80
+            pathType: Prefix
