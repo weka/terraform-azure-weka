@@ -20,7 +20,7 @@ locals {
   log_analytics_workspace_id   = var.enable_application_insights ? var.log_analytics_workspace_id == "" ? azurerm_log_analytics_workspace.la_workspace[0].id : var.log_analytics_workspace_id : ""
   application_insights_id      = var.enable_application_insights ? var.application_insights_name == "" ? azurerm_application_insights.application_insights[0].id : data.azurerm_application_insights.application_insights[0].id : ""
   application_insights_rg_name = var.application_insights_rg_name == "" ? var.rg_name : var.application_insights_rg_name
-  insights_instrumenation_key  = var.enable_application_insights ? var.application_insights_name == "" ? azurerm_application_insights.application_insights[0].instrumentation_key : data.azurerm_application_insights.application_insights[0].instrumentation_key : ""
+  insights_instrumenation_key  = var.enable_application_insights ? var.application_insights_name == "" ? azurerm_application_insights.application_insights[0].instrumentation_key : data.azurerm_application_insights.application_insights[0].instrumentation_key : null
   # nfs autoscaling
   nfs_deployment_container_name = var.nfs_deployment_container_name == "" ? "${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}-protocol-deployment" : var.nfs_deployment_container_name
 
