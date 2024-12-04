@@ -466,6 +466,12 @@ variable "enable_application_insights" {
   description = "Enable Application Insights."
 }
 
+variable "application_insights_instrumentation_key" {
+  type        = string
+  description = "The Application Insights instrumentation key."
+  default     = ""
+}
+
 variable "create_lb" {
   type        = bool
   default     = true
