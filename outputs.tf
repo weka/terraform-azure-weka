@@ -17,6 +17,10 @@ locals {
       url  = "https://${local.function_app_name}.azurewebsites.net/api/status"
       body = { "type" : "status" }
     }
+    weka_api = {
+      url  = "https://${local.function_app_name}.azurewebsites.net/api/weka_api"
+      body = { "Method" : "status" }
+    }
     resize = {
       uri  = "https://${local.function_app_name}.azurewebsites.net/api/resize"
       body = { "value" : 7 }
@@ -142,6 +146,11 @@ output "cluster_helper_commands" {
 function_key=$(az functionapp keys list --name ${local.function_app_name} --resource-group ${local.resource_group_name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
 # for weka status pass "status" instead of "progress"
 curl --fail https://${local.function_app_name}.azurewebsites.net/api/status?code=$function_key -H "Content-Type:application/json" -d '{"type": "progress"}'
+EOT
+    weka_api            = <<EOT
+function_key=$(az functionapp keys list --name ${local.function_app_name} --resource-group ${local.resource_group_name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
+# change the "Method" as needed
+curl --fail https://${local.function_app_name}.azurewebsites.net/api/weka_api?code=$function_key -H "Content-Type:application/json" -d '{"Method": "status"}'
 EOT
     get_password          = "az keyvault secret show --vault-name ${local.key_vault_name} --name ${azurerm_key_vault_secret.weka_password_secret.name} | jq .value"
     resize_cluster        = local.resize_helper_command
