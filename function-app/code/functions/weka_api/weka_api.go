@@ -82,6 +82,12 @@ func GetClusterStatus(ctx context.Context, vmssParams *common.ScaleSetParams, st
 	return
 }
 
+type WekaApi struct {
+	Method   string            `json:"method"`
+	Params   map[string]string `json:"params"`
+	Protocol string            `json:"protocol"`
+}
+
 func Handler(w http.ResponseWriter, r *http.Request) {
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
@@ -96,45 +102,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	nfsScaleSetName := os.Getenv("NFS_VMSS_NAME")
 
 	ctx := r.Context()
-	logger := logging.LoggerFromCtx(ctx)
+	//logger := logging.LoggerFromCtx(ctx)
 	log.Info().Msg("this is weka api")
 
-	var wekaRequest WekaApiRequest
-	if err := json.NewDecoder(r.Body).Decode(&wekaRequest); err != nil {
-		common.WriteErrorResponse(w, err)
+	var err error
+	var wekaApi WekaApi
+	err = common.GetBody(ctx, w, r, &wekaApi)
+	if wekaApi.Method != "status" {
+		common.WriteErrorResponse(w, fmt.Errorf("bad method"))
 		return
-	}
-
-	var invokeRequest common.InvokeRequest
-
-	var requestBody struct {
-		Type     string `json:"type"`
-		Protocol string `json:"protocol"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&invokeRequest); err != nil {
-		err = fmt.Errorf("cannot decode the request: %v", err)
-		logger.Error().Err(err).Send()
-		common.WriteErrorResponse(w, err)
-		return
-	}
-
-	var reqData map[string]interface{}
-	err := json.Unmarshal(invokeRequest.Data["req"], &reqData)
-	if err != nil {
-		err = fmt.Errorf("cannot unmarshal the request data: %v", err)
-		logger.Error().Err(err).Send()
-		common.WriteErrorResponse(w, err)
-		return
-	}
-
-	if reqData["Body"] != nil {
-		if err := json.Unmarshal([]byte(reqData["Body"].(string)), &requestBody); err != nil {
-			err = fmt.Errorf("cannot unmarshal the request body: %v", err)
-			logger.Error().Err(err).Send()
-			common.WriteErrorResponse(w, err)
-			return
-		}
 	}
 
 	stateParams := common.BlobObjParams{
@@ -150,7 +126,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		Flexible:          false,
 	}
 
-	if requestBody.Protocol == "nfs" {
+	if wekaApi.Protocol == "nfs" {
 		stateParams.ContainerName = nfsStateContainerName
 		stateParams.BlobName = nfsStateBlobName
 
@@ -159,7 +135,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var result interface{}
-	if requestBody.Type == "" || requestBody.Type == "status" {
+	if wekaApi.Method == "" || wekaApi.Method == "status" {
 		result, err = GetClusterStatus(ctx, vmssParams, stateParams, keyVaultUri)
 	}
 
