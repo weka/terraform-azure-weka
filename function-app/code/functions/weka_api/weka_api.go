@@ -18,25 +18,9 @@ import (
 	"github.com/weka/go-cloud-lib/protocol"
 )
 
-type WekaApiRequest struct {
-	Method string            `json:"method"`
-	Params map[string]string `json:"params"`
-}
-
-func GetClusterStatus(ctx context.Context, vmssParams *common.ScaleSetParams, stateParams common.BlobObjParams, keyVaultUri string) (clusterStatus protocol.ClusterStatus, err error) {
+func GetClusterStatus(ctx context.Context, wekaApi WekaApiRequest, stateParams common.BlobObjParams, keyVaultUri string) (message *json.RawMessage, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("fetching cluster status...")
-
-	state, err := common.ReadState(ctx, stateParams)
-	if err != nil {
-		return
-	}
-	clusterStatus.InitialSize = state.InitialSize
-	clusterStatus.DesiredSize = state.DesiredSize
-	clusterStatus.Clusterized = state.Clusterized
-	if !state.Clusterized {
-		return
-	}
 
 	credentials, err := common.GetWekaClusterCredentials(ctx, keyVaultUri)
 	if err != nil {
@@ -47,9 +31,9 @@ func GetClusterStatus(ctx context.Context, vmssParams *common.ScaleSetParams, st
 		return connectors.NewJrpcClient(ctx, ip, weka.ManagementJrpcPort, credentials.Username, credentials.Password)
 	}
 
-	vmIps, err := common.GetVmsPrivateIps(ctx, vmssParams)
+	vmIps, err := common.GetVmsPrivateIps(ctx, wekaApi.vmssParams)
 	if err != nil {
-		return
+		return nil, err
 	}
 	ips := make([]string, 0, len(vmIps))
 	for _, ip := range vmIps {
@@ -68,24 +52,17 @@ func GetClusterStatus(ctx context.Context, vmssParams *common.ScaleSetParams, st
 
 	var rawWekaStatus json.RawMessage
 
-	err = jpool.Call(weka.JrpcStatus, struct{}{}, &rawWekaStatus)
+	err = jpool.Call(wekaApi.Method, struct{}{}, &rawWekaStatus)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	wekaStatus := protocol.WekaStatus{}
 	if err = json.Unmarshal(rawWekaStatus, &wekaStatus); err != nil {
-		return
+		return nil, err
 	}
-	clusterStatus.WekaStatus = wekaStatus
 
-	return
-}
-
-type WekaApi struct {
-	Method   string            `json:"method"`
-	Params   map[string]string `json:"params"`
-	Protocol string            `json:"protocol"`
+	return &rawWekaStatus, nil
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -106,7 +83,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	log.Info().Msg("this is weka api")
 
 	var err error
-	var wekaApi WekaApi
+	var wekaApi WekaApiRequest
 	err = common.GetBody(ctx, w, r, &wekaApi)
 	if wekaApi.Method != "status" {
 		common.WriteErrorResponse(w, fmt.Errorf("bad method"))
@@ -119,7 +96,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		BlobName:      stateBlobName,
 	}
 
-	vmssParams := &common.ScaleSetParams{
+	wekaApi.vmssParams = &common.ScaleSetParams{
 		SubscriptionId:    subscriptionId,
 		ResourceGroupName: resourceGroupName,
 		ScaleSetName:      common.GetVmScaleSetName(prefix, clusterName),
@@ -130,13 +107,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		stateParams.ContainerName = nfsStateContainerName
 		stateParams.BlobName = nfsStateBlobName
 
-		vmssParams.ScaleSetName = nfsScaleSetName
-		vmssParams.Flexible = true
+		wekaApi.vmssParams.ScaleSetName = nfsScaleSetName
+		wekaApi.vmssParams.Flexible = true
 	}
 
-	var result interface{}
+	var result *json.RawMessage
 	if wekaApi.Method == "" || wekaApi.Method == "status" {
-		result, err = GetClusterStatus(ctx, vmssParams, stateParams, keyVaultUri)
+		result, err = GetClusterStatus(ctx, wekaApi, stateParams, keyVaultUri)
 	}
 
 	if err != nil {
