@@ -18,7 +18,7 @@ import (
 	"github.com/weka/go-cloud-lib/protocol"
 )
 
-func GetClusterStatus(ctx context.Context, wekaApi WekaApiRequest, stateParams common.BlobObjParams, keyVaultUri string) (message *json.RawMessage, err error) {
+func GetClusterStatus(ctx context.Context, wekaApi WekaApiRequest, keyVaultUri string) (message *json.RawMessage, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("fetching cluster status...")
 
@@ -68,14 +68,9 @@ func GetClusterStatus(ctx context.Context, wekaApi WekaApiRequest, stateParams c
 func Handler(w http.ResponseWriter, r *http.Request) {
 	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
 	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
-	stateContainerName := os.Getenv("STATE_CONTAINER_NAME")
-	stateStorageName := os.Getenv("STATE_STORAGE_NAME")
-	stateBlobName := os.Getenv("STATE_BLOB_NAME")
 	prefix := os.Getenv("PREFIX")
 	clusterName := os.Getenv("CLUSTER_NAME")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
-	nfsStateContainerName := os.Getenv("NFS_STATE_CONTAINER_NAME")
-	nfsStateBlobName := os.Getenv("NFS_STATE_BLOB_NAME")
 	nfsScaleSetName := os.Getenv("NFS_VMSS_NAME")
 
 	ctx := r.Context()
@@ -90,12 +85,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stateParams := common.BlobObjParams{
-		StorageName:   stateStorageName,
-		ContainerName: stateContainerName,
-		BlobName:      stateBlobName,
-	}
-
 	wekaApi.vmssParams = &common.ScaleSetParams{
 		SubscriptionId:    subscriptionId,
 		ResourceGroupName: resourceGroupName,
@@ -104,16 +93,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if wekaApi.Protocol == "nfs" {
-		stateParams.ContainerName = nfsStateContainerName
-		stateParams.BlobName = nfsStateBlobName
-
 		wekaApi.vmssParams.ScaleSetName = nfsScaleSetName
 		wekaApi.vmssParams.Flexible = true
 	}
 
 	var result *json.RawMessage
 	if wekaApi.Method == "" || wekaApi.Method == "status" {
-		result, err = GetClusterStatus(ctx, wekaApi, stateParams, keyVaultUri)
+		result, err = GetClusterStatus(ctx, wekaApi, keyVaultUri)
 	}
 
 	if err != nil {
