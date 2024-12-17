@@ -15,14 +15,37 @@ import (
 	"github.com/weka/go-cloud-lib/lib/jrpc"
 	"github.com/weka/go-cloud-lib/lib/weka"
 	"github.com/weka/go-cloud-lib/logging"
-	"github.com/weka/go-cloud-lib/protocol"
 )
 
-func GetClusterStatus(ctx context.Context, wekaApi WekaApiRequest, keyVaultUri string) (message *json.RawMessage, err error) {
+func (wr *WekaApiRequest) MakeRequest(ctx context.Context) (*json.RawMessage, error) {
+	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
+	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
+	prefix := os.Getenv("PREFIX")
+	clusterName := os.Getenv("CLUSTER_NAME")
+	nfsScaleSetName := os.Getenv("NFS_VMSS_NAME")
+
+	wr.keyvaultURI = os.Getenv("KEY_VAULT_URI")
+
+	wr.vmssParams = &common.ScaleSetParams{
+		SubscriptionId:    subscriptionId,
+		ResourceGroupName: resourceGroupName,
+		ScaleSetName:      common.GetVmScaleSetName(prefix, clusterName),
+		Flexible:          false,
+	}
+
+	if wr.Protocol == "nfs" {
+		wr.vmssParams.ScaleSetName = nfsScaleSetName
+		wr.vmssParams.Flexible = true
+	}
+
+	return CallJRPC(ctx, wr)
+}
+
+func CallJRPC(ctx context.Context, wekaApi *WekaApiRequest) (message *json.RawMessage, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("fetching cluster status...")
 
-	credentials, err := common.GetWekaClusterCredentials(ctx, keyVaultUri)
+	credentials, err := common.GetWekaClusterCredentials(ctx, wekaApi.keyvaultURI)
 	if err != nil {
 		return
 	}
@@ -57,21 +80,10 @@ func GetClusterStatus(ctx context.Context, wekaApi WekaApiRequest, keyVaultUri s
 		return nil, err
 	}
 
-	wekaStatus := protocol.WekaStatus{}
-	if err = json.Unmarshal(rawWekaStatus, &wekaStatus); err != nil {
-		return nil, err
-	}
-
 	return &rawWekaStatus, nil
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	subscriptionId := os.Getenv("SUBSCRIPTION_ID")
-	resourceGroupName := os.Getenv("RESOURCE_GROUP_NAME")
-	prefix := os.Getenv("PREFIX")
-	clusterName := os.Getenv("CLUSTER_NAME")
-	keyVaultUri := os.Getenv("KEY_VAULT_URI")
-	nfsScaleSetName := os.Getenv("NFS_VMSS_NAME")
 
 	ctx := r.Context()
 	//logger := logging.LoggerFromCtx(ctx)
@@ -80,27 +92,17 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var wekaApi WekaApiRequest
 	err = common.GetBody(ctx, w, r, &wekaApi)
-	if wekaApi.Method != "status" {
+	if !isSupportedMethod(wekaApi.Method) {
 		common.WriteErrorResponse(w, fmt.Errorf("bad method"))
 		return
 	}
 
-	wekaApi.vmssParams = &common.ScaleSetParams{
-		SubscriptionId:    subscriptionId,
-		ResourceGroupName: resourceGroupName,
-		ScaleSetName:      common.GetVmScaleSetName(prefix, clusterName),
-		Flexible:          false,
-	}
+	result, err := wekaApi.MakeRequest(ctx)
 
-	if wekaApi.Protocol == "nfs" {
-		wekaApi.vmssParams.ScaleSetName = nfsScaleSetName
-		wekaApi.vmssParams.Flexible = true
-	}
-
-	var result *json.RawMessage
-	if wekaApi.Method == "" || wekaApi.Method == "status" {
-		result, err = GetClusterStatus(ctx, wekaApi, keyVaultUri)
-	}
+	//var result *json.RawMessage
+	//if wekaApi.Method == "" || wekaApi.Method == "status" {
+	//	result, err = CallJRPC(ctx, wekaApi)
+	//}
 
 	if err != nil {
 		common.WriteErrorResponse(w, err)
