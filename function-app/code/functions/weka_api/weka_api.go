@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -43,11 +42,11 @@ func (wr *WekaApiRequest) MakeRequest(ctx context.Context) (*json.RawMessage, er
 
 func CallJRPC(ctx context.Context, wekaApi *WekaApiRequest) (message *json.RawMessage, err error) {
 	logger := logging.LoggerFromCtx(ctx)
-	logger.Info().Msg("fetching cluster status...")
 
 	credentials, err := common.GetWekaClusterCredentials(ctx, wekaApi.keyvaultURI)
 	if err != nil {
-		return
+		logger.Error().Msgf("failed to get cluster credentials: %v", err)
+		return nil, err
 	}
 
 	jrpcBuilder := func(ip string) *jrpc.BaseClient {
@@ -56,6 +55,7 @@ func CallJRPC(ctx context.Context, wekaApi *WekaApiRequest) (message *json.RawMe
 
 	vmIps, err := common.GetVmsPrivateIps(ctx, wekaApi.vmssParams)
 	if err != nil {
+		logger.Error().Msgf("failed to get vms ips: %v", err)
 		return nil, err
 	}
 	ips := make([]string, 0, len(vmIps))
@@ -77,6 +77,7 @@ func CallJRPC(ctx context.Context, wekaApi *WekaApiRequest) (message *json.RawMe
 
 	err = jpool.Call(wekaApi.Method, struct{}{}, &rawWekaStatus)
 	if err != nil {
+		logger.Error().Msgf("jrpc call failed: %v", err)
 		return nil, err
 	}
 
@@ -84,10 +85,8 @@ func CallJRPC(ctx context.Context, wekaApi *WekaApiRequest) (message *json.RawMe
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-
 	ctx := r.Context()
-	//logger := logging.LoggerFromCtx(ctx)
-	log.Info().Msg("this is weka api")
+	logger := logging.LoggerFromCtx(ctx)
 
 	var err error
 	var wekaApi WekaApiRequest
@@ -96,15 +95,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		common.WriteErrorResponse(w, fmt.Errorf("bad method"))
 		return
 	}
-
 	result, err := wekaApi.MakeRequest(ctx)
 
-	//var result *json.RawMessage
-	//if wekaApi.Method == "" || wekaApi.Method == "status" {
-	//	result, err = CallJRPC(ctx, wekaApi)
-	//}
-
 	if err != nil {
+		logger.Error().Msgf("weka-api failed: %v", err)
 		common.WriteErrorResponse(w, err)
 		return
 	}
