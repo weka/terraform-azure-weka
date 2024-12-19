@@ -5,8 +5,8 @@ locals {
   location                 = data.azurerm_resource_group.rg.location
   read_remote_function_zip = !var.read_function_zip_from_storage_account
   function_app_zip_name    = local.read_remote_function_zip ? "${var.function_app_dist}/${var.function_app_version}.zip" : var.deployment_function_app_code_blob
-  weka_sa                  = local.read_remote_function_zip ? "${var.function_app_storage_account_prefix}${local.location}" : var.deployment_storage_account_name
-  weka_sa_container        = local.read_remote_function_zip ? "${var.function_app_storage_account_container_prefix}${local.location}" : var.deployment_container_name
+  weka_sa                  = local.read_remote_function_zip ? "${var.function_app_storage_account_prefix}eastus" : var.deployment_storage_account_name
+  weka_sa_container        = local.read_remote_function_zip ? "${var.function_app_storage_account_container_prefix}eastus" : var.deployment_container_name
   function_app_blob_sas    = local.read_remote_function_zip ? "" : data.azurerm_storage_account_blob_container_sas.function_app_code_sas[0].sas
   function_code_path       = "${path.module}/function-app/code"
   function_app_code_hash   = md5(join("", [for f in fileset(local.function_code_path, "**") : filemd5("${local.function_code_path}/${f}")]))

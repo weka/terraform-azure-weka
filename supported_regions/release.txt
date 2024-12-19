@@ -18,3 +18,4 @@ centralindia
 japaneast
 eastasia
 southeastasia
+eastus2euap
