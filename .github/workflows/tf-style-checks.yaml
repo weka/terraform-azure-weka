@@ -1,4 +1,4 @@
-name: Terrafrom style check
+name: Terraform style check
 
 on:
   pull_request:
@@ -7,7 +7,10 @@ jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v3
-    - uses: terraform-linters/setup-tflint@v2
-    - uses: pre-commit/action@v3.0.0
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+      - uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: "1.5.7"
+      - uses: terraform-linters/setup-tflint@v2
+      - uses: pre-commit/action@v3.0.0

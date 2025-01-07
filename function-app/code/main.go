@@ -17,6 +17,7 @@ import (
 	"weka-deployment/functions/status"
 	"weka-deployment/functions/terminate"
 	"weka-deployment/functions/transient"
+	"weka-deployment/functions/weka_api"
 
 	"github.com/weka/go-cloud-lib/logging"
 )
@@ -49,6 +50,7 @@ func main() {
 	mux.Handle("/resize", logging.LoggingMiddleware(resize.Handler))
 	mux.Handle("/report", logging.LoggingMiddleware(report.Handler))
 	mux.Handle("/protect", logging.LoggingMiddleware(protect.Handler))
+	mux.Handle("/weka_api", logging.LoggingMiddleware(weka_api.Handler))
 	logger.Info().Msgf("Go server Listening on: %v", customHandlerPort)
 	logger.Fatal().Err(http.ListenAndServe(":"+customHandlerPort, mux)).Send()
 }
