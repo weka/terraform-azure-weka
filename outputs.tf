@@ -147,7 +147,7 @@ function_key=$(az functionapp keys list --name ${local.function_app_name} --reso
 # for weka status pass "status" instead of "progress"
 curl --fail https://${local.function_app_name}.azurewebsites.net/api/status?code=$function_key -H "Content-Type:application/json" -d '{"type": "progress"}'
 EOT
-    weka_api            = <<EOT
+    weka_api              = <<EOT
 function_key=$(az functionapp keys list --name ${local.function_app_name} --resource-group ${local.resource_group_name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
 # change the "Method" as needed
 curl --fail https://${local.function_app_name}.azurewebsites.net/api/weka_api?code=$function_key -H "Content-Type:application/json" -d '{"Method": "status"}'
