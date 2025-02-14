@@ -52,6 +52,7 @@ locals {
     tags = merge(var.tags_map, {
       "weka_cluster" : var.cluster_name,
       "user_id" : data.azurerm_client_config.current.object_id,
+      "platformsettings.host_environment.disablehyperthreading": "true",
     })
 
     os_disk = {
