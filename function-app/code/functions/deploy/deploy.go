@@ -265,6 +265,7 @@ func GetDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, p A
 			ScriptBase:         dedent.Dedent(scriptBase),
 			Params:             joinParams,
 			FuncDef:            funcDef,
+			DeviceNameCmd:      GetDeviceName(p.DiskSize),
 		}
 		bashScript = joinScriptGenerator.GetJoinScript(ctx)
 	}
