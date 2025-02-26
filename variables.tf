@@ -141,6 +141,18 @@ variable "weka_version" {
   type        = string
   description = "The Weka version to deploy."
   default     = ""
+  validation {
+    condition = (
+      (
+        var.weka_version == "" || (
+          length(regexall("^[0-9]+\\.[0-9]+\\.[0-9]+", var.weka_version)) > 0 &&
+          tonumber(split(".", var.weka_version)[0]) > 4 &&
+          tonumber(split(".", var.weka_version)[1]) > 4 &&
+          tonumber(split(".", var.weka_version)[2]) >= 1
+        )
+    ))
+    error_message = "WEKA version must be 4.4.1 or higher."
+  }
 }
 
 variable "get_weka_io_token" {
