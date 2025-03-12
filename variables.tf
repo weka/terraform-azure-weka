@@ -404,13 +404,13 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "bef288291e94411aa8c388613e355c4a"
+  default     = "239d469255a978f32c3795d70ed84706"
 }
 
 variable "function_app_dist" {
   type        = string
   description = "Function app code dist"
-  default     = "release"
+  default     = "dev"
 
   validation {
     condition     = contains(["dev", "release"], var.function_app_dist)
@@ -500,12 +500,12 @@ variable "tiering_enable_ssd_percent" {
 variable "tiering_obs_container_name" {
   type        = string
   default     = ""
-  description = "Name of existing obs conatiner name"
+  description = "Name of existing obs container name."
 }
 
 variable "tiering_blob_obs_access_key" {
   type        = string
-  description = "The access key of the existing Blob object store container."
+  description = "The access key of the existing Blob object store container. If not provided, new obs will be created with given name (tiering_obs_name)."
   sensitive   = true
   default     = ""
 }
