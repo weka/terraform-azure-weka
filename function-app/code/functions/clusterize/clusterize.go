@@ -8,19 +8,18 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"weka-deployment/common"
-	"weka-deployment/functions/azure_functions_def"
-
-	"github.com/weka/go-cloud-lib/join"
-	"github.com/weka/go-cloud-lib/utils"
 
 	"github.com/lithammer/dedent"
-
 	"github.com/weka/go-cloud-lib/clusterize"
 	cloudCommon "github.com/weka/go-cloud-lib/common"
 	"github.com/weka/go-cloud-lib/functions_def"
+	"github.com/weka/go-cloud-lib/join"
 	"github.com/weka/go-cloud-lib/logging"
 	"github.com/weka/go-cloud-lib/protocol"
+	"github.com/weka/go-cloud-lib/utils"
+
+	"weka-deployment/common"
+	"weka-deployment/functions/azure_functions_def"
 )
 
 func GetObsScript(obsParams common.AzureObsParams) string {
@@ -105,13 +104,16 @@ func PrepareWekaObs(ctx context.Context, p *ClusterizationParams) (err error) {
 	}
 
 	if noExistingObs {
+		common.ReportMsg(ctx, p.Vm.Name, p.StateParams, "debug", "creating OBS as no access key was provided")
+
 		p.Obs.AccessKey, err = common.CreateStorageAccount(
 			ctx, p.SubscriptionId, p.ResourceGroupName, p.Location, p.Obs,
 		)
 		if err != nil {
 			err = fmt.Errorf("failed to create storage account: %w", err)
+			common.ReportMsg(ctx, p.Vm.Name, p.StateParams, "error", err.Error())
 			logger.Error().Err(err).Send()
-			return
+			return nil
 		}
 
 		if p.Obs.NetworkAccess == "Disabled" && p.CreateBlobPrivateEndpoint {
@@ -120,9 +122,10 @@ func PrepareWekaObs(ctx context.Context, p *ClusterizationParams) (err error) {
 
 			err = common.CreateStorageAccountBlobPrivateEndpoint(ctx, p.SubscriptionId, p.ResourceGroupName, p.Location, p.Obs.Name, endpointName, p.SubnetId, p.PrivateDNSZoneId)
 			if err != nil {
-				err = fmt.Errorf("failed to create private endpoint: %w", err)
+				err = fmt.Errorf("failed to create private endpoint for storage account: %w", err)
+				common.ReportMsg(ctx, p.Vm.Name, p.StateParams, "error", err.Error())
 				logger.Error().Err(err).Send()
-				return
+				return nil
 			}
 		}
 	}
