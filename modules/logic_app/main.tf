@@ -50,6 +50,7 @@ resource "azurerm_logic_app_standard" "logic_app_standard" {
   site_config {
     public_network_access_enabled = false
     vnet_route_all_enabled        = true
+    always_on                     = true
     dynamic "ip_restriction" {
       for_each = range(var.restricted_inbound_access ? 1 : 0)
       content {
