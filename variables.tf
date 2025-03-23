@@ -375,7 +375,7 @@ variable "stripe_width" {
 variable "hotspare" {
   type        = number
   default     = 1
-  description = "Number of hotspares to set on weka cluster. Refer to https://docs.weka.io/overview/ssd-capacity-management#hot-spare"
+  description = "Number of hotspares to set on weka cluster. Refer to https://docs.weka.io/weka-system-overview/ssd-capacity-management#hot-spare"
 }
 
 variable "function_app_log_level" {
