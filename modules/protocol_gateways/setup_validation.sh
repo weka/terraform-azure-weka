@@ -1,6 +1,3 @@
-echo "$(date -u): running validation for setting protocol script"
-
-
 # get token for key vault access
 access_token=$(curl 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fvault.azure.net' -H Metadata:true | jq -r '.access_token')
 # get key vault secret
@@ -11,101 +8,9 @@ function report {
   curl ${report_function_url}?code="$function_app_key" -H 'Content-Type:application/json' -d "$json_data"
 }
 
-filesystem_name="default"
-function wait_for_weka_fs(){
-  max_retries=30 # 30 * 10 = 5 minutes
-  for (( i=0; i < max_retries; i++ )); do
-    if [[ "$(weka fs | grep -c $filesystem_name)" -ge 1 ]]; then
-      echo "$(date -u): weka filesystem $filesystem_name is up"
-      break
-    fi
-    echo "$(date -u): waiting for weka filesystem $filesystem_name to be up"
-    sleep 10
-  done
-  if (( i > max_retries )); then
-      err_msg="timeout: weka filesystem $filesystem_name is not up after $max_retries attempts."
-      echo "$(date -u): $err_msg"
-      report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"$err_msg\"}"
-      return 1
-  fi
-}
-
-function create_config_fs(){
-  config_filesystem_name=".config_fs"
-  size="10GB"
-
-  if [ "$(weka fs | grep -c $config_filesystem_name)" -ge 1 ]; then
-    echo "$(date -u): weka filesystem $config_filesystem_name exists"
-    return 0
-  fi
-
-  echo "$(date -u): trying to create filesystem $config_filesystem_name"
-  output=$(weka fs create $config_filesystem_name default $size 2>&1)
-  # possiible outputs:
-  # FSId: 1 (means success)
-  # error: The given filesystem ".config_fs" already exists.
-  # error: Not enough available drive capacity for filesystem. requested "10.00 GB", but only "0 B" are free
-  if [ $? -eq 0 ]; then
-    echo "$(date -u): weka filesystem $config_filesystem_name is created"
-    return 0
-  fi
-
-  if [[ $output == *"already exists"* ]]; then
-    echo "$(date -u): weka filesystem $config_filesystem_name already exists"
-    break
-  elif [[ $output == *"Not enough available drive capacity for filesystem"* ]]; then
-    err_msg="Not enough available drive capacity for filesystem $config_filesystem_name for size $size"
-    echo "$(date -u): $err_msg"
-    report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"$err_msg\"}"
-    return 1
-  else
-    echo "$(date -u): output: $output"
-    report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"cannot create weka filesystem $config_filesystem_name\"}"
-    return 1
-  fi
-}
-
-
-# make sure weka cluster is already up
-max_retries=60
-for (( i=0; i < max_retries; i++ )); do
-  if [ $(weka status | grep 'status: OK' | wc -l) -ge 1 ]; then
-    echo "$(date -u): weka cluster is up"
-    break
-  fi
-  echo "$(date -u): waiting for weka cluster to be up"
-  sleep 30
-done
-if (( i > max_retries )); then
-    err_msg="timeout: weka cluster is not up after $max_retries attempts."
-    echo "$(date -u): $err_msg"
-    report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"$err_msg\"}"
-    exit 1
-fi
-
-cluster_size="${gateways_number}"
-
-current_mngmnt_ip=$(weka local resources | grep 'Management IPs' | awk '{print $NF}')
-# get container id
-for ((i=0; i<20; i++)); do
-  container_id=$(weka cluster container | grep frontend0 | grep ${gateways_name} | grep $current_mngmnt_ip | grep UP | awk '{print $1}')
-  if [ -n "$container_id" ]; then
-      echo "$(date -u): frontend0 container id: $container_id"
-      report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"frontend0 container $container_id is up\"}"
-      break
-  fi
-  echo "$(date -u): waiting for frontend0 container to be up"
-  sleep 5
-done
-
-if [ -z "$container_id" ]; then
-  err_msg="Failed to get the frontend0 container ID."
-  echo "$(date -u): $err_msg"
-  report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"$err_msg\"}"
-  exit 1
-fi
 
 # wait for all containers to be ready
+cluster_size="${gateways_number}"
 max_retries=60
 for (( retry=1; retry<=max_retries; retry++ )); do
     # get all UP gateway container ids
@@ -126,12 +31,6 @@ if (( retry > max_retries )); then
     echo "$(date -u): $err_msg"
     report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"$err_msg\"}"
     exit 1
-fi
-
-
-if [[ ${smbw_enabled} == true || ${protocol} == "s3" ]]; then
-  wait_for_weka_fs || exit 1
-  create_config_fs || exit 1
 fi
 
 echo "$(date -u): Done running validation for protocol"
