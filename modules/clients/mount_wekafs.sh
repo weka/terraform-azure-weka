@@ -60,40 +60,8 @@ mkdir -p $MOUNT_POINT
 
 weka local stop && weka local rm -f --all
 
-gateways="${all_gateways}"
 FRONTEND_CONTAINER_CORES_NUM="${frontend_container_cores_num}"
-NICS_NUM=$((FRONTEND_CONTAINER_CORES_NUM+1))
 eth0=$(ifconfig | grep eth0 -C2 | grep 'inet ' | awk '{print $2}')
-
-
-function getNetStrForDpdk {
-		i=$1
-		j=$2
-		gateways=$3
-		net_option_name=$4
-
-		if [ -n "$gateways" ]; then #azure and gcp
-			gateways=($gateways)
-		fi
-
-		net=" "
-		for ((i; i<$j; i++)); do
-			eth=eth$i
-			subnet_inet=$(ifconfig $eth | grep 'inet ' | awk '{print $2}')
-			if [ -z $subnet_inet ];then
-				net=""
-				break
-			fi
-			enp=$(ls -l /sys/class/net/$eth/ | grep lower | awk -F"_" '{print $2}' | awk '{print $1}') #for azure
-			bits=$(ip -o -f inet addr show $eth | awk '{print $4}')
-			IFS='/' read -ra netmask <<< "$bits"
-
-			if [ -n "$gateways" ]; then
-				gateway=$${gateways[0]}
-				net="$net $net_option_name$enp/$subnet_inet/$${netmask[1]}/$gateway"
-			fi
-		done
-}
 
 function retry {
   local retry_max=$1
@@ -116,9 +84,7 @@ function retry {
 
 mount_command="mount -t wekafs -o net=udp $backend_ip/$FILESYSTEM_NAME $MOUNT_POINT"
 if [[ ${clients_use_dpdk} == true ]]; then
-  net_option_name="-o net="
-  getNetStrForDpdk 1 $NICS_NUM "$gateways" "$net_option_name"
-  mount_command="mount -t wekafs $net -o num_cores=$FRONTEND_CONTAINER_CORES_NUM -o mgmt_ip=$eth0 $backend_ip/$FILESYSTEM_NAME $MOUNT_POINT"
+  mount_command="mount -t wekafs -o num_cores=$FRONTEND_CONTAINER_CORES_NUM -o mgmt_ip=$eth0 $backend_ip/$FILESYSTEM_NAME $MOUNT_POINT"
 fi
 
 retry 60 45 $mount_command
