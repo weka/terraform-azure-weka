@@ -199,7 +199,7 @@ resource "azurerm_linux_virtual_machine" "this" {
   }
 
   lifecycle {
-    ignore_changes = [tags, custom_data]
+    ignore_changes = [tags, custom_data, source_image_id]
     precondition {
       condition     = var.protocol == "S3" ? var.gateways_number >= 1 : var.gateways_number >= 3 && var.gateways_number <= 8
       error_message = "The amount of protocol gateways should be at least 1 for S3 and at least 3 and at most 8 for SMB."
