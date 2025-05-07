@@ -42,7 +42,7 @@ locals {
     admin_username                  = var.vm_username
     ssh_public_key                  = local.public_ssh_key
     computer_name_prefix            = "${var.prefix}-${var.cluster_name}-backend"
-    custom_data                     = ""
+    user_data                       = var.user_data
     disable_password_authentication = true
     proximity_placement_group_id    = local.placement_group_id
     single_placement_group          = var.vmss_single_placement_group
@@ -179,7 +179,6 @@ locals {
     VMSS_CONFIG           = local.vmss_config
     # init script inputs
     APT_REPO_SERVER = var.apt_repo_server
-    USER_DATA       = var.user_data
   }
 
   secured_storage_account_app_settings = {

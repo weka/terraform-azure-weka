@@ -1813,10 +1813,11 @@ func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armc
 		}
 	}
 
-	var customData string
-	if scaleSet.Properties.VirtualMachineProfile.OSProfile.CustomData != nil {
-		customData = *scaleSet.Properties.VirtualMachineProfile.OSProfile.CustomData
-	}
+	// no need to retrieve custom data when reading the config
+	// var customData string
+	// if scaleSet.Properties.VirtualMachineProfile.OSProfile.CustomData != nil {
+	// 	customData = *scaleSet.Properties.VirtualMachineProfile.OSProfile.CustomData
+	// }
 
 	var ppg *string
 	if scaleSet.Properties.ProximityPlacementGroup != nil {
@@ -1866,7 +1867,6 @@ func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armc
 		AdminUsername:      *scaleSet.Properties.VirtualMachineProfile.OSProfile.AdminUsername,
 		SshPublicKey:       sshPublicKey,
 		ComputerNamePrefix: *scaleSet.Properties.VirtualMachineProfile.OSProfile.ComputerNamePrefix,
-		CustomData:         customData,
 
 		DisablePasswordAuthentication: *scaleSet.Properties.VirtualMachineProfile.OSProfile.LinuxConfiguration.DisablePasswordAuthentication,
 		ProximityPlacementGroupID:     ppg,
@@ -1890,7 +1890,7 @@ func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armc
 	return vmssConfig
 }
 
-func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, configHash string, config VMSSConfig, vmssSize int) (id *string, err error) {
+func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, configHash string, config VMSSConfig, vmssSize int, customData string) (id *string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := getCredential(ctx)
@@ -2040,7 +2040,7 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 							},
 						},
 					},
-					CustomData: &config.CustomData,
+					CustomData: &customData,
 				},
 				StorageProfile: &armcompute.VirtualMachineScaleSetStorageProfile{
 					OSDisk: &armcompute.VirtualMachineScaleSetOSDisk{

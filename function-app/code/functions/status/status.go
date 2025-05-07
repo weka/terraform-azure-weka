@@ -9,13 +9,14 @@ import (
 	"os"
 	"strings"
 	"time"
-	"weka-deployment/common"
 
 	"github.com/weka/go-cloud-lib/connectors"
 	"github.com/weka/go-cloud-lib/lib/jrpc"
 	"github.com/weka/go-cloud-lib/lib/weka"
 	"github.com/weka/go-cloud-lib/logging"
 	"github.com/weka/go-cloud-lib/protocol"
+
+	"weka-deployment/common"
 )
 
 func itemInList(item string, list []string) bool {
@@ -185,7 +186,7 @@ func GetRefreshStatus(ctx context.Context, vmssParams *common.ScaleSetParams, st
 	if err != nil {
 		return nil, err
 	}
-	vmssConfig.CustomData = "<hidden>"
+	vmssConfig.UserData = "<hidden>"
 	vmssConfig.SshPublicKey = "<hidden>"
 
 	currentConfig, err := common.GetCurrentScaleSetConfiguration(ctx, vmssParams)
@@ -205,7 +206,7 @@ func GetRefreshStatus(ctx context.Context, vmssParams *common.ScaleSetParams, st
 	}
 
 	if extended && currentConfig != nil {
-		currentConfig.CustomData = "<hidden>"
+		currentConfig.UserData = "<hidden>"
 		currentConfig.SshPublicKey = "<hidden>"
 		result.CurrentConfig = currentConfig
 	}
