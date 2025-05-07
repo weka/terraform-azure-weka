@@ -73,7 +73,7 @@ type VMSSConfig struct {
 	AdminUsername      string   `json:"admin_username"`
 	SshPublicKey       string   `json:"ssh_public_key"`
 	ComputerNamePrefix string   `json:"computer_name_prefix"`
-	CustomData         string   `json:"custom_data"`
+	UserData           string   `json:"user_data"`
 
 	DisablePasswordAuthentication bool    `json:"disable_password_authentication"`
 	ProximityPlacementGroupID     *string `json:"proximity_placement_group_id,omitempty"`
@@ -91,7 +91,7 @@ type VMSSConfig struct {
 // NOTES:
 // - does not compare "config_hash" and "config_applied_at" tags, and names which include version
 func VmssConfigsDiff(old, new VMSSConfig) string {
-	old.CustomData, new.CustomData = "", ""
+	old.UserData, new.UserData = "", "" // ignore user data when generating diff (as it may contain sensitive data)
 	old.Tags["config_hash"], new.Tags["config_hash"] = "", ""
 	old.Tags["config_applied_at"], new.Tags["config_applied_at"] = "", ""
 	old.ComputerNamePrefix, new.ComputerNamePrefix = "", ""

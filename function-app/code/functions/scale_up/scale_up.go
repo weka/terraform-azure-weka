@@ -8,12 +8,13 @@ import (
 	"os"
 	"strconv"
 	"time"
-	"weka-deployment/common"
-	"weka-deployment/functions/azure_functions_def"
 
 	"github.com/weka/go-cloud-lib/functions_def"
 	"github.com/weka/go-cloud-lib/logging"
 	"github.com/weka/go-cloud-lib/protocol"
+
+	"weka-deployment/common"
+	"weka-deployment/functions/azure_functions_def"
 )
 
 var (
@@ -44,14 +45,13 @@ var (
 	}
 )
 
-func getBackendCustomDataScript(ctx context.Context) (customData string, err error) {
+func getBackendCustomDataScript(ctx context.Context, userData string) (customData string, err error) {
 	functionAppName := os.Getenv("FUNCTION_APP_NAME")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 	diskSize, _ := strconv.Atoi(os.Getenv("DISK_SIZE"))
 	nicsNum, _ := strconv.Atoi(os.Getenv("NICS_NUM"))
 	subnet := os.Getenv("SUBNET")
 	aptRepo := os.Getenv("APT_REPO_SERVER")
-	userData := os.Getenv("USER_DATA")
 
 	logger := logging.LoggerFromCtx(ctx)
 
@@ -218,14 +218,14 @@ func createVmss(ctx context.Context, vmssConfig *common.VMSSConfig, vmssName str
 	logger := logging.LoggerFromCtx(ctx)
 	vmssConfigHash := vmssConfig.ConfigHash
 
-	vmssConfig.CustomData, err = getBackendCustomDataScript(ctx)
+	customData, err := getBackendCustomDataScript(ctx, vmssConfig.UserData)
 	if err != nil {
 		logger.Error().Err(err).Msg("cannot get custom data script")
 		return err
 	}
 
 	logger.Info().Msgf("creating new vmss %s of size %d", vmssName, vmssSize)
-	_, err = common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, vmssName, vmssConfigHash, *vmssConfig, vmssSize)
+	_, err = common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, vmssName, vmssConfigHash, *vmssConfig, vmssSize, customData)
 	if err != nil {
 		return err
 	}
@@ -253,13 +253,13 @@ func handleVmssUpdate(ctx context.Context, currentConfig, newConfig *common.VMSS
 		return common.AddClusterUpdate(ctx, stateParams, update)
 	}
 
-	newConfig.CustomData, err = getBackendCustomDataScript(ctx)
+	customData, err := getBackendCustomDataScript(ctx, newConfig.UserData)
 	if err != nil {
 		logger.Error().Err(err).Msg("cannot get custom data script")
 		return err
 	}
 
-	_, err = common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, currentConfig.Name, newConfigHash, *newConfig, desiredSize)
+	_, err = common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, currentConfig.Name, newConfigHash, *newConfig, desiredSize, customData)
 	if err != nil {
 		logger.Error().Err(err).Msgf("cannot update vmss %s", currentConfig.Name)
 		errStr := err.Error()
