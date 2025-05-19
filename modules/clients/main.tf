@@ -145,6 +145,7 @@ resource "azurerm_linux_virtual_machine" "this" {
     caching              = "ReadWrite"
     name                 = "${var.clients_name}-os-disk-${count.index}"
     storage_account_type = "StandardSSD_LRS"
+    disk_size_gb         = var.root_volume_size
   }
 
   admin_ssh_key {
@@ -227,6 +228,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "this" {
   os_disk {
     caching              = "ReadWrite"
     storage_account_type = "StandardSSD_LRS"
+    disk_size_gb         = var.root_volume_size
   }
 
   admin_ssh_key {

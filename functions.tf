@@ -57,6 +57,7 @@ locals {
     os_disk = {
       caching              = "ReadWrite"
       storage_account_type = "Premium_LRS"
+      disk_size_gb         = var.backends_root_volume_size
     }
 
     data_disk = {

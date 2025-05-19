@@ -1874,7 +1874,7 @@ func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armc
 		OSDisk: OSDisk{
 			Caching:            string(*scaleSet.Properties.VirtualMachineProfile.StorageProfile.OSDisk.Caching),
 			StorageAccountType: string(*scaleSet.Properties.VirtualMachineProfile.StorageProfile.OSDisk.ManagedDisk.StorageAccountType),
-			SizeGB:             scaleSet.Properties.VirtualMachineProfile.StorageProfile.OSDisk.DiskSizeGB,
+			DiskSizeGB:         scaleSet.Properties.VirtualMachineProfile.StorageProfile.OSDisk.DiskSizeGB,
 		},
 		DataDisk: DataDisk{
 			Caching:            string(*scaleSet.Properties.VirtualMachineProfile.StorageProfile.DataDisks[0].Caching),
@@ -1919,8 +1919,8 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 	}
 
 	var osDiskSizeGb *int32
-	if config.OSDisk.SizeGB != nil {
-		osDiskSizeGb = config.OSDisk.SizeGB
+	if config.OSDisk.DiskSizeGB != nil {
+		osDiskSizeGb = config.OSDisk.DiskSizeGB
 	}
 
 	identityType, err := ToEnumStrValue[armcompute.ResourceIdentityType](config.Identity.Type, armcompute.PossibleResourceIdentityTypeValues())
