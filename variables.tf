@@ -335,10 +335,16 @@ variable "containers_config_map" {
   }
 }
 
-variable "default_disk_size" {
+variable "backends_weka_volume_size" {
   type        = number
   default     = 48
   description = "The default disk size."
+}
+
+variable "backends_root_volume_size" {
+  type        = number
+  default     = null
+  description = "The backends' root disk size."
 }
 
 variable "traces_per_ionode" {
@@ -404,7 +410,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "c1e7430d91c6592c6b95e467ce9929fd"
+  default     = "94c2233b81535ecb924ed6a2e0d1cbeb"
 }
 
 variable "function_app_dist" {
@@ -585,6 +591,12 @@ variable "clients_use_vmss" {
   type        = bool
   default     = false
   description = "Use VMSS for clients"
+}
+
+variable "clients_root_volume_size" {
+  type        = number
+  description = "The client's root volume size in GB"
+  default     = null
 }
 
 variable "placement_group_id" {

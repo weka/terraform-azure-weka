@@ -24,4 +24,5 @@ module "clients" {
   vmss_name                    = "${var.prefix}-${var.cluster_name}-vmss"
   depends_on                   = [azurerm_proximity_placement_group.ppg, module.network]
   arch                         = var.client_arch
+  root_volume_size             = var.clients_root_volume_size
 }
