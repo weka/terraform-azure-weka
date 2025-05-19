@@ -125,3 +125,9 @@ variable "use_vmss" {
   description = "Use VMSS"
   default     = false
 }
+
+variable "root_volume_size" {
+  type        = number
+  description = "The client's root volume size in GB"
+  default     = null
+}

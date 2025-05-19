@@ -23,7 +23,7 @@ type DataDisk struct {
 type OSDisk struct {
 	Caching            string `json:"caching"`
 	StorageAccountType string `json:"storage_account_type"`
-	SizeGB             *int32 `json:"size_gb,omitempty"`
+	DiskSizeGB         *int32 `json:"disk_size_gb,omitempty"`
 }
 
 type PublicIPAddress struct {
@@ -106,8 +106,8 @@ func VmssConfigsDiff(old, new VMSSConfig) string {
 		}
 	}
 
-	if new.OSDisk.SizeGB == nil {
-		old.OSDisk.SizeGB = nil
+	if new.OSDisk.DiskSizeGB == nil {
+		old.OSDisk.DiskSizeGB = nil
 	}
 
 	return cmp.Diff(old, new) // arguments order: (want, got)
