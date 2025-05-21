@@ -85,35 +85,24 @@ func PrepareWekaObs(ctx context.Context, p *ClusterizationParams) (err error) {
 
 	noExistingObs := p.Obs.AccessKey == ""
 
-	if p.Obs.NetworkAccess == "Disabled" && noExistingObs && !p.CreateBlobPrivateEndpoint {
-		ignoredErr := fmt.Errorf("private endpoint creation is required for obs when public access is disabled")
-		logger.Error().Err(ignoredErr).Send()
+	if noExistingObs && p.Obs.Name != "" {
+		return fmt.Errorf("OBS misconfiguration: access key must be provided when creating a new OBS")
+	}
 
-		common.ReportMsg(ctx, p.Vm.Name, p.StateParams, "error", ignoredErr.Error())
-		p.Cluster.SetObs = false
-		return nil
+	if p.Obs.NetworkAccess == "Disabled" && noExistingObs && !p.CreateBlobPrivateEndpoint {
+		return fmt.Errorf("private endpoint creation is required for obs when public access is disabled")
 	}
 
 	if p.Obs.NetworkAccess == "Disabled" && p.CreateBlobPrivateEndpoint && p.PrivateDNSZoneId == "" {
-		ignoredErr := fmt.Errorf("private dns zone id is required for private endpoint creation when public access is disabled")
-		logger.Error().Err(ignoredErr).Send()
-
-		common.ReportMsg(ctx, p.Vm.Name, p.StateParams, "error", ignoredErr.Error())
-		p.Cluster.SetObs = false
-		return nil
+		return fmt.Errorf("private dns zone id is required for private endpoint creation when public access is disabled")
 	}
 
 	if noExistingObs {
-		common.ReportMsg(ctx, p.Vm.Name, p.StateParams, "debug", "creating OBS as no access key was provided")
-
 		p.Obs.AccessKey, err = common.CreateStorageAccount(
 			ctx, p.SubscriptionId, p.ResourceGroupName, p.Location, p.Obs,
 		)
 		if err != nil {
-			err = fmt.Errorf("failed to create storage account: %w", err)
-			common.ReportMsg(ctx, p.Vm.Name, p.StateParams, "error", err.Error())
-			logger.Error().Err(err).Send()
-			return nil
+			return fmt.Errorf("failed to create storage account: %w", err)
 		}
 
 		if p.Obs.NetworkAccess == "Disabled" && p.CreateBlobPrivateEndpoint {
@@ -122,19 +111,14 @@ func PrepareWekaObs(ctx context.Context, p *ClusterizationParams) (err error) {
 
 			err = common.CreateStorageAccountBlobPrivateEndpoint(ctx, p.SubscriptionId, p.ResourceGroupName, p.Location, p.Obs.Name, endpointName, p.SubnetId, p.PrivateDNSZoneId)
 			if err != nil {
-				err = fmt.Errorf("failed to create private endpoint for storage account: %w", err)
-				common.ReportMsg(ctx, p.Vm.Name, p.StateParams, "error", err.Error())
-				logger.Error().Err(err).Send()
-				return nil
+				return fmt.Errorf("failed to create private endpoint for storage account: %w", err)
 			}
 		}
 	}
 	// create container (if it doesn't exist)
 	err = common.CreateContainer(ctx, p.Obs.Name, p.Obs.ContainerName)
 	if err != nil {
-		err = fmt.Errorf("failed to create container: %w", err)
-		logger.Error().Err(err).Send()
-		return
+		return fmt.Errorf("failed to create container: %w", err)
 	}
 	return
 }
@@ -149,7 +133,8 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 		err = PrepareWekaObs(ctx, &p)
 		if err != nil {
 			logger.Error().Err(err).Send()
-			return
+			common.ReportMsg(ctx, p.Vm.Name, p.StateParams, "error", err.Error())
+			p.Cluster.SetObs = false
 		}
 	}
 
