@@ -343,6 +343,11 @@ resource "azurerm_linux_function_app" "function_app" {
       condition     = var.install_weka_url != "" || var.weka_version != ""
       error_message = "Please provide either 'install_weka_url' or 'weka_version' variables."
     }
+
+    precondition {
+      condition     = !var.tiering_enable_obs_integration || var.tiering_obs_name == "" || var.tiering_blob_obs_access_key != ""
+      error_message = "OBS misconfiguration: obs access key must be provided when tiering_obs_name is set"
+    }
   }
 
   depends_on = [module.network, module.iam, azurerm_storage_account.deployment_sa, azurerm_private_endpoint.file_endpoint, azurerm_private_endpoint.blob_endpoint]
