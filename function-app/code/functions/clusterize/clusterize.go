@@ -85,10 +85,6 @@ func PrepareWekaObs(ctx context.Context, p *ClusterizationParams) (err error) {
 
 	noExistingObs := p.Obs.AccessKey == ""
 
-	if noExistingObs && p.Obs.Name != "" {
-		return fmt.Errorf("OBS misconfiguration: access key must be provided when creating a new OBS")
-	}
-
 	if p.Obs.NetworkAccess == "Disabled" && noExistingObs && !p.CreateBlobPrivateEndpoint {
 		return fmt.Errorf("private endpoint creation is required for obs when public access is disabled")
 	}
