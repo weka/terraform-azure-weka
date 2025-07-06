@@ -8,9 +8,6 @@ if [[ "${apt_repo_server}" ]]; then
   echo "deb ${apt_repo_server} focal-updates main restricted" >> /etc/apt/sources.list
 fi
 
-INSTALLATION_PATH="/tmp/weka"
-mkdir -p $INSTALLATION_PATH
-
 for(( i=0; i<${nics_num}; i++ )); do
     cat <<-EOF | sed -i "/        eth$i/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
             mtu: 3900
@@ -78,5 +75,3 @@ systemctl enable remove-routes.service
 systemctl start remove-routes.service
 systemctl status remove-routes.service || true # show status of remove-routes.service
 ip route # show routes after removing
-
-rm -rf $INSTALLATION_PATH

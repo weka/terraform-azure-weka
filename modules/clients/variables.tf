@@ -94,9 +94,22 @@ variable "tags_map" {
 
 variable "custom_data" {
   type        = string
-  description = "Custom data to pass to the instances"
+  description = "Custom data to pass to the instances. Deprecated, use `custom_data_post_mount` instead."
   default     = ""
 }
+
+variable "custom_data_pre_mount" {
+  type        = string
+  description = "Custom data to pass to the instances, will run before weka agent install and mount."
+  default     = ""
+}
+
+variable "custom_data_post_mount" {
+  type        = string
+  description = "Custom data to pass to the instances, will run after weka agent install and mount."
+  default     = ""
+}
+
 
 variable "vmss_name" {
   type        = string
