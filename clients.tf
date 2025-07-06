@@ -20,6 +20,8 @@ module "clients" {
   sg_id                        = local.sg_id
   tags_map                     = var.tags_map
   custom_data                  = var.clients_custom_data
+  custom_data_pre_mount        = var.clients_custom_data_pre_mount
+  custom_data_post_mount       = var.clients_custom_data_post_mount
   use_vmss                     = var.clients_use_vmss
   vmss_name                    = "${var.prefix}-${var.cluster_name}-vmss"
   depends_on                   = [azurerm_proximity_placement_group.ppg, module.network]
