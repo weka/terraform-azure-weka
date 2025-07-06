@@ -26,7 +26,7 @@ locals {
     vmss_name                    = var.vmss_name
   })
 
-  custom_data_parts = [local.preparation_script, local.mount_wekafs_script, "${var.custom_data}\n"]
+  custom_data_parts = [local.preparation_script, var.custom_data_pre_mount, local.mount_wekafs_script, var.custom_data_post_mount, "${var.custom_data}\n"]
   vms_custom_data   = base64encode(join("\n", local.custom_data_parts))
 
   client_identity_id = var.vm_identity_name == "" ? azurerm_user_assigned_identity.this[0].id : data.azurerm_user_assigned_identity.this[0].id

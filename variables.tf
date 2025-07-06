@@ -583,9 +583,22 @@ variable "client_frontend_cores" {
 
 variable "clients_custom_data" {
   type        = string
-  description = "Custom data to pass to the client instances"
+  description = "Custom data to pass to the client instances. Deprecated, use `clients_custom_data_post_mount` instead."
   default     = ""
 }
+
+variable "clients_custom_data_pre_mount" {
+  type        = string
+  description = "Custom data to pass to the client instances, will run before weka agent install and mount."
+  default     = ""
+}
+
+variable "clients_custom_data_post_mount" {
+  type        = string
+  description = "Custom data to pass to the client instances, will run after weka agent install and mount."
+  default     = ""
+}
+
 
 variable "clients_use_vmss" {
   type        = bool
