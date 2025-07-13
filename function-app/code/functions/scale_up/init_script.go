@@ -86,6 +86,9 @@ for(( i=0; i<\$retry_max; i++ )); do
 done
 if [ \$i -eq \$retry_max ]; then
   echo "Routes are not ready on time"
+  host_routes=$(ip route)
+  weka_resources=$(weka local resources || "no weka resources")
+  report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Routes are not ready on time. Routes: $host_routes WEKA resources: $weka_resources\"}"
   shutdown -h now
   exit 1
 fi
@@ -139,6 +142,7 @@ done
 
 if [ -z "$compute_name" ]; then
   echo "Failed to get compute name from metadata after $max_retries attempts"
+  report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Failed to get compute name from metadata\"}"
   shutdown -h now
   exit 1
 fi
