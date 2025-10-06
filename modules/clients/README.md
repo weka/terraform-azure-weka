@@ -66,6 +66,7 @@ No modules.
 | <a name="input_vmss_name"></a> [vmss\_name](#input\_vmss\_name) | The name of the backends virtual machine scale set. | `string` | n/a | yes |
 | <a name="input_vnet_name"></a> [vnet\_name](#input\_vnet\_name) | The virtual network name. | `string` | n/a | yes |
 | <a name="input_vnet_rg_name"></a> [vnet\_rg\_name](#input\_vnet\_rg\_name) | Resource group name of vnet | `string` | n/a | yes |
+| <a name="input_weka_cgroups_mode"></a> [weka\_cgroups\_mode](#input\_weka\_cgroups\_mode) | Weka cgroups mode, valid values are 'auto' and 'force\_v2' | `string` | `"auto"` | no |
 
 ## Outputs
 
