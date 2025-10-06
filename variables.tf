@@ -410,7 +410,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "20f870df1b6f458c976feab6884c8a98"
+  default     = "d56b6c2fe62fdbc26fba3430df521913"
 }
 
 variable "function_app_dist" {
@@ -610,6 +610,16 @@ variable "clients_root_volume_size" {
   type        = number
   description = "The client's root volume size in GB"
   default     = null
+}
+
+variable "clients_weka_cgroups_mode" {
+  type        = string
+  description = "Weka cgroups mode, valid values are 'auto' and 'force_v2'"
+  default     = "auto"
+  validation {
+    condition     = var.clients_weka_cgroups_mode == "auto" || var.clients_weka_cgroups_mode == "force_v2"
+    error_message = "Allowed weka_cgroups_mode values: [\"auto\", \"force_v2\"]."
+  }
 }
 
 variable "placement_group_id" {
@@ -939,4 +949,14 @@ variable "post_cluster_setup_script" {
   type        = string
   description = "A script to run after the cluster is up"
   default     = ""
+}
+
+variable "weka_cgroups_mode" {
+  type        = string
+  description = "Weka cgroups mode, valid values are 'auto' and 'force_v2'"
+  default     = "auto"
+  validation {
+    condition     = var.weka_cgroups_mode == "auto" || var.weka_cgroups_mode == "force_v2"
+    error_message = "Allowed weka_cgroups_mode values: [\"auto\", \"force_v2\"]."
+  }
 }
