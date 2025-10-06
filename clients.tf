@@ -27,4 +27,5 @@ module "clients" {
   depends_on                   = [azurerm_proximity_placement_group.ppg, module.network]
   arch                         = var.client_arch
   root_volume_size             = var.clients_root_volume_size
+  weka_cgroups_mode            = var.clients_weka_cgroups_mode
 }

@@ -46,7 +46,7 @@ function retry_weka_install {
       echo "$(date -u): weka install failed"
       return 1
   }
-  chmod +x install_script.sh && ./install_script.sh
+  chmod +x install_script.sh && WEKA_CGROUPS_MODE="${weka_cgroups_mode}" ./install_script.sh
   return 0
 }
 

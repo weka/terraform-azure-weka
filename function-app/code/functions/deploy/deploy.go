@@ -54,6 +54,7 @@ type AzureDeploymentParams struct {
 	S3GatewayFeCoresNum   int
 	S3DiskSize            int
 	NvmesNum              int
+	CgroupsMode           string
 }
 
 func GetDeviceName(diskSize int) string {
@@ -209,6 +210,7 @@ func GetDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, p A
 			ProxyUrl:         p.ProxyUrl,
 			NvmesNum:         p.NvmesNum,
 			FindDrivesScript: dedent.Dedent(common.FindDrivesScript),
+			CgroupsMode:      p.CgroupsMode,
 		}
 		deployScriptGenerator := deploy.DeployScriptGenerator{
 			FuncDef:       funcDef,
@@ -252,6 +254,7 @@ func GetDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, p A
 			InstanceParams: instanceParams,
 			Gateways:       p.Gateways,
 			ProxyUrl:       p.ProxyUrl,
+			CgroupsMode:    p.CgroupsMode,
 		}
 
 		scriptBase := `
@@ -329,6 +332,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	tracesPerFrontend, _ := strconv.Atoi(os.Getenv("TRACES_PER_FRONTEND"))
 	backendLbIp := os.Getenv("BACKEND_LB_IP")
 	nvmesNum, _ := strconv.Atoi(os.Getenv("NVMES_NUM"))
+	cgroupsMode := os.Getenv("CGROUPS_MODE")
 
 	installUrl := os.Getenv("INSTALL_URL")
 	proxyUrl := os.Getenv("PROXY_URL")
@@ -396,6 +400,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		S3GatewayFeCoresNum:   s3ProtocolGatewayFeCoresNum,
 		S3DiskSize:            s3DiskSize + tracesPerFrontend*s3ProtocolGatewayFeCoresNum,
 		NvmesNum:              nvmesNum,
+		CgroupsMode:           cgroupsMode,
 	}
 
 	// create Function Definer
