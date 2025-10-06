@@ -449,6 +449,7 @@ proxy_url = VALUE
 | <a name="input_clients_root_volume_size"></a> [clients\_root\_volume\_size](#input\_clients\_root\_volume\_size) | The client's root volume size in GB | `number` | `null` | no |
 | <a name="input_clients_use_dpdk"></a> [clients\_use\_dpdk](#input\_clients\_use\_dpdk) | Mount weka clients in DPDK mode | `bool` | `true` | no |
 | <a name="input_clients_use_vmss"></a> [clients\_use\_vmss](#input\_clients\_use\_vmss) | Use VMSS for clients | `bool` | `false` | no |
+| <a name="input_clients_weka_cgroups_mode"></a> [clients\_weka\_cgroups\_mode](#input\_clients\_weka\_cgroups\_mode) | Weka cgroups mode, valid values are 'auto' and 'force\_v2' | `string` | `"auto"` | no |
 | <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | Cluster name | `string` | `"poc"` | no |
 | <a name="input_cluster_size"></a> [cluster\_size](#input\_cluster\_size) | The number of virtual machines to deploy. | `number` | `6` | no |
 | <a name="input_clusterization_target"></a> [clusterization\_target](#input\_clusterization\_target) | The clusterization target | `number` | `null` | no |
@@ -549,6 +550,7 @@ proxy_url = VALUE
 | <a name="input_vnet_name"></a> [vnet\_name](#input\_vnet\_name) | The virtual network name. | `string` | `""` | no |
 | <a name="input_vnet_rg_name"></a> [vnet\_rg\_name](#input\_vnet\_rg\_name) | Resource group name of vnet. Will be used when vnet\_name is not provided. | `string` | `""` | no |
 | <a name="input_vnets_to_peer_to_deployment_vnet"></a> [vnets\_to\_peer\_to\_deployment\_vnet](#input\_vnets\_to\_peer\_to\_deployment\_vnet) | List of vent-name:resource-group-name to peer | <pre>list(object({<br>    vnet = string<br>    rg   = string<br>  }))</pre> | `[]` | no |
+| <a name="input_weka_cgroups_mode"></a> [weka\_cgroups\_mode](#input\_weka\_cgroups\_mode) | Weka cgroups mode, valid values are 'auto' and 'force\_v2' | `string` | `"auto"` | no |
 | <a name="input_weka_home_url"></a> [weka\_home\_url](#input\_weka\_home\_url) | Weka Home url | `string` | `""` | no |
 | <a name="input_weka_tar_storage_account_id"></a> [weka\_tar\_storage\_account\_id](#input\_weka\_tar\_storage\_account\_id) | ### private blob | `string` | `""` | no |
 | <a name="input_weka_version"></a> [weka\_version](#input\_weka\_version) | The Weka version to deploy. | `string` | `""` | no |
