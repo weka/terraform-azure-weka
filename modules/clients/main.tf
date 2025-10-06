@@ -24,6 +24,7 @@ locals {
     clients_use_dpdk             = var.clients_use_dpdk
     rg_name                      = var.rg_name
     vmss_name                    = var.vmss_name
+    weka_cgroups_mode            = var.weka_cgroups_mode
   })
 
   custom_data_parts = [local.preparation_script, var.custom_data_pre_mount, local.mount_wekafs_script, var.custom_data_post_mount, "${var.custom_data}\n"]

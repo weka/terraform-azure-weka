@@ -180,6 +180,7 @@ locals {
     VMSS_CONFIG           = local.vmss_config
     # init script inputs
     APT_REPO_SERVER = var.apt_repo_server
+    CGROUPS_MODE    = var.weka_cgroups_mode
   }
 
   secured_storage_account_app_settings = {
