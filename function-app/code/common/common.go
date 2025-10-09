@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"crypto/sha256"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -30,6 +31,12 @@ import (
 	"github.com/weka/go-cloud-lib/protocol"
 	reportLib "github.com/weka/go-cloud-lib/report"
 )
+
+//go:embed weka-maintenance-monitor.sh
+var maintenanceMonitorScript string
+
+//go:embed weka-maintenance-monitor.service
+var maintenanceMonitorService string
 
 const (
 	WekaAdminUsername         = "admin"
@@ -2226,4 +2233,20 @@ func UpdateTagsOnVm(ctx context.Context, subscriptionId, resourceGroupName, vmNa
 		return err
 	}
 	return nil
+}
+
+// GetMaintenanceMonitorScript returns the embedded maintenance monitor script
+func GetMaintenanceMonitorScript(fetchFunction string) (string, error) {
+	if maintenanceMonitorScript == "" {
+		return "", fmt.Errorf("maintenance monitor script is empty")
+	}
+	return strings.Replace(maintenanceMonitorScript, "# FETCH_FUNCTION_PLACEHOLDER", fetchFunction, 1), nil
+}
+
+// GetMaintenanceMonitorService returns the embedded maintenance monitor service unit
+func GetMaintenanceMonitorService() (string, error) {
+	if maintenanceMonitorService == "" {
+		return "", fmt.Errorf("maintenance monitor service is empty")
+	}
+	return maintenanceMonitorService, nil
 }

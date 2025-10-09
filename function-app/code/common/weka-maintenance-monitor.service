@@ -1,0 +1,19 @@
+[Unit]
+Description=WEKA Maintenance Event Monitor for Azure
+After=network-online.target weka-agent.service
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=10
+User=root
+Environment="CHECK_INTERVAL=30"
+EnvironmentFile=-/etc/default/weka-maintenance-monitor
+ExecStart=/usr/local/bin/weka-maintenance-monitor.sh
+StandardOutput=append:/var/log/weka-maintenance-monitor.log
+StandardError=append:/var/log/weka-maintenance-monitor.log
+
+[Install]
+WantedBy=multi-user.target

@@ -65,8 +65,22 @@ func getBackendCustomDataScript(ctx context.Context, userData string) (customDat
 	funcDef := azure_functions_def.NewFuncDef(baseFunctionUrl, functionAppKey)
 	reportFunction := funcDef.GetFunctionCmdDefinition(functions_def.Report)
 	deployFunction := funcDef.GetFunctionCmdDefinition(functions_def.Deploy)
+	fetchFunction := funcDef.GetFunctionCmdDefinition(functions_def.Fetch)
 
-	customDataStr := getInitScript(userData, diskSize, nicsNum, subnet, aptRepo, reportFunction, deployFunction)
+	// Get maintenance monitor script and service files
+	monitorScript, err := common.GetMaintenanceMonitorScript(fetchFunction)
+	if err != nil {
+		logger.Error().Err(err).Msg("cannot get maintenance monitor script")
+		return
+	}
+
+	serviceUnit, err := common.GetMaintenanceMonitorService()
+	if err != nil {
+		logger.Error().Err(err).Msg("cannot get maintenance monitor service")
+		return
+	}
+
+	customDataStr := getInitScript(userData, diskSize, nicsNum, subnet, aptRepo, reportFunction, deployFunction, clusterName, monitorScript, serviceUnit)
 	// base64 encode the custom data
 	customData = base64.StdEncoding.EncodeToString([]byte(customDataStr))
 	return
