@@ -169,9 +169,44 @@ echo "$(date -u): running deploy script"
 
 chmod +x /tmp/deploy.sh
 /tmp/deploy.sh 2>&1 | tee /tmp/weka_deploy.log
+
+# Install WEKA maintenance event monitor
+echo "$(date -u): installing weka maintenance event monitor"
+
+CLUSTER_NAME="%s"
+
+# Create maintenance monitor script with injected fetch function
+cat > /usr/local/bin/weka-maintenance-monitor.sh << 'MONITOR_SCRIPT_EOF'
+%s
+MONITOR_SCRIPT_EOF
+
+chmod +x /usr/local/bin/weka-maintenance-monitor.sh
+
+# Create environment configuration
+cat > /etc/default/weka-maintenance-monitor << EOF
+CLUSTER_NAME=$CLUSTER_NAME
+CHECK_INTERVAL=30
+EOF
+
+chmod 644 /etc/default/weka-maintenance-monitor
+
+# Create systemd service
+cat > /etc/systemd/system/weka-maintenance-monitor.service << 'SERVICE_EOF'
+%s
+SERVICE_EOF
+
+chmod 644 /etc/systemd/system/weka-maintenance-monitor.service
+
+# Enable and start service
+systemctl daemon-reload
+systemctl enable weka-maintenance-monitor.service
+systemctl start weka-maintenance-monitor.service
+
+echo "$(date -u): weka maintenance event monitor installed and started"
+report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Weka maintenance event monitor installed and started\"}"
 `
 )
 
-func getInitScript(userData string, diskSize int, nicsNum int, subnetRange string, aptRepoServer string, reportFuncDef string, deployFuncDef string) string {
-	return fmt.Sprintf(initScript, userData, diskSize, nicsNum, subnetRange, aptRepoServer, reportFuncDef, deployFuncDef)
+func getInitScript(userData string, diskSize int, nicsNum int, subnetRange string, aptRepoServer string, reportFuncDef string, deployFuncDef string, clusterName string, monitorScript string, serviceUnit string) string {
+	return fmt.Sprintf(initScript, userData, diskSize, nicsNum, subnetRange, aptRepoServer, reportFuncDef, deployFuncDef, clusterName, monitorScript, serviceUnit)
 }
