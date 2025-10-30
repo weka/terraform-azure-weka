@@ -112,11 +112,11 @@ WantedBy=multi-user.target
 EOF
 
   ip route # show routes before removing
-  systemctl daemon-reload
-  systemctl enable remove-routes.service
-  systemctl start remove-routes.service
-  systemctl status remove-routes.service || true # show status of remove-routes.service
-  ip route # show routes after removing
+  #systemctl daemon-reload
+  #systemctl enable remove-routes.service
+  #systemctl start remove-routes.service
+  #systemctl status remove-routes.service || true # show status of remove-routes.service
+  #ip route # show routes after removing
 fi
 
 echo "$(date -u): routes configured"
