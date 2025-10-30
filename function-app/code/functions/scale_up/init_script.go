@@ -65,62 +65,6 @@ EOF
 
 netplan apply
 
-if [[ $NICS_NUM -gt 1 ]]; then
-  are_routes_ready='ip route | grep eth1'
-  for(( i=2; i<$NICS_NUM; i++ )); do
-    are_routes_ready=$are_routes_ready' && ip route | grep eth'"$i"
-  done
-cat >>/usr/sbin/remove-routes.sh <<EOF
-#!/bin/bash
-set -ex
-retry_max=24
-for(( i=0; i<\$retry_max; i++ )); do
-  if eval "$are_routes_ready"; then
-    for(( j=1; j<$NICS_NUM; j++ )); do
-      /usr/sbin/ip route del $SUBNET_RANGE dev eth\$j
-    done
-    break
-  fi
-  ip route
-  sleep 5
-done
-if [ \$i -eq \$retry_max ]; then
-  echo "Routes are not ready on time"
-  host_routes=$(ip route)
-  weka_resources=$(weka local resources || "no weka resources")
-  report "{\"hostname\": \"$HOSTNAME\", \"type\": \"error\", \"message\": \"Routes are not ready on time. Routes: $host_routes WEKA resources: $weka_resources\"}"
-  shutdown -h now
-  exit 1
-fi
-echo "Routes were removed successfully"
-EOF
-
-  chmod +x /usr/sbin/remove-routes.sh
-
-cat >/etc/systemd/system/remove-routes.service <<EOF
-[Unit]
-Description=Remove specific routes
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=/bin/bash /usr/sbin/remove-routes.sh
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-  ip route # show routes before removing
-  systemctl daemon-reload
-  systemctl enable remove-routes.service
-  systemctl start remove-routes.service
-  systemctl status remove-routes.service || true # show status of remove-routes.service
-  ip route # show routes after removing
-fi
-
-echo "$(date -u): routes configured"
-
 disk_size_str="${DISK_SIZE}G"
 while ! [ "$(lsblk | grep $disk_size_str | awk '{print $1}')" ] ; do
   echo "waiting for disk to be ready"
@@ -165,10 +109,18 @@ if [ $retry -gt 0 ]; then
   report "{\"hostname\": \"$HOSTNAME\", \"type\": \"debug\", \"message\": \"$msg\"}"
 fi
 
+# debug info
+ip route
+ip addr show
+
 echo "$(date -u): running deploy script"
 
 chmod +x /tmp/deploy.sh
 /tmp/deploy.sh 2>&1 | tee /tmp/weka_deploy.log
+
+# debug info
+ip route
+ip addr show
 
 # Install WEKA maintenance event monitor
 echo "$(date -u): installing weka maintenance event monitor"
