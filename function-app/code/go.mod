@@ -1,6 +1,6 @@
 module weka-deployment
 
-go 1.24.1
+go 1.25.4
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.11.1
@@ -14,7 +14,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
 	github.com/lithammer/dedent v1.1.0
-	github.com/weka/go-cloud-lib v0.0.0-20251023132428-c547b07bfddc
+	github.com/weka/go-cloud-lib v0.0.0-20251120090520-df08c3369c2b
 )
 
 require (
