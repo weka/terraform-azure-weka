@@ -42,56 +42,13 @@ EOF
 
 netplan apply
 
-are_routes_ready='ip route | grep eth1'
-for(( i=2; i<${nics_num}; i++ )); do
-  are_routes_ready=$are_routes_ready' && ip route | grep eth'"$i"
+for(( i=1; i<${nics_num}; i++ )); do
+  while ! ip route | grep eth$i; do
+    echo "Waiting for eth$i to be up..."
+    sleep 5
+  done
 done
-cat >>/usr/sbin/remove-routes.sh <<EOF
-#!/bin/bash
-set -ex
-retry_max=24
-for(( i=0; i<\$retry_max; i++ )); do
-  if eval "$are_routes_ready"; then
-    for(( j=1; j<${nics_num}; j++ )); do
-      /usr/sbin/ip route del ${subnet_range} dev eth\$j
-    done
-    break
-  fi
-  ip route
-  sleep 5
-done
-if [ \$i -eq \$retry_max ]; then
-  echo "Routes are not ready on time"
-  shutdown -h now
-  exit 1
-fi
-echo "Routes were removed successfully"
-EOF
 
-chmod +x /usr/sbin/remove-routes.sh
-
-cat >/etc/systemd/system/remove-routes.service <<EOF
-[Unit]
-Description=Remove specific routes
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=/bin/bash /usr/sbin/remove-routes.sh
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-ip route # show routes before removing
-systemctl daemon-reload
-systemctl enable remove-routes.service
-systemctl start remove-routes.service
-systemctl status remove-routes.service || true # show status of remove-routes.service
-ip route # show routes after removing
-
-echo "$(date -u): routes configured"
 
 while ! [ "$(lsblk | grep ${disk_size}G | awk '{print $1}')" ] ; do
   echo "waiting for disk to be ready"
