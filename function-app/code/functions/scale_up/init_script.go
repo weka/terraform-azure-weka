@@ -34,33 +34,17 @@ if [[ "$APT_REPO_SERVER" ]]; then
   apt update -y
 fi
 
-for(( i=0; i<$NICS_NUM; i++ )); do
-    cat <<-EOF | sed -i "/        eth$i/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
-            mtu: 3900
-EOF
-done
-
-# config network with multi nics
-echo "200 eth0-rt" >> /etc/iproute2/rt_tables
-
-echo "network:"> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
-echo "  config: disabled" >> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
-gateway=$(ip r | grep default | awk '{print $3}')
-eth=$(ifconfig | grep eth0 -C2 | grep 'inet ' | awk '{print $2}')
-cat <<-EOF | sed -i "/            set-name: eth0/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
-            routes:
-             - to: $SUBNET_RANGE
-               via: $gateway
-               metric: 200
-               table: 200
-             - to: 0.0.0.0/0
-               via: $gateway
-               table: 200
-            routing-policy:
-             - from: $eth/32
-               table: 200
-             - to: $eth/32
-               table: 200
+# Set MTU to 3900 for all NICs
+cat > /etc/netplan/99-mtu.yaml <<EOF
+network:
+  version: 2
+  ethernets:
+    all:
+      match:
+        name: "eth*"
+      mtu: 3900
+      dhcp4-overrides:
+        use-mtu: false
 EOF
 
 netplan apply
