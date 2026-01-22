@@ -12,6 +12,7 @@ import (
 	"weka-deployment/functions/protect"
 	"weka-deployment/functions/report"
 	"weka-deployment/functions/resize"
+	"weka-deployment/functions/instance_refresh"
 	"weka-deployment/functions/scale_down"
 	"weka-deployment/functions/scale_up"
 	"weka-deployment/functions/status"
@@ -47,6 +48,8 @@ func main() {
 	mux.Handle("/terminate", logging.LoggingMiddleware(terminate.Handler))
 	mux.Handle("/transient", logging.LoggingMiddleware(transient.Handler))
 	mux.Handle("/resize", logging.LoggingMiddleware(resize.Handler))
+	mux.Handle("/instance_refresh", logging.LoggingMiddleware(instance_refresh.Handler))
+	mux.Handle("/instance_refresh_worker", logging.LoggingMiddleware(instance_refresh.WorkerHandler))
 	mux.Handle("/report", logging.LoggingMiddleware(report.Handler))
 	mux.Handle("/protect", logging.LoggingMiddleware(protect.Handler))
 	logger.Info().Msgf("Go server Listening on: %v", customHandlerPort)

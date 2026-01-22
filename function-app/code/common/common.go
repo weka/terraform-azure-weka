@@ -69,6 +69,15 @@ type BlobObjParams struct {
 	BlobName      string
 }
 
+// BlobReadResult contains the blob data along with its ETag for optimistic concurrency
+type BlobReadResult struct {
+	Data []byte
+	ETag *azcore.ETag
+}
+
+// ErrBlobModified is returned when a conditional write fails because the blob was modified
+var ErrBlobModified = errors.New("blob was modified by another process")
+
 type AzureObsParams struct {
 	Name              string
 	ContainerName     string
@@ -224,6 +233,15 @@ func UnlockContainer(ctx context.Context, storageAccountName, containerName stri
 }
 
 func ReadBlobObject(ctx context.Context, bl BlobObjParams) (state []byte, err error) {
+	result, err := ReadBlobObjectWithETag(ctx, bl)
+	if err != nil {
+		return nil, err
+	}
+	return result.Data, nil
+}
+
+// ReadBlobObjectWithETag reads a blob and returns its data along with the ETag for optimistic concurrency
+func ReadBlobObjectWithETag(ctx context.Context, bl BlobObjParams) (result BlobReadResult, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := getCredential(ctx)
@@ -243,13 +261,14 @@ func ReadBlobObject(ctx context.Context, bl BlobObjParams) (state []byte, err er
 		return
 	}
 
-	state, err = io.ReadAll(downloadResponse.Body)
+	result.Data, err = io.ReadAll(downloadResponse.Body)
 	if err != nil {
 		logger.Error().Err(err).Send()
+		return
 	}
 
+	result.ETag = downloadResponse.ETag
 	return
-
 }
 
 func containerExists(ctx context.Context, containerClient *container.Client, storageName, containerName string) (bool, error) {
@@ -400,6 +419,47 @@ func WriteBlobObject(ctx context.Context, bl BlobObjParams, state []byte) (err e
 
 	return
 
+}
+
+// WriteBlobObjectWithETag writes a blob with optimistic concurrency using ETags.
+// If etag is provided, the write will only succeed if the blob's current ETag matches.
+// Returns ErrBlobModified if the blob was modified by another process.
+func WriteBlobObjectWithETag(ctx context.Context, bl BlobObjParams, data []byte, etag *azcore.ETag) error {
+	logger := logging.LoggerFromCtx(ctx)
+
+	credential, err := getCredential(ctx)
+	if err != nil {
+		return err
+	}
+
+	blobClient, err := azblob.NewClient(getBlobUrl(bl.StorageName), credential, nil)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return err
+	}
+
+	opts := &azblob.UploadBufferOptions{}
+	if etag != nil {
+		opts.AccessConditions = &blob.AccessConditions{
+			ModifiedAccessConditions: &blob.ModifiedAccessConditions{
+				IfMatch: etag,
+			},
+		}
+	}
+
+	_, err = blobClient.UploadBuffer(ctx, bl.ContainerName, bl.BlobName, data, opts)
+	if err != nil {
+		// Check if this is a precondition failed error (ETag mismatch)
+		var respErr *azcore.ResponseError
+		if errors.As(err, &respErr) && respErr.StatusCode == 412 {
+			logger.Warn().Msgf("blob %s was modified by another process (ETag mismatch)", bl.BlobName)
+			return ErrBlobModified
+		}
+		logger.Error().Err(err).Send()
+		return err
+	}
+
+	return nil
 }
 
 func WriteState(ctx context.Context, stateParams BlobObjParams, state protocol.ClusterState) (err error) {
@@ -1721,6 +1781,19 @@ func GetScaleSetVmsExpandedView(ctx context.Context, p *ScaleSetParams) ([]*VMIn
 	} else {
 		return GetUniformScaleSetInstances(ctx, p.SubscriptionId, p.ResourceGroupName, p.ScaleSetName, &expand)
 	}
+}
+
+func GetScaleSetVmInstanceIds(ctx context.Context, p *ScaleSetParams) ([]string, error) {
+	vms, err := GetScaleSetVmsExpandedView(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]string, 0, len(vms))
+	for _, vm := range vms {
+		ids = append(ids, vm.InstanceID)
+	}
+	return ids, nil
 }
 
 func GetAzureInstanceNameCmd() string {

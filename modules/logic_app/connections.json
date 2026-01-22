@@ -59,6 +59,18 @@
         "id": "${function_id}/functions/transient"
       },
       "triggerUrl": "https://${function_name}.azurewebsites.net/api/transient"
+    },
+    "instance-refresh-worker-connection": {
+      "authentication": {
+        "name": "Code",
+        "type": "QueryString",
+        "value": "@appsetting('function_app_key')"
+      },
+      "displayName": "instance-refresh-worker",
+      "function": {
+        "id": "${function_id}/functions/instance_refresh_worker"
+      },
+      "triggerUrl": "https://${function_name}.azurewebsites.net/api/instance_refresh_worker"
     }
   },
   "serviceProviderConnections": {
