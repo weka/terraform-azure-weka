@@ -122,6 +122,56 @@ func GetReports(ctx context.Context, stateParams common.BlobObjParams, vmssParam
 	return
 }
 
+// GetWekaStatus fetches the Weka cluster status via JRPC
+func GetWekaStatus(ctx context.Context, vmssParams *common.ScaleSetParams, keyVaultUri string) (protocol.WekaStatus, error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	credentials, err := common.GetWekaClusterCredentials(ctx, keyVaultUri)
+	if err != nil {
+		return protocol.WekaStatus{}, fmt.Errorf("failed to get Weka credentials: %v", err)
+	}
+
+	jrpcBuilder := func(ip string) *jrpc.BaseClient {
+		return connectors.NewJrpcClient(ctx, ip, weka.ManagementJrpcPort, credentials.Username, credentials.Password)
+	}
+
+	vmIps, err := common.GetVmsPrivateIps(ctx, vmssParams)
+	if err != nil {
+		return protocol.WekaStatus{}, fmt.Errorf("failed to get VM IPs: %v", err)
+	}
+
+	ips := make([]string, 0, len(vmIps))
+	for _, ip := range vmIps {
+		ips = append(ips, ip)
+	}
+
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r.Shuffle(len(ips), func(i, j int) { ips[i], ips[j] = ips[j], ips[i] })
+
+	jpool := &jrpc.Pool{
+		Ips:     ips,
+		Clients: map[string]*jrpc.BaseClient{},
+		Active:  "",
+		Builder: jrpcBuilder,
+		Ctx:     ctx,
+	}
+
+	var rawWekaStatus json.RawMessage
+	if err := jpool.Call(weka.JrpcStatus, struct{}{}, &rawWekaStatus); err != nil {
+		return protocol.WekaStatus{}, fmt.Errorf("failed to call Weka status: %v", err)
+	}
+
+	var wekaStatus protocol.WekaStatus
+	if err := json.Unmarshal(rawWekaStatus, &wekaStatus); err != nil {
+		return protocol.WekaStatus{}, fmt.Errorf("failed to unmarshal Weka status: %v", err)
+	}
+
+	logger.Debug().Msgf("Weka status: io_status=%s, status=%s, backends=%d, drives=%d",
+		wekaStatus.IoStatus, wekaStatus.Status, wekaStatus.Hosts.Backends.Active, wekaStatus.Drives.Active)
+
+	return wekaStatus, nil
+}
+
 func GetClusterStatus(ctx context.Context, vmssParams *common.ScaleSetParams, stateParams common.BlobObjParams, keyVaultUri string) (clusterStatus protocol.ClusterStatus, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 	logger.Info().Msg("fetching cluster status...")
@@ -137,43 +187,8 @@ func GetClusterStatus(ctx context.Context, vmssParams *common.ScaleSetParams, st
 		return
 	}
 
-	credentials, err := common.GetWekaClusterCredentials(ctx, keyVaultUri)
+	wekaStatus, err := GetWekaStatus(ctx, vmssParams, keyVaultUri)
 	if err != nil {
-		return
-	}
-
-	jrpcBuilder := func(ip string) *jrpc.BaseClient {
-		return connectors.NewJrpcClient(ctx, ip, weka.ManagementJrpcPort, credentials.Username, credentials.Password)
-	}
-
-	vmIps, err := common.GetVmsPrivateIps(ctx, vmssParams)
-	if err != nil {
-		return
-	}
-	ips := make([]string, 0, len(vmIps))
-	for _, ip := range vmIps {
-		ips = append(ips, ip)
-	}
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	r.Shuffle(len(ips), func(i, j int) { ips[i], ips[j] = ips[j], ips[i] })
-	logger.Info().Msgf("ips: %s", ips)
-	jpool := &jrpc.Pool{
-		Ips:     ips,
-		Clients: map[string]*jrpc.BaseClient{},
-		Active:  "",
-		Builder: jrpcBuilder,
-		Ctx:     ctx,
-	}
-
-	var rawWekaStatus json.RawMessage
-
-	err = jpool.Call(weka.JrpcStatus, struct{}{}, &rawWekaStatus)
-	if err != nil {
-		return
-	}
-
-	wekaStatus := protocol.WekaStatus{}
-	if err = json.Unmarshal(rawWekaStatus, &wekaStatus); err != nil {
 		return
 	}
 	clusterStatus.WekaStatus = wekaStatus

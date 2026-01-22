@@ -102,6 +102,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func updateDesiredClusterSize(ctx context.Context, newSize int, subscriptionId, resourceGroupName, vmScaleSetName string, stateParams common.BlobObjParams) error {
+	logger := logging.LoggerFromCtx(ctx)
+
+	// Acquire lock to prevent race conditions with other state modifications
+	leaseId, err := common.LockContainer(ctx, stateParams.StorageName, stateParams.ContainerName)
+	if err != nil {
+		return fmt.Errorf("failed to acquire lock: %v", err)
+	}
+	defer common.UnlockContainer(ctx, stateParams.StorageName, stateParams.ContainerName, leaseId)
+
 	state, err := common.ReadState(ctx, stateParams)
 	if err != nil {
 		return err
@@ -109,7 +118,6 @@ func updateDesiredClusterSize(ctx context.Context, newSize int, subscriptionId, 
 
 	if !state.Clusterized {
 		err = fmt.Errorf("weka cluster is not ready (vmss: %s)", vmScaleSetName)
-		logger := logging.LoggerFromCtx(ctx)
 		logger.Error().Err(err).Send()
 		return err
 	}

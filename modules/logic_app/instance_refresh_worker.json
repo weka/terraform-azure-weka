@@ -1,0 +1,32 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "instance-refresh-worker": {
+        "inputs": {
+          "function": {
+            "connectionName": "instance-refresh-worker-connection"
+          },
+          "method": "POST",
+          "retryPolicy": {
+            "type": "none"
+          }
+        },
+        "runAfter": {},
+        "type": "Function"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "run-every-1-minute": {
+        "recurrence": {
+          "frequency": "Minute",
+          "interval": 1
+        },
+        "type": "Recurrence"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

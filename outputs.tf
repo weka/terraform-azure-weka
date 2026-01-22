@@ -21,6 +21,10 @@ locals {
       uri  = "https://${local.function_app_name}.azurewebsites.net/api/resize"
       body = { "value" : 7 }
     }
+    instance_refresh = {
+      uri  = "https://${local.function_app_name}.azurewebsites.net/api/instance_refresh"
+      body = { "action" : "status" }
+    }
   }
 }
 
@@ -129,9 +133,17 @@ output "weka_cluster_admin_password_secret_name" {
 
 
 locals {
-  resize_helper_command = !local.create_logic_app ? "" : <<EOT
+  resize_helper_command           = !local.create_logic_app ? "" : <<EOT
 function_key=$(az functionapp keys list --name ${local.function_app_name} --resource-group ${local.resource_group_name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
 curl --fail https://${local.function_app_name}.azurewebsites.net/api/resize?code=$function_key -H "Content-Type:application/json" -d '{"value":ENTER_NEW_VALUE_HERE}'
+EOT
+  instance_refresh_helper_command = !local.create_logic_app ? "" : <<EOT
+function_key=$(az functionapp keys list --name ${local.function_app_name} --resource-group ${local.resource_group_name} --subscription ${var.subscription_id} --query functionKeys -o tsv)
+# Actions: start, status, cancel
+# Start an instance refresh (scale_up_interval is optional, default 2):
+curl --fail https://${local.function_app_name}.azurewebsites.net/api/instance_refresh?code=$function_key -H "Content-Type:application/json" -d '{"action":"start", "scale_up_interval": 2}'
+# Check status:
+curl --fail https://${local.function_app_name}.azurewebsites.net/api/instance_refresh?code=$function_key -H "Content-Type:application/json" -d '{"action":"status"}'
 EOT
 }
 
@@ -145,6 +157,7 @@ curl --fail https://${local.function_app_name}.azurewebsites.net/api/status?code
 EOT
     get_password          = "az keyvault secret show --vault-name ${local.key_vault_name} --name ${azurerm_key_vault_secret.weka_password_secret.name} | jq .value"
     resize_cluster        = local.resize_helper_command
+    instance_refresh      = local.instance_refresh_helper_command
     download_ssh_key      = local.download_ssh_key
     pre_terraform_destroy = "az vmss delete --name <ENTER YOUR BACKENDS VMSS_NAME HERE> --resource-group ${var.rg_name} --force-deletion true --subscription ${var.subscription_id}"
   }
