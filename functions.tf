@@ -168,7 +168,9 @@ locals {
     SMB_DISK_SIZE                     = var.smb_protocol_gateway_disk_size
     S3_DISK_SIZE                      = var.s3_protocol_gateway_disk_size
     SMB_PROTOCOL_GATEWAY_FE_CORES_NUM = var.smb_protocol_gateway_fe_cores_num
+    SMB_PROTOCOL_GATEWAYS_NUM         = var.smb_protocol_gateways_number
     S3_PROTOCOL_GATEWAY_FE_CORES_NUM  = var.s3_protocol_gateway_fe_cores_num
+    S3_PROTOCOL_GATEWAYS_NUM          = var.s3_protocol_gateways_number
     TRACES_PER_FRONTEND               = var.traces_per_ionode
     SET_DEFAULT_FS                    = var.set_default_fs
     POST_CLUSTER_SETUP_SCRIPT         = var.post_cluster_setup_script
