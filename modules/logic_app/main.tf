@@ -64,7 +64,7 @@ resource "azurerm_logic_app_standard" "logic_app_standard" {
   app_settings = {
     "WEBSITE_CONTENTOVERVNET"      = var.use_secured_storage_account ? 1 : 0
     "FUNCTIONS_WORKER_RUNTIME"     = "node"
-    "WEBSITE_NODE_DEFAULT_VERSION" = "~18"
+    "WEBSITE_NODE_DEFAULT_VERSION" = "~24"
     "function_app_key"             = var.function_app_key
     "keyVaultUri"                  = var.key_vault_uri
   }
