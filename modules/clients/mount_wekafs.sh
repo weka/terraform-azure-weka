@@ -61,7 +61,7 @@ mkdir -p $MOUNT_POINT
 weka local stop && weka local rm -f --all
 
 FRONTEND_CONTAINER_CORES_NUM="${frontend_container_cores_num}"
-eth0=$(ifconfig | grep eth0 -C2 | grep 'inet ' | awk '{print $2}')
+eth0=$(ip -4 addr show eth0 | awk '/inet / {split($2,a,"/"); print a[1]}')
 
 function retry {
   local retry_max=$1

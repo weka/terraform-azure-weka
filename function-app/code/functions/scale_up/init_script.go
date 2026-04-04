@@ -34,6 +34,10 @@ if [[ "$APT_REPO_SERVER" ]]; then
   apt update -y
 fi
 
+if ! command -v jq &> /dev/null; then
+  apt install -y jq
+fi
+
 for(( i=0; i<$NICS_NUM; i++ )); do
     cat <<-EOF | sed -i "/        eth$i/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
             mtu: 3900
@@ -46,7 +50,7 @@ echo "200 eth0-rt" >> /etc/iproute2/rt_tables
 echo "network:"> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
 echo "  config: disabled" >> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
 gateway=$(ip r | grep default | awk '{print $3}')
-eth=$(ifconfig | grep eth0 -C2 | grep 'inet ' | awk '{print $2}')
+eth=$(ip -4 addr show eth0 | awk '/inet / {split($2,a,"/"); print a[1]}')
 cat <<-EOF | sed -i "/            set-name: eth0/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
             routes:
              - to: $SUBNET_RANGE
@@ -99,9 +103,11 @@ while ! deploy "{\"name\": \"$compute_name:$HOSTNAME\"}" > /tmp/deploy.sh 2>/tmp
   sleep 5
 done
 
-weka_dir="/opt/weka/data"
-mkdir -p $weka_dir
-mv /root/weka-prepackaged $weka_dir
+if [ -d "/root/weka-prepackaged" ]; then
+  weka_dir="/opt/weka/data"
+  mkdir -p $weka_dir
+  mv /root/weka-prepackaged $weka_dir
+fi
 
 if [ $retry -gt 0 ]; then
   msg="Deploy script generation retried $retry times"

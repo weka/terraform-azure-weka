@@ -83,7 +83,8 @@ resource "azurerm_network_interface_security_group_association" "primary_gateway
 }
 
 locals {
-  secondary_nics_num = (local.nics_numbers - 1) * var.gateways_number
+  use_marketplace_image = var.image_sku != null && var.image_offer != null
+  secondary_nics_num    = (local.nics_numbers - 1) * var.gateways_number
 }
 
 resource "azurerm_network_interface" "secondary_gateway_nic" {
@@ -174,8 +175,18 @@ resource "azurerm_linux_virtual_machine" "this" {
   custom_data                     = base64encode(local.custom_data)
   proximity_placement_group_id    = var.ppg_id
   disable_password_authentication = true
-  source_image_id                 = var.source_image_id
+  source_image_id                 = local.use_marketplace_image ? "" : var.source_image_id
   tags                            = merge(var.tags_map, { "weka_protocol_gateways" : var.gateways_name, "user_id" : data.azurerm_client_config.current.object_id })
+
+  dynamic "source_image_reference" {
+    for_each = local.use_marketplace_image ? [1] : []
+    content {
+      publisher = "Canonical"
+      offer     = var.image_offer
+      sku       = var.image_sku
+      version   = var.image_version
+    }
+  }
 
   network_interface_ids = concat(
     [local.first_nic_ids[count.index]],
@@ -304,7 +315,17 @@ resource "azurerm_orchestrated_virtual_machine_scale_set" "nfs" {
   sku_name                     = var.instance_type
   tags                         = merge(var.tags_map, { "weka_protocol_gateways" : var.gateways_name, "user_id" : data.azurerm_client_config.current.object_id })
   proximity_placement_group_id = var.ppg_id
-  source_image_id              = var.source_image_id
+  source_image_id              = local.use_marketplace_image ? "" : var.source_image_id
+
+  dynamic "source_image_reference" {
+    for_each = local.use_marketplace_image ? [1] : []
+    content {
+      publisher = "Canonical"
+      offer     = var.image_offer
+      sku       = var.image_sku
+      version   = var.image_version
+    }
+  }
 
   os_profile {
     custom_data = base64encode(local.custom_data)

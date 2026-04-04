@@ -9,6 +9,7 @@ data "azurerm_subnet" "subnet" {
 }
 
 locals {
+  use_marketplace_image   = var.image_sku != null && var.image_offer != null
   first_nic_ids           = var.assign_public_ip ? azurerm_network_interface.public_first_nic[*].id : azurerm_network_interface.private_first_nic[*].id
   private_nic_first_index = var.assign_public_ip ? 1 : 0
   nics_num                = var.frontend_container_cores_num + 1
@@ -128,7 +129,7 @@ resource "azurerm_linux_virtual_machine" "this" {
   admin_username      = var.vm_username
   tags                = merge({ "weka_cluster_client" : var.clients_name }, var.tags_map)
   custom_data         = local.vms_custom_data
-  source_image_id     = local.source_image_id
+  source_image_id     = local.use_marketplace_image ? "" : local.source_image_id
   size                = local.instance_type
   network_interface_ids = concat([
     local.first_nic_ids[count.index]
@@ -136,6 +137,16 @@ resource "azurerm_linux_virtual_machine" "this" {
 
   proximity_placement_group_id    = var.ppg_id
   disable_password_authentication = true
+
+  dynamic "source_image_reference" {
+    for_each = local.use_marketplace_image ? [1] : []
+    content {
+      publisher = "Canonical"
+      offer     = var.image_offer
+      sku       = var.image_sku
+      version   = var.image_version
+    }
+  }
 
   identity {
     type         = "UserAssigned"
@@ -170,6 +181,16 @@ resource "azurerm_linux_virtual_machine_scale_set" "this" {
   custom_data         = local.vms_custom_data
   source_image_id     = local.source_image_id
   sku                 = local.instance_type
+
+  dynamic "source_image_reference" {
+    for_each = local.use_marketplace_image ? [1] : []
+    content {
+      publisher = "Canonical"
+      offer     = var.image_offer
+      sku       = var.image_sku
+      version   = var.image_version
+    }
+  }
 
   dynamic "network_interface" {
     for_each = range(local.private_nic_first_index)
