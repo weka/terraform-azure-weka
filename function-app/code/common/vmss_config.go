@@ -61,6 +61,9 @@ type VMSSConfig struct {
 	ResourceGroupName string            `json:"resource_group_name"`
 	SKU               string            `json:"sku"`
 	SourceImageID     string            `json:"source_image_id"`
+	ImageSKU          string            `json:"image_sku"`
+	ImageOffer        string            `json:"image_offer"`
+	ImageVersion      string            `json:"image_version"`
 	Tags              map[string]string `json:"tags"`
 
 	UpgradeMode          string `json:"upgrade_mode"`

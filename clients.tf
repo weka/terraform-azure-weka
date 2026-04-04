@@ -28,4 +28,7 @@ module "clients" {
   arch                         = var.client_arch
   root_volume_size             = var.clients_root_volume_size
   weka_cgroups_mode            = var.clients_weka_cgroups_mode
+  image_sku                    = var.image_sku
+  image_offer                  = var.image_offer
+  image_version                = var.image_version
 }

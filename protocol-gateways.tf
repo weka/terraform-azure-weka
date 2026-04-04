@@ -1,3 +1,4 @@
+
 module "nfs_protocol_gateways" {
   count                        = var.nfs_protocol_gateways_number > 0 ? 1 : 0
   source                       = "./modules/protocol_gateways"
@@ -29,6 +30,9 @@ module "nfs_protocol_gateways" {
   deploy_function_url          = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/deploy"
   report_function_url          = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/report"
   function_app_default_key     = data.azurerm_function_app_host_keys.function_keys.default_function_key
+  image_sku                    = var.image_sku
+  image_offer                  = var.image_offer
+  image_version                = var.image_version
   depends_on                   = [module.network, azurerm_key_vault_secret.get_weka_io_token, azurerm_proximity_placement_group.ppg]
 }
 
@@ -132,6 +136,9 @@ module "smb_protocol_gateways" {
   deploy_function_url          = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/deploy"
   report_function_url          = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/report"
   function_app_default_key     = data.azurerm_function_app_host_keys.function_keys.default_function_key
+  image_sku                    = var.image_sku
+  image_offer                  = var.image_offer
+  image_version                = var.image_version
   depends_on                   = [module.network, azurerm_key_vault_secret.get_weka_io_token, azurerm_proximity_placement_group.ppg, azurerm_private_dns_resolver_dns_forwarding_ruleset.dns_forwarding_ruleset]
 }
 
@@ -165,5 +172,8 @@ module "s3_protocol_gateways" {
   deploy_function_url          = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/deploy"
   report_function_url          = "https://${azurerm_linux_function_app.function_app.name}.azurewebsites.net/api/report"
   function_app_default_key     = data.azurerm_function_app_host_keys.function_keys.default_function_key
+  image_sku                    = var.image_sku
+  image_offer                  = var.image_offer
+  image_version                = var.image_version
   depends_on                   = [module.network, azurerm_key_vault_secret.get_weka_io_token, azurerm_proximity_placement_group.ppg, azurerm_private_dns_resolver_dns_forwarding_ruleset.dns_forwarding_ruleset]
 }

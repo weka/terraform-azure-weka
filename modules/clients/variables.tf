@@ -129,8 +129,26 @@ variable "arch" {
 
 variable "source_image_id" {
   type        = string
-  description = "Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1"
+  description = "Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1. Ignored if image_sku is set."
   default     = ""
+}
+
+variable "image_sku" {
+  type        = string
+  default     = null
+  description = "Azure Marketplace image SKU (e.g., '22_04-lts-gen2' for Ubuntu 22.04 LTS). Required when using marketplace images. Must be paired with image_offer. Use underscores, not dots. When set, source_image_id is ignored."
+}
+
+variable "image_offer" {
+  type        = string
+  default     = null
+  description = "Azure Marketplace image offer (e.g., '0001-com-ubuntu-server-jammy' for Ubuntu 22.04 LTS). Required when image_sku is set. Common offers: 0001-com-ubuntu-server-focal (20.04), 0001-com-ubuntu-server-jammy (22.04)."
+}
+
+variable "image_version" {
+  type        = string
+  default     = "latest"
+  description = "Azure Marketplace image version (e.g., 'latest' or a specific version). Only used when image_sku is set. Use 'latest' for the most recent version, or pin to a specific version for reproducibility."
 }
 
 variable "use_vmss" {

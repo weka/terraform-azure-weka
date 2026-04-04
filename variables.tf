@@ -98,7 +98,25 @@ variable "cluster_size" {
 variable "source_image_id" {
   type        = string
   default     = "/communityGalleries/WekaIO-ddbef83d-dec1-42d0-998a-3c083f1450b7/images/weka_custom_image/versions/1.0.1"
-  description = "Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1"
+  description = "Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1. Ignored if image_sku is set."
+}
+
+variable "image_sku" {
+  type        = string
+  default     = null
+  description = "Azure Marketplace image SKU (e.g., '22_04-lts-gen2' for Ubuntu 22.04 LTS). Required when using marketplace images. Must be paired with image_offer. Use underscores, not dots. When set, source_image_id is ignored."
+}
+
+variable "image_offer" {
+  type        = string
+  default     = null
+  description = "Azure Marketplace image offer (e.g., '0001-com-ubuntu-server-jammy' for Ubuntu 22.04 LTS). Required when image_sku is set. Common offers: 0001-com-ubuntu-server-focal (20.04), 0001-com-ubuntu-server-jammy (22.04)."
+}
+
+variable "image_version" {
+  type        = string
+  default     = "latest"
+  description = "Azure Marketplace image version (e.g., 'latest' or a specific version). Only used when image_sku is set. Use 'latest' for the most recent version, or pin to a specific version for reproducibility."
 }
 
 variable "sg_id" {
@@ -410,7 +428,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "cfcfae26fee29902ed6e4dde17762be4"
+  default     = "a3a1f45e076af23f6c5c609dc677cf90"
 }
 
 variable "function_app_dist" {

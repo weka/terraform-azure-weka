@@ -8,6 +8,10 @@ if [[ "${apt_repo_server}" ]]; then
   echo "deb ${apt_repo_server} focal-updates main restricted" >> /etc/apt/sources.list
 fi
 
+if ! command -v jq &> /dev/null; then
+  apt install -y jq
+fi
+
 for(( i=0; i<${nics_num}; i++ )); do
     cat <<-EOF | sed -i "/        eth$i/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
             mtu: 3900
@@ -20,7 +24,7 @@ echo "200 eth0-rt" >> /etc/iproute2/rt_tables
 echo "network:"> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
 echo "  config: disabled" >> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
 gateway=$(ip r | grep default | awk '{print $3}')
-eth=$(ifconfig | grep eth0 -C2 | grep 'inet ' | awk '{print $2}')
+eth=$(ip -4 addr show eth0 | awk '/inet / {split($2,a,"/"); print a[1]}')
 cat <<-EOF | sed -i "/            set-name: eth0/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
             routes:
              - to: ${subnet_range}

@@ -1,4 +1,5 @@
 locals {
+  use_marketplace_image    = var.image_sku != null && var.image_offer != null
   create_private_function  = var.function_access_restriction_enabled ? 1 : 0
   stripe_width_calculated  = var.cluster_size - var.protection_level - 1
   stripe_width             = local.stripe_width_calculated < 16 ? local.stripe_width_calculated : 16
@@ -46,7 +47,10 @@ locals {
     disable_password_authentication = true
     proximity_placement_group_id    = local.placement_group_id
     single_placement_group          = var.vmss_single_placement_group
-    source_image_id                 = var.source_image_id
+    source_image_id                 = local.use_marketplace_image ? "" : var.source_image_id
+    image_sku                       = local.use_marketplace_image ? var.image_sku : ""
+    image_offer                     = local.use_marketplace_image ? var.image_offer : ""
+    image_version                   = local.use_marketplace_image ? var.image_version : ""
     overprovision                   = false
     orchestration_mode              = "Uniform"
     tags = merge(var.tags_map, {
