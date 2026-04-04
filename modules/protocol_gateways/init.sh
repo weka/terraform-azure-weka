@@ -17,13 +17,17 @@ for(( i=0; i<${nics_num}; i++ )); do
 EOF
 done
 
+if ! command -v jq &> /dev/null; then
+  apt install -y jq
+fi
+
 # config network with multi nics
 echo "200 eth0-rt" >> /etc/iproute2/rt_tables
 
 echo "network:"> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
 echo "  config: disabled" >> /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
 gateway=$(ip r | grep default | awk '{print $3}')
-eth=$(ifconfig | grep eth0 -C2 | grep 'inet ' | awk '{print $2}')
+eth=$(ip -4 addr show eth0 | awk '/inet / {split($2,a,"/"); print a[1]}')
 cat <<-EOF | sed -i "/            set-name: eth0/r /dev/stdin" /etc/netplan/50-cloud-init.yaml
             routes:
              - to: ${subnet_range}
@@ -108,9 +112,11 @@ while ! curl ${deploy_url}?code="${function_app_default_key}" --fail -H "Content
   sleep 5
 done
 
-weka_dir="/opt/weka/data"
-mkdir -p $weka_dir
-mv /root/weka-prepackaged $weka_dir
+if [ -d "/root/weka-prepackaged" ]; then
+  weka_dir="/opt/weka/data"
+  mkdir -p $weka_dir
+  mv /root/weka-prepackaged $weka_dir
+fi
 
 if [ $retry -gt 0 ]; then
   msg="Deploy script generation retried $retry times"

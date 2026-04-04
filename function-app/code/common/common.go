@@ -1908,10 +1908,25 @@ func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armc
 	}
 
 	var sourceImageID string
-	if scaleSet.Properties.VirtualMachineProfile.StorageProfile.ImageReference.CommunityGalleryImageID != nil {
-		sourceImageID = *scaleSet.Properties.VirtualMachineProfile.StorageProfile.ImageReference.CommunityGalleryImageID
-	} else {
-		sourceImageID = *scaleSet.Properties.VirtualMachineProfile.StorageProfile.ImageReference.ID
+	var imageSKU string
+	var imageOffer string
+	var imageVersion string
+
+	imageRef := scaleSet.Properties.VirtualMachineProfile.StorageProfile.ImageReference
+	if imageRef.CommunityGalleryImageID != nil {
+		sourceImageID = *imageRef.CommunityGalleryImageID
+	} else if imageRef.ID != nil {
+		sourceImageID = *imageRef.ID
+	}
+
+	if imageRef.SKU != nil {
+		imageSKU = *imageRef.SKU
+	}
+	if imageRef.Offer != nil {
+		imageOffer = *imageRef.Offer
+	}
+	if imageRef.Version != nil {
+		imageVersion = *imageRef.Version
 	}
 
 	tags := PtrMapToStrMap(scaleSet.Tags)
@@ -1932,6 +1947,9 @@ func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armc
 		ResourceGroupName: resourceGroupName,
 		SKU:               *scaleSet.SKU.Name,
 		SourceImageID:     sourceImageID,
+		ImageSKU:          imageSKU,
+		ImageOffer:        imageOffer,
+		ImageVersion:      imageVersion,
 		Tags:              tags,
 
 		UpgradeMode:          string(*scaleSet.Properties.UpgradePolicy.Mode),
@@ -2058,11 +2076,25 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 	}
 
 	imageReference := &armcompute.ImageReference{}
-	sourceImageIdLower := strings.ToLower(config.SourceImageID)
-	if strings.HasPrefix(sourceImageIdLower, "/communitygalleries") {
-		imageReference.CommunityGalleryImageID = &config.SourceImageID
+	if config.ImageSKU != "" && config.ImageOffer != "" {
+		// Use marketplace image (official Azure images)
+		publisher := "Canonical"
+		imageReference.Publisher = &publisher
+		imageReference.Offer = &config.ImageOffer
+		imageReference.SKU = &config.ImageSKU
+		version := config.ImageVersion
+		if version == "" {
+			version = "latest"
+		}
+		imageReference.Version = &version
 	} else {
-		imageReference.ID = &config.SourceImageID
+		// Use custom image (community gallery or custom image)
+		sourceImageIdLower := strings.ToLower(config.SourceImageID)
+		if strings.HasPrefix(sourceImageIdLower, "/communitygalleries") {
+			imageReference.CommunityGalleryImageID = &config.SourceImageID
+		} else {
+			imageReference.ID = &config.SourceImageID
+		}
 	}
 
 	var nics []*armcompute.VirtualMachineScaleSetNetworkConfiguration
