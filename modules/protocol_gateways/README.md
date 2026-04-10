@@ -54,6 +54,9 @@ No modules.
 | <a name="input_function_app_default_key"></a> [function\_app\_default\_key](#input\_function\_app\_default\_key) | The default key of the function app. | `string` | n/a | yes |
 | <a name="input_gateways_name"></a> [gateways\_name](#input\_gateways\_name) | The protocol group name. | `string` | n/a | yes |
 | <a name="input_gateways_number"></a> [gateways\_number](#input\_gateways\_number) | The number of virtual machines to deploy as protocol gateways. | `number` | n/a | yes |
+| <a name="input_image_offer"></a> [image\_offer](#input\_image\_offer) | Azure Marketplace image offer (e.g., '0001-com-ubuntu-server-jammy' for Ubuntu 22.04 LTS). Required when image\_sku is set. Common offers: 0001-com-ubuntu-server-focal (20.04), 0001-com-ubuntu-server-jammy (22.04). | `string` | `null` | no |
+| <a name="input_image_sku"></a> [image\_sku](#input\_image\_sku) | Azure Marketplace image SKU (e.g., '22\_04-lts-gen2' for Ubuntu 22.04 LTS). Required when using marketplace images. Must be paired with image\_offer. Use underscores, not dots. When set, source\_image\_id is ignored. | `string` | `null` | no |
+| <a name="input_image_version"></a> [image\_version](#input\_image\_version) | Azure Marketplace image version (e.g., 'latest' or a specific version). Only used when image\_sku is set. Use 'latest' for the most recent version, or pin to a specific version for reproducibility. | `string` | `"latest"` | no |
 | <a name="input_instance_type"></a> [instance\_type](#input\_instance\_type) | The virtual machine type (sku) to deploy. | `string` | n/a | yes |
 | <a name="input_key_vault_id"></a> [key\_vault\_id](#input\_key\_vault\_id) | The id of the Azure Key Vault. | `string` | n/a | yes |
 | <a name="input_key_vault_url"></a> [key\_vault\_url](#input\_key\_vault\_url) | The URL of the Azure Key Vault. | `string` | n/a | yes |
@@ -68,7 +71,7 @@ No modules.
 | <a name="input_smb_cluster_name"></a> [smb\_cluster\_name](#input\_smb\_cluster\_name) | The name of the SMB setup. | `string` | `"Weka-SMB"` | no |
 | <a name="input_smb_domain_name"></a> [smb\_domain\_name](#input\_smb\_domain\_name) | The domain to join the SMB cluster to. | `string` | `""` | no |
 | <a name="input_smbw_enabled"></a> [smbw\_enabled](#input\_smbw\_enabled) | Enable SMBW protocol. | `bool` | `true` | no |
-| <a name="input_source_image_id"></a> [source\_image\_id](#input\_source\_image\_id) | Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1 | `string` | n/a | yes |
+| <a name="input_source_image_id"></a> [source\_image\_id](#input\_source\_image\_id) | Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1. Ignored if image\_sku is set. | `string` | n/a | yes |
 | <a name="input_ssh_public_key"></a> [ssh\_public\_key](#input\_ssh\_public\_key) | The VM public key. If it is not set, the keys are auto-generated. | `string` | n/a | yes |
 | <a name="input_subnet_name"></a> [subnet\_name](#input\_subnet\_name) | The subnet names. | `string` | n/a | yes |
 | <a name="input_tags_map"></a> [tags\_map](#input\_tags\_map) | A map of tags to assign the same metadata to all resources in the environment. Format: key:value. | `map(string)` | `{}` | no |

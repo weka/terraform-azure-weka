@@ -51,12 +51,15 @@ No modules.
 | <a name="input_custom_data_post_mount"></a> [custom\_data\_post\_mount](#input\_custom\_data\_post\_mount) | Custom data to pass to the instances, will run after weka agent install and mount. | `string` | `""` | no |
 | <a name="input_custom_data_pre_mount"></a> [custom\_data\_pre\_mount](#input\_custom\_data\_pre\_mount) | Custom data to pass to the instances, will run before weka agent install and mount. | `string` | `""` | no |
 | <a name="input_frontend_container_cores_num"></a> [frontend\_container\_cores\_num](#input\_frontend\_container\_cores\_num) | Number of nics to set on each client vm | `number` | `1` | no |
+| <a name="input_image_offer"></a> [image\_offer](#input\_image\_offer) | Azure Marketplace image offer (e.g., '0001-com-ubuntu-server-jammy' for Ubuntu 22.04 LTS). Required when image\_sku is set. Common offers: 0001-com-ubuntu-server-focal (20.04), 0001-com-ubuntu-server-jammy (22.04). | `string` | `null` | no |
+| <a name="input_image_sku"></a> [image\_sku](#input\_image\_sku) | Azure Marketplace image SKU (e.g., '22\_04-lts-gen2' for Ubuntu 22.04 LTS). Required when using marketplace images. Must be paired with image\_offer. Use underscores, not dots. When set, source\_image\_id is ignored. | `string` | `null` | no |
+| <a name="input_image_version"></a> [image\_version](#input\_image\_version) | Azure Marketplace image version (e.g., 'latest' or a specific version). Only used when image\_sku is set. Use 'latest' for the most recent version, or pin to a specific version for reproducibility. | `string` | `"latest"` | no |
 | <a name="input_instance_type"></a> [instance\_type](#input\_instance\_type) | The virtual machine type (sku) to deploy. | `string` | n/a | yes |
 | <a name="input_ppg_id"></a> [ppg\_id](#input\_ppg\_id) | Placement proximity group id. | `string` | `null` | no |
 | <a name="input_rg_name"></a> [rg\_name](#input\_rg\_name) | A predefined resource group in the Azure subscription. | `string` | n/a | yes |
 | <a name="input_root_volume_size"></a> [root\_volume\_size](#input\_root\_volume\_size) | The client's root volume size in GB | `number` | `null` | no |
 | <a name="input_sg_id"></a> [sg\_id](#input\_sg\_id) | Security group id | `string` | n/a | yes |
-| <a name="input_source_image_id"></a> [source\_image\_id](#input\_source\_image\_id) | Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1 | `string` | `""` | no |
+| <a name="input_source_image_id"></a> [source\_image\_id](#input\_source\_image\_id) | Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1. Ignored if image\_sku is set. | `string` | `""` | no |
 | <a name="input_ssh_public_key"></a> [ssh\_public\_key](#input\_ssh\_public\_key) | Ssh public key to pass to vms. | `string` | n/a | yes |
 | <a name="input_subnet_name"></a> [subnet\_name](#input\_subnet\_name) | The subnet names. | `string` | n/a | yes |
 | <a name="input_tags_map"></a> [tags\_map](#input\_tags\_map) | A map of tags to assign the same metadata to all resources in the environment. Format: key:value. | `map(string)` | `{}` | no |
