@@ -24,18 +24,15 @@ import (
 
 func GetObsScript(obsParams common.AzureObsParams) string {
 	template := `
-	TIERING_SSD_PERCENT=%s
 	OBS_NAME=%s
 	OBS_CONTAINER_NAME=%s
 	OBS_BLOB_KEY=%s
 
 	weka fs tier s3 add azure-obs --site local --obs-name default-local --obs-type AZURE --hostname $OBS_NAME.blob.core.windows.net --port 443 --bucket $OBS_CONTAINER_NAME --access-key-id $OBS_NAME --secret-key $OBS_BLOB_KEY --protocol https --auth-method AWSSignature4
 	weka fs tier s3 attach default azure-obs
-	tiering_percent=$(echo "$full_capacity * 100 / $TIERING_SSD_PERCENT" | bc)
-	weka fs update default --total-capacity "$tiering_percent"B
 	`
 	return fmt.Sprintf(
-		dedent.Dedent(template), obsParams.TieringSsdPercent, obsParams.Name, obsParams.ContainerName, obsParams.AccessKey,
+		dedent.Dedent(template), obsParams.Name, obsParams.ContainerName, obsParams.AccessKey,
 	)
 }
 
@@ -379,7 +376,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	obsAllowedPublicIpsStr := os.Getenv("OBS_ALLOWED_PUBLIC_IPS")
 	obsAllowedPublicIps := []string{}
 	location := os.Getenv("LOCATION")
-	tieringSsdPercent := os.Getenv("TIERING_SSD_PERCENT")
+	tieringSsdPercent, _ := strconv.Atoi(os.Getenv("TIERING_SSD_PERCENT"))
 	tieringTargetSsdRetention, _ := strconv.Atoi(os.Getenv("TIERING_TARGET_SSD_RETENTION"))
 	tieringStartDemote, _ := strconv.Atoi(os.Getenv("TIERING_START_DEMOTE"))
 	prefix := os.Getenv("PREFIX")
@@ -470,19 +467,19 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			},
 			PreStartIoScript:          preStartIoScript,
 			PostClusterCreationScript: postClusterCreationScript,
+			TieringSSDPercent:         tieringSsdPercent,
 			TieringTargetSSDRetention: tieringTargetSsdRetention,
 			TieringStartDemote:        tieringStartDemote,
 			SetDefaultFs:              setDefaultFs,
 			PostClusterSetupScript:    postClusterSetupScript,
 		},
 		Obs: common.AzureObsParams{
-			Name:              obsName,
-			ContainerName:     obsContainerName,
-			AccessKey:         obsAccessKey,
-			TieringSsdPercent: tieringSsdPercent,
-			NetworkAccess:     obsNetworkAccess,
-			AllowedSubnets:    obsAllowedSubnets,
-			AllowedPublicIps:  obsAllowedPublicIps,
+			Name:             obsName,
+			ContainerName:    obsContainerName,
+			AccessKey:        obsAccessKey,
+			NetworkAccess:    obsNetworkAccess,
+			AllowedSubnets:   obsAllowedSubnets,
+			AllowedPublicIps: obsAllowedPublicIps,
 		},
 		NFSStateParams:  common.BlobObjParams{StorageName: stateStorageName, ContainerName: nfsStateContainerName, BlobName: nfsStateBlobName},
 		FunctionAppName: functionAppName,

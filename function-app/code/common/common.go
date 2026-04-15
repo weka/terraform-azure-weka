@@ -79,13 +79,12 @@ type BlobReadResult struct {
 var ErrBlobModified = errors.New("blob was modified by another process")
 
 type AzureObsParams struct {
-	Name              string
-	ContainerName     string
-	AccessKey         string
-	TieringSsdPercent string
-	NetworkAccess     string
-	AllowedSubnets    []string
-	AllowedPublicIps  []string
+	Name             string
+	ContainerName    string
+	AccessKey        string
+	NetworkAccess    string
+	AllowedSubnets   []string
+	AllowedPublicIps []string
 }
 
 const FindDrivesScript = `

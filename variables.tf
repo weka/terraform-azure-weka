@@ -428,7 +428,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "a3a1f45e076af23f6c5c609dc677cf90"
+  default     = "a40126d9134824e554460b5e176f028d"
 }
 
 variable "function_app_dist" {

@@ -28,7 +28,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	obsContainerName := os.Getenv("OBS_CONTAINER_NAME")
 	obsAccessKey := os.Getenv("OBS_ACCESS_KEY")
 	location := os.Getenv("LOCATION")
-	tieringSsdPercent := os.Getenv("TIERING_SSD_PERCENT")
+	tieringSsdPercent, _ := strconv.Atoi(os.Getenv("TIERING_SSD_PERCENT"))
 	prefix := os.Getenv("PREFIX")
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 	// data protection-related vars
@@ -114,13 +114,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 						ProtectionLevel: protectionLevel,
 						Hotspare:        hotspare,
 					},
-					SetObs: setObs,
+					SetObs:            setObs,
+					TieringSSDPercent: tieringSsdPercent,
 				},
 				Obs: common.AzureObsParams{
-					Name:              obsName,
-					ContainerName:     obsContainerName,
-					AccessKey:         obsAccessKey,
-					TieringSsdPercent: tieringSsdPercent,
+					Name:          obsName,
+					ContainerName: obsContainerName,
+					AccessKey:     obsAccessKey,
 				},
 			}
 			result, err = clusterizeFunc.HandleLastClusterVm(ctx, state, params, &azure_functions_def.AzureFuncDef{})
