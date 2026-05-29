@@ -95,7 +95,7 @@ variable "sg_id" {
 
 variable "source_image_id" {
   type        = string
-  description = "Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1. Ignored if image_sku is set."
+  description = "Use weka custom image, ubuntu 20.04 with kernel 6.8.0. Ignored if image_sku is set."
 }
 
 variable "image_sku" {

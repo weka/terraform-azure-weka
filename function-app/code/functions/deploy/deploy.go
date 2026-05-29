@@ -55,6 +55,9 @@ type AzureDeploymentParams struct {
 	S3DiskSize            int
 	NvmesNum              int
 	CgroupsMode           string
+	NFSCgroupsMode        string
+	SMBCgroupsMode        string
+	S3CgroupsMode         string
 }
 
 func GetDeviceName(diskSize int) string {
@@ -107,6 +110,7 @@ func GetNfsDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, 
 		ProtocolGatewayFeCoresNum: p.NFSGatewayFeCoresNum,
 		LoadBalancerIP:            p.BackendLbIp,
 		GetPrimaryIpCmd:           GetAzurePrimaryIpCmd(),
+		CgroupsMode:              p.NFSCgroupsMode,
 	}
 
 	if !state.Clusterized {
@@ -143,12 +147,15 @@ func GetProtocolDeployScript(ctx context.Context, funcDef functions_def.Function
 
 	var protocolGatewayFeCoresNum int
 	var diskSize int
+	var protocolCgroupsMode string
 	if protocolGw == protocol.SMB || protocolGw == protocol.SMBW {
 		protocolGatewayFeCoresNum = p.SMBGatewayFeCoresNum
 		diskSize = p.SMBDiskSize
+		protocolCgroupsMode = p.SMBCgroupsMode
 	} else if protocolGw == protocol.S3 {
 		protocolGatewayFeCoresNum = p.S3GatewayFeCoresNum
 		diskSize = p.S3DiskSize
+		protocolCgroupsMode = p.S3CgroupsMode
 	}
 
 	deploymentParams := deploy.DeploymentParams{
@@ -162,6 +169,7 @@ func GetProtocolDeployScript(ctx context.Context, funcDef functions_def.Function
 		ProtocolGatewayFeCoresNum: protocolGatewayFeCoresNum,
 		Gateways:                  p.Gateways,
 		LoadBalancerIP:            p.BackendLbIp,
+		CgroupsMode:              protocolCgroupsMode,
 	}
 
 	deployScriptGenerator := deploy.DeployScriptGenerator{
@@ -333,6 +341,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	backendLbIp := os.Getenv("BACKEND_LB_IP")
 	nvmesNum, _ := strconv.Atoi(os.Getenv("NVMES_NUM"))
 	cgroupsMode := os.Getenv("CGROUPS_MODE")
+	nfsProtocolGatewayCgroupsMode := os.Getenv("NFS_PROTOCOL_GATEWAY_CGROUPS_MODE")
+	smbProtocolGatewayCgroupsMode := os.Getenv("SMB_PROTOCOL_GATEWAY_CGROUPS_MODE")
+	s3ProtocolGatewayCgroupsMode := os.Getenv("S3_PROTOCOL_GATEWAY_CGROUPS_MODE")
 
 	installUrl := os.Getenv("INSTALL_URL")
 	proxyUrl := os.Getenv("PROXY_URL")
@@ -401,6 +412,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		S3DiskSize:            s3DiskSize + tracesPerFrontend*s3ProtocolGatewayFeCoresNum,
 		NvmesNum:              nvmesNum,
 		CgroupsMode:           cgroupsMode,
+		NFSCgroupsMode:        nfsProtocolGatewayCgroupsMode,
+		SMBCgroupsMode:        smbProtocolGatewayCgroupsMode,
+		S3CgroupsMode:         s3ProtocolGatewayCgroupsMode,
 	}
 
 	// create Function Definer
