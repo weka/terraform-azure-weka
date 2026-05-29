@@ -129,7 +129,7 @@ variable "arch" {
 
 variable "source_image_id" {
   type        = string
-  description = "Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1. Ignored if image_sku is set."
+  description = "Use weka custom image, ubuntu 20.04 with kernel 6.8.0. Ignored if image_sku is set."
   default     = ""
 }
 
@@ -166,7 +166,7 @@ variable "root_volume_size" {
 variable "weka_cgroups_mode" {
   type        = string
   description = "Weka cgroups mode, valid values are 'auto' and 'force_v2'"
-  default     = "auto"
+  default     = "force_v2"
   validation {
     condition     = var.weka_cgroups_mode == "auto" || var.weka_cgroups_mode == "force_v2"
     error_message = "Allowed weka_cgroups_mode values: [\"auto\", \"force_v2\"]."

@@ -185,8 +185,11 @@ locals {
     CLUSTERIZATION_TARGET = local.clusterization_target
     VMSS_CONFIG           = local.vmss_config
     # init script inputs
-    APT_REPO_SERVER = var.apt_repo_server
-    CGROUPS_MODE    = var.weka_cgroups_mode
+    APT_REPO_SERVER                   = var.apt_repo_server
+    CGROUPS_MODE                      = var.weka_cgroups_mode
+    NFS_PROTOCOL_GATEWAY_CGROUPS_MODE = var.nfs_protocol_gateway_weka_cgroups_mode
+    SMB_PROTOCOL_GATEWAY_CGROUPS_MODE = var.smb_protocol_gateway_weka_cgroups_mode
+    S3_PROTOCOL_GATEWAY_CGROUPS_MODE  = var.s3_protocol_gateway_weka_cgroups_mode
   }
 
   secured_storage_account_app_settings = {

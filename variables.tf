@@ -97,8 +97,8 @@ variable "cluster_size" {
 
 variable "source_image_id" {
   type        = string
-  default     = "/communityGalleries/WekaIO-ddbef83d-dec1-42d0-998a-3c083f1450b7/images/weka_custom_image/versions/1.0.1"
-  description = "Use weka custom image, ubuntu 20.04 with kernel 5.4 and ofed 5.8-1.1.2.1. Ignored if image_sku is set."
+  default     = "/communityGalleries/WekaIO-ddbef83d-dec1-42d0-998a-3c083f1450b7/images/weka_custom_image/versions/3.0.0"
+  description = "Use weka custom image, ubuntu 20.04 with kernel 6.8.0. Ignored if image_sku is set."
 }
 
 variable "image_sku" {
@@ -428,13 +428,13 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "a40126d9134824e554460b5e176f028d"
+  default     = "28cc3d16413eb7d0bb3657d436a3dfc6"
 }
 
 variable "function_app_dist" {
   type        = string
   description = "Function app code dist"
-  default     = "release"
+  default     = "dev"
 
   validation {
     condition     = contains(["dev", "release"], var.function_app_dist)
@@ -633,7 +633,7 @@ variable "clients_root_volume_size" {
 variable "clients_weka_cgroups_mode" {
   type        = string
   description = "Weka cgroups mode, valid values are 'auto' and 'force_v2'"
-  default     = "auto"
+  default     = "force_v2"
   validation {
     condition     = var.clients_weka_cgroups_mode == "auto" || var.clients_weka_cgroups_mode == "force_v2"
     error_message = "Allowed weka_cgroups_mode values: [\"auto\", \"force_v2\"]."
@@ -730,10 +730,20 @@ variable "nfs_protocol_gateway_fe_cores_num" {
   description = "The number of frontend cores on single protocol gateway machine."
 }
 
+variable "nfs_protocol_gateway_weka_cgroups_mode" {
+  type        = string
+  description = "Weka cgroups mode for NFS protocol gateway instances. Valid values are 'auto' and 'force_v2'."
+  default     = "force_v2"
+  validation {
+    condition     = var.nfs_protocol_gateway_weka_cgroups_mode == "auto" || var.nfs_protocol_gateway_weka_cgroups_mode == "force_v2"
+    error_message = "Allowed weka_cgroups_mode values: [\"auto\", \"force_v2\"]."
+  }
+}
+
 variable "nfs_setup_protocol" {
   type        = bool
   description = "Config protocol, default if false"
-  default     = false
+  default     = true
 }
 
 variable "nfs_interface_group_name" {
@@ -778,10 +788,20 @@ variable "smb_protocol_gateway_fe_cores_num" {
   description = "The number of frontend cores on single protocol gateway machine."
 }
 
+variable "smb_protocol_gateway_weka_cgroups_mode" {
+  type        = string
+  description = "Weka cgroups mode for SMB protocol gateway instances. Valid values are 'auto' and 'force_v2'."
+  default     = "force_v2"
+  validation {
+    condition     = var.smb_protocol_gateway_weka_cgroups_mode == "auto" || var.smb_protocol_gateway_weka_cgroups_mode == "force_v2"
+    error_message = "Allowed weka_cgroups_mode values: [\"auto\", \"force_v2\"]."
+  }
+}
+
 variable "smb_setup_protocol" {
   type        = bool
   description = "Config protocol, default if false"
-  default     = false
+  default     = true
 }
 
 variable "smbw_enabled" {
@@ -868,10 +888,20 @@ variable "s3_protocol_gateway_fe_cores_num" {
   description = "The number of frontend cores on single protocol gateway machine."
 }
 
+variable "s3_protocol_gateway_weka_cgroups_mode" {
+  type        = string
+  description = "Weka cgroups mode for S3 protocol gateway instances. Valid values are 'auto' and 'force_v2'."
+  default     = "force_v2"
+  validation {
+    condition     = var.s3_protocol_gateway_weka_cgroups_mode == "auto" || var.s3_protocol_gateway_weka_cgroups_mode == "force_v2"
+    error_message = "Allowed weka_cgroups_mode values: [\"auto\", \"force_v2\"]."
+  }
+}
+
 variable "s3_setup_protocol" {
   type        = bool
   description = "Config protocol, default if false"
-  default     = false
+  default     = true
 }
 
 #### private blob
@@ -972,7 +1002,7 @@ variable "post_cluster_setup_script" {
 variable "weka_cgroups_mode" {
   type        = string
   description = "Weka cgroups mode, valid values are 'auto' and 'force_v2'"
-  default     = "auto"
+  default     = "force_v2"
   validation {
     condition     = var.weka_cgroups_mode == "auto" || var.weka_cgroups_mode == "force_v2"
     error_message = "Allowed weka_cgroups_mode values: [\"auto\", \"force_v2\"]."
