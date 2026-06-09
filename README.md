@@ -568,6 +568,7 @@ proxy_url = VALUE
 |------|-------------|
 | <a name="output_backend_ips"></a> [backend\_ips](#output\_backend\_ips) | If 'assign\_public\_ip' is set to true, it will output the public ips, If no it will output the private ips |
 | <a name="output_backend_lb_private_ip"></a> [backend\_lb\_private\_ip](#output\_backend\_lb\_private\_ip) | Backend load balancer ip address |
+| <a name="output_backend_lb_public_ip"></a> [backend\_lb\_public\_ip](#output\_backend\_lb\_public\_ip) | Backend load balancer ip address |
 | <a name="output_client_ips"></a> [client\_ips](#output\_client\_ips) | If 'private\_network' is set to false, it will output clients public ips, otherwise private ips. |
 | <a name="output_client_vmss_ips"></a> [client\_vmss\_ips](#output\_client\_vmss\_ips) | If 'private\_network' is set to false, it will output clients public ips, otherwise private ips. |
 | <a name="output_clients_vmss_name"></a> [clients\_vmss\_name](#output\_clients\_vmss\_name) | n/a |
