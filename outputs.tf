@@ -33,6 +33,11 @@ output "backend_lb_private_ip" {
   description = "Backend load balancer ip address"
 }
 
+output "backend_lb_public_ip" {
+  value       = var.create_lb && var.assign_public_ip ? azurerm_public_ip.backend_ip[0].ip_address : null
+  description = "Backend load balancer ip address"
+}
+
 output "functions_url" {
   value       = local.functions_url
   description = "Functions url and body for api request"
