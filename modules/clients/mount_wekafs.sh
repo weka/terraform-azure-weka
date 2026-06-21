@@ -84,7 +84,21 @@ function retry {
 
 mount_command="mount -t wekafs -o net=udp $backend_ip/$FILESYSTEM_NAME $MOUNT_POINT"
 if [[ ${clients_use_dpdk} == true ]]; then
-  mount_command="mount -t wekafs -o num_cores=$FRONTEND_CONTAINER_CORES_NUM -o mgmt_ip=$eth0 $backend_ip/$FILESYSTEM_NAME $MOUNT_POINT"
+  # WekaFS automatic DPDK slot assignment fails to validate Azure MANA VFs (HBv5/HBv6
+  # and other newer SKUs), so the client container never joins the cluster. Pass the
+  # bound accelerated (VF) device explicitly for MANA-based SKUs. Mellanox/ConnectX
+  # SKUs keep automatic slot assignment, which already works for them.
+  net_opts=""
+  if ls -d /sys/bus/pci/drivers/mana/*:* >/dev/null 2>&1; then
+    for eth in $(ls /sys/class/net | grep -E '^eth[0-9]+$' | grep -v '^eth0$'); do
+      eth_ip=$(ip -4 addr show "$eth" | awk '/inet / {split($2,a,"/"); print a[1]}')
+      [ -z "$eth_ip" ] && continue
+      eth_prefix=$(ip -o -4 addr show "$eth" | awk '{print $4}' | cut -d/ -f2)
+      vf=$(ls -d /sys/class/net/$eth/lower_* 2>/dev/null | head -1 | sed 's#.*/lower_##')
+      net_opts="$net_opts -o net=$${vf:-$eth}/$eth_ip/$eth_prefix"
+    done
+  fi
+  mount_command="mount -t wekafs$net_opts -o num_cores=$FRONTEND_CONTAINER_CORES_NUM -o mgmt_ip=$eth0 $backend_ip/$FILESYSTEM_NAME $MOUNT_POINT"
 fi
 
 retry 60 45 $mount_command
