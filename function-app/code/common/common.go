@@ -91,7 +91,10 @@ const FindDrivesScript = `
 import json
 import sys
 for d in json.load(sys.stdin)['disks']:
-	if d['isRotational'] or 'nvme' not in d['devPath']: continue
+	if d['isRotational']: continue
+	if d['type'] != 'DISK': continue
+	if d['isMounted']: continue
+	if 'Microsoft NVMe Direct Disk' not in d['model']: continue
 	print(d['devPath'])
 `
 
