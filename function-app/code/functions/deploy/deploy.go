@@ -53,7 +53,6 @@ type AzureDeploymentParams struct {
 	SMBDiskSize           int
 	S3GatewayFeCoresNum   int
 	S3DiskSize            int
-	NvmesNum              int
 	CgroupsMode           string
 	NFSCgroupsMode        string
 	SMBCgroupsMode        string
@@ -110,7 +109,7 @@ func GetNfsDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, 
 		ProtocolGatewayFeCoresNum: p.NFSGatewayFeCoresNum,
 		LoadBalancerIP:            p.BackendLbIp,
 		GetPrimaryIpCmd:           GetAzurePrimaryIpCmd(),
-		CgroupsMode:              p.NFSCgroupsMode,
+		CgroupsMode:               p.NFSCgroupsMode,
 	}
 
 	if !state.Clusterized {
@@ -169,7 +168,7 @@ func GetProtocolDeployScript(ctx context.Context, funcDef functions_def.Function
 		ProtocolGatewayFeCoresNum: protocolGatewayFeCoresNum,
 		Gateways:                  p.Gateways,
 		LoadBalancerIP:            p.BackendLbIp,
-		CgroupsMode:              protocolCgroupsMode,
+		CgroupsMode:               protocolCgroupsMode,
 	}
 
 	deployScriptGenerator := deploy.DeployScriptGenerator{
@@ -216,7 +215,6 @@ func GetDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, p A
 			NicsNum:          p.NicsNum,
 			Gateways:         p.Gateways,
 			ProxyUrl:         p.ProxyUrl,
-			NvmesNum:         p.NvmesNum,
 			FindDrivesScript: dedent.Dedent(common.FindDrivesScript),
 			CgroupsMode:      p.CgroupsMode,
 		}
@@ -339,7 +337,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	s3DiskSize, _ := strconv.Atoi(os.Getenv("S3_DISK_SIZE"))
 	tracesPerFrontend, _ := strconv.Atoi(os.Getenv("TRACES_PER_FRONTEND"))
 	backendLbIp := os.Getenv("BACKEND_LB_IP")
-	nvmesNum, _ := strconv.Atoi(os.Getenv("NVMES_NUM"))
 	cgroupsMode := os.Getenv("CGROUPS_MODE")
 	nfsProtocolGatewayCgroupsMode := os.Getenv("NFS_PROTOCOL_GATEWAY_CGROUPS_MODE")
 	smbProtocolGatewayCgroupsMode := os.Getenv("SMB_PROTOCOL_GATEWAY_CGROUPS_MODE")
@@ -410,7 +407,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		SMBDiskSize:           smbDiskSize + tracesPerFrontend*smbProtocolGatewayFeCoresNum,
 		S3GatewayFeCoresNum:   s3ProtocolGatewayFeCoresNum,
 		S3DiskSize:            s3DiskSize + tracesPerFrontend*s3ProtocolGatewayFeCoresNum,
-		NvmesNum:              nvmesNum,
 		CgroupsMode:           cgroupsMode,
 		NFSCgroupsMode:        nfsProtocolGatewayCgroupsMode,
 		SMBCgroupsMode:        smbProtocolGatewayCgroupsMode,

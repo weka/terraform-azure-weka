@@ -5,7 +5,7 @@ module "nfs_protocol_gateways" {
   rg_name                      = var.rg_name
   location                     = data.azurerm_resource_group.rg.location
   subnet_name                  = data.azurerm_subnet.subnet.name
-  source_image_id              = var.source_image_id
+  source_image_id              = local.source_image_id
   vnet_name                    = local.vnet_name
   vnet_rg_name                 = local.vnet_rg_name
   tags_map                     = var.tags_map
@@ -109,7 +109,7 @@ module "smb_protocol_gateways" {
   rg_name                      = var.rg_name
   location                     = data.azurerm_resource_group.rg.location
   subnet_name                  = data.azurerm_subnet.subnet.name
-  source_image_id              = var.source_image_id
+  source_image_id              = local.source_image_id
   vnet_name                    = local.vnet_name
   vnet_rg_name                 = local.vnet_rg_name
   setup_protocol               = var.smb_setup_protocol
@@ -148,7 +148,7 @@ module "s3_protocol_gateways" {
   rg_name                      = var.rg_name
   location                     = data.azurerm_resource_group.rg.location
   subnet_name                  = data.azurerm_subnet.subnet.name
-  source_image_id              = var.source_image_id
+  source_image_id              = local.source_image_id
   vnet_name                    = local.vnet_name
   vnet_rg_name                 = local.vnet_rg_name
   setup_protocol               = var.s3_setup_protocol

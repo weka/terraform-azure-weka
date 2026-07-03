@@ -1,5 +1,8 @@
 locals {
   use_marketplace_image    = var.image_sku != null && var.image_offer != null
+  is_lsv4_instance         = can(regex("^Standard_L[0-9]+s_v4$", var.instance_type))
+  default_source_image_id  = local.is_lsv4_instance ? "/communityGalleries/WekaIO-ddbef83d-dec1-42d0-998a-3c083f1450b7/images/weka_custom_image_nvme/versions/1.0.0" : "/communityGalleries/WekaIO-ddbef83d-dec1-42d0-998a-3c083f1450b7/images/weka_custom_image/versions/3.0.0"
+  source_image_id          = var.source_image_id != null ? var.source_image_id : local.default_source_image_id
   create_private_function  = var.function_access_restriction_enabled ? 1 : 0
   stripe_width_calculated  = var.cluster_size - var.protection_level - 1
   stripe_width             = local.stripe_width_calculated < 16 ? local.stripe_width_calculated : 16
@@ -47,7 +50,7 @@ locals {
     disable_password_authentication = true
     proximity_placement_group_id    = local.placement_group_id
     single_placement_group          = var.vmss_single_placement_group
-    source_image_id                 = local.use_marketplace_image ? "" : var.source_image_id
+    source_image_id                 = local.use_marketplace_image ? "" : local.source_image_id
     image_sku                       = local.use_marketplace_image ? var.image_sku : ""
     image_offer                     = local.use_marketplace_image ? var.image_offer : ""
     image_version                   = local.use_marketplace_image ? var.image_version : ""
