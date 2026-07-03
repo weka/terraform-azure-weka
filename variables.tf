@@ -97,8 +97,8 @@ variable "cluster_size" {
 
 variable "source_image_id" {
   type        = string
-  default     = "/communityGalleries/WekaIO-ddbef83d-dec1-42d0-998a-3c083f1450b7/images/weka_custom_image/versions/3.0.0"
-  description = "Use weka custom image, ubuntu 20.04 with kernel 6.8.0. Ignored if image_sku is set."
+  default     = null
+  description = "Use weka custom image, ubuntu 22.04 with kernel 6.8.0. When null, defaults to the weka custom image matching the instance_type (an NVMe image for Lsv4 SKUs, otherwise weka_custom_image 3.0.0). Ignored if image_sku is set."
 }
 
 variable "image_sku" {
@@ -345,7 +345,63 @@ variable "containers_config_map" {
       nvme     = 8
       nics     = 8
       memory   = ["384GB", "384GB"]
-    }
+    },
+    Standard_L8s_v4 = {
+      compute  = 1
+      drive    = 1
+      frontend = 1
+      nvme     = 1
+      nics     = 4
+      memory   = ["33GB", "31GB"]
+    },
+    Standard_L16s_v4 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 2
+      nics     = 8
+      memory   = ["79GB", "72GB"]
+    },
+    Standard_L32s_v4 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 4
+      nics     = 8
+      memory   = ["197GB", "189GB"]
+    },
+    Standard_L48s_v4 = {
+      compute  = 3
+      drive    = 3
+      frontend = 1
+      nvme     = 6
+      nics     = 8
+      memory   = ["314GB", "306GB"]
+    },
+    Standard_L64s_v4 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 8
+      nics     = 8
+      memory   = ["357GB", "384GB"]
+    },
+    Standard_L80s_v4 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 8
+      nics     = 8
+      memory   = ["384GB", "384GB"]
+    },
+    Standard_L96s_v4 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 8
+      nics     = 8
+      memory   = ["384GB", "384GB"]
+    },
   }
   validation {
     condition     = alltrue([for m in flatten([for i in values(var.containers_config_map) : (flatten(i.memory))]) : tonumber(trimsuffix(m, "GB")) <= 384])
@@ -428,7 +484,7 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "c5b31950c4802d44a25f3d0f8f2ace22"
+  default     = "7eefdf63b5e1837e8d392ae90fc88883"
 }
 
 variable "function_app_dist" {
