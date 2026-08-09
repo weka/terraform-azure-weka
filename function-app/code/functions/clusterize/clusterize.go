@@ -59,13 +59,6 @@ type ClusterizationParams struct {
 	FunctionAppName string
 }
 
-func GetPostClusterCreationScript() string {
-	s := `
-	weka debug config override clusterInfo.diskPoolAutoBehavior Legacy
-	`
-	return dedent.Dedent(s)
-}
-
 func GetErrorScript(err error) string {
 	return fmt.Sprintf(`
 #!/bin/bash
@@ -186,9 +179,6 @@ func HandleLastClusterVm(ctx context.Context, state protocol.ClusterState, p Clu
 	clusterParams.InstallDpdk = p.InstallDpdk
 	clusterParams.FindDrivesScript = common.FindDrivesScript
 	clusterParams.ClusterizationTarget = state.ClusterizationTarget
-
-	// prepend the mandatory post cluster creation script, keeping any user-supplied script
-	clusterParams.PostClusterCreationScript = GetPostClusterCreationScript() + "\n" + clusterParams.PostClusterCreationScript
 
 	scriptGenerator := clusterize.ClusterizeScriptGenerator{
 		Params:  clusterParams,
