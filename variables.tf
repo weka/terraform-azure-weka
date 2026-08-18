@@ -350,7 +350,7 @@ variable "containers_config_map" {
       compute  = 1
       drive    = 1
       frontend = 1
-      nvme     = 1
+      nvme     = 4
       nics     = 4
       memory   = ["33GB", "31GB"]
     },
@@ -399,6 +399,62 @@ variable "containers_config_map" {
       drive    = 2
       frontend = 1
       nvme     = 8
+      nics     = 8
+      memory   = ["384GB", "384GB"]
+    },
+    Standard_L8as_v4 = {
+      compute  = 1
+      drive    = 1
+      frontend = 1
+      nvme     = 4
+      nics     = 4
+      memory   = ["29GB", "29GB"]
+    },
+    Standard_L16as_v4 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 4
+      nics     = 8
+      memory   = ["72GB", "73GB"]
+    },
+    Standard_L32as_v4 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 8
+      nics     = 8
+      memory   = ["190GB", "190GB"]
+    },
+    Standard_L48as_v4 = {
+      compute  = 3
+      drive    = 3
+      frontend = 1
+      nvme     = 6
+      nics     = 8
+      memory   = ["308GB", "308GB"]
+    },
+    Standard_L64as_v4 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 8
+      nics     = 8
+      memory   = ["384GB", "384GB"]
+    },
+    Standard_L80as_v4 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 10
+      nics     = 8
+      memory   = ["384GB", "384GB"]
+    },
+    Standard_L96as_v4 = {
+      compute  = 4
+      drive    = 2
+      frontend = 1
+      nvme     = 12
       nics     = 8
       memory   = ["384GB", "384GB"]
     },
