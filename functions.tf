@@ -1,7 +1,9 @@
 locals {
-  use_marketplace_image    = var.image_sku != null && var.image_offer != null
-  is_lsv4_instance         = can(regex("^Standard_L[0-9]+s_v4$", var.instance_type))
-  default_source_image_id  = local.is_lsv4_instance ? "/communityGalleries/WekaIO-ddbef83d-dec1-42d0-998a-3c083f1450b7/images/weka_custom_image_nvme/versions/1.0.0" : "/communityGalleries/WekaIO-ddbef83d-dec1-42d0-998a-3c083f1450b7/images/weka_custom_image/versions/3.0.0"
+  use_marketplace_image = var.image_sku != null && var.image_offer != null
+  # All v4 L-family SKUs (Lsv4, Lasv4, Laosv4) are NVMe-controller-only and
+  # require an OS image tagged for NVMe support.
+  is_nvme_only_instance    = can(regex("^Standard_L[0-9]+[a-z]*s_v4$", var.instance_type))
+  default_source_image_id  = local.is_nvme_only_instance ? "/communityGalleries/WekaIO-ddbef83d-dec1-42d0-998a-3c083f1450b7/images/weka_custom_image_nvme/versions/1.0.0" : "/communityGalleries/WekaIO-ddbef83d-dec1-42d0-998a-3c083f1450b7/images/weka_custom_image/versions/3.0.0"
   source_image_id          = var.source_image_id != null ? var.source_image_id : local.default_source_image_id
   create_private_function  = var.function_access_restriction_enabled ? 1 : 0
   stripe_width_calculated  = var.cluster_size - var.protection_level - 1
