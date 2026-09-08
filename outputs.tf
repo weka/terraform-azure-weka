@@ -8,6 +8,10 @@ locals {
   download_ssh_key     = var.ssh_public_key == null ? local.ssh_keys_commands : ""
   private_ssh_key_path = var.ssh_public_key == null ? local.ssh_private_key_path : null
   resource_group_name  = data.azurerm_resource_group.rg.name
+
+  data_services_vmss_name = var.data_services_number > 0 ? module.data_services[0].data_services_vmss_name : ""
+  data_services_vmss_ips  = local.assign_public_ip ? "az vmss list-instance-public-ips -g ${var.rg_name} --name ${local.data_services_vmss_name} --subscription ${var.subscription_id} --query \"[].ipAddress\" \n" : "az vmss nic list -g ${var.rg_name} --vmss-name ${local.data_services_vmss_name} --subscription ${var.subscription_id} --query \"[].ipConfigurations[]\" | jq -r '.[] | select(.name==\"ipconfig0\")'.privateIPAddress \n"
+
   functions_url = {
     progressing_status = {
       url  = "https://${local.function_app_name}.azurewebsites.net/api/status"
@@ -94,6 +98,16 @@ output "smb_protocol_gateway_ips" {
 output "s3_protocol_gateway_ips" {
   value       = var.s3_protocol_gateways_number > 0 ? module.s3_protocol_gateways[0].protocol_gateways_ips : null
   description = "If 'private_network' is set to false, it will output smb protocol gateway public ips, otherwise private ips."
+}
+
+output "data_services_vmss_name" {
+  value       = var.data_services_number > 0 ? local.data_services_vmss_name : null
+  description = "Data services vmss name"
+}
+
+output "data_services_ips" {
+  value       = var.data_services_number > 0 ? local.data_services_vmss_ips : null
+  description = "If 'private_network' is set to false, it will output the data services public ips, otherwise private ips."
 }
 
 output "private_ssh_key" {

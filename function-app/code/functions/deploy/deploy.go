@@ -53,10 +53,12 @@ type AzureDeploymentParams struct {
 	SMBDiskSize           int
 	S3GatewayFeCoresNum   int
 	S3DiskSize            int
+	DataServicesDiskSize  int
 	CgroupsMode           string
 	NFSCgroupsMode        string
 	SMBCgroupsMode        string
 	S3CgroupsMode         string
+	DataServicesCgroups   string
 }
 
 func GetDeviceName(diskSize int) string {
@@ -175,6 +177,36 @@ func GetProtocolDeployScript(ctx context.Context, funcDef functions_def.Function
 		FuncDef:       funcDef,
 		Params:        deploymentParams,
 		DeviceNameCmd: GetDeviceName(diskSize),
+	}
+	bashScript = deployScriptGenerator.GetDeployScript()
+	return
+}
+
+func GetDataServicesDeployScript(ctx context.Context, funcDef functions_def.FunctionDef, p AzureDeploymentParams) (bashScript string, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+	logger.Info().Msg("Getting data services deploy script")
+
+	var token string
+	token, err = getWekaIoToken(ctx, p.KeyVaultUri)
+	if err != nil {
+		logger.Error().Err(err).Send()
+		return
+	}
+
+	deploymentParams := deploy.DeploymentParams{
+		VMName:         p.VmName,
+		WekaInstallUrl: p.InstallUrl,
+		WekaToken:      token,
+		ProxyUrl:       p.ProxyUrl,
+		Protocol:       protocol.DATA,
+		LoadBalancerIP: p.BackendLbIp,
+		CgroupsMode:    p.DataServicesCgroups,
+	}
+
+	deployScriptGenerator := deploy.DeployScriptGenerator{
+		FuncDef:       funcDef,
+		Params:        deploymentParams,
+		DeviceNameCmd: GetDeviceName(p.DataServicesDiskSize),
 	}
 	bashScript = deployScriptGenerator.GetDeployScript()
 	return
@@ -335,12 +367,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	nfsDiskSize, _ := strconv.Atoi(os.Getenv("NFS_DISK_SIZE"))
 	smbDiskSize, _ := strconv.Atoi(os.Getenv("SMB_DISK_SIZE"))
 	s3DiskSize, _ := strconv.Atoi(os.Getenv("S3_DISK_SIZE"))
+	dataServicesDiskSize, _ := strconv.Atoi(os.Getenv("DATA_SERVICES_DISK_SIZE"))
 	tracesPerFrontend, _ := strconv.Atoi(os.Getenv("TRACES_PER_FRONTEND"))
 	backendLbIp := os.Getenv("BACKEND_LB_IP")
 	cgroupsMode := os.Getenv("CGROUPS_MODE")
 	nfsProtocolGatewayCgroupsMode := os.Getenv("NFS_PROTOCOL_GATEWAY_CGROUPS_MODE")
 	smbProtocolGatewayCgroupsMode := os.Getenv("SMB_PROTOCOL_GATEWAY_CGROUPS_MODE")
 	s3ProtocolGatewayCgroupsMode := os.Getenv("S3_PROTOCOL_GATEWAY_CGROUPS_MODE")
+	dataServicesCgroupsMode := os.Getenv("DATA_SERVICES_CGROUPS_MODE")
 
 	installUrl := os.Getenv("INSTALL_URL")
 	proxyUrl := os.Getenv("PROXY_URL")
@@ -407,10 +441,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		SMBDiskSize:           smbDiskSize + tracesPerFrontend*smbProtocolGatewayFeCoresNum,
 		S3GatewayFeCoresNum:   s3ProtocolGatewayFeCoresNum,
 		S3DiskSize:            s3DiskSize + tracesPerFrontend*s3ProtocolGatewayFeCoresNum,
+		DataServicesDiskSize:  dataServicesDiskSize,
 		CgroupsMode:           cgroupsMode,
 		NFSCgroupsMode:        nfsProtocolGatewayCgroupsMode,
 		SMBCgroupsMode:        smbProtocolGatewayCgroupsMode,
 		S3CgroupsMode:         s3ProtocolGatewayCgroupsMode,
+		DataServicesCgroups:   dataServicesCgroupsMode,
 	}
 
 	// create Function Definer
@@ -426,6 +462,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		bashScript, err = GetNfsDeployScript(ctx, funcDef, params)
 	} else if vm.Protocol == protocol.SMB || vm.Protocol == protocol.SMBW || vm.Protocol == protocol.S3 {
 		bashScript, err = GetProtocolDeployScript(ctx, funcDef, params, vm.Protocol)
+	} else if vm.Protocol == protocol.DATA {
+		bashScript, err = GetDataServicesDeployScript(ctx, funcDef, params)
 	} else if vm.Protocol != "" {
 		err = fmt.Errorf("unsupported protocol: %s", vm.Protocol)
 	} else {
