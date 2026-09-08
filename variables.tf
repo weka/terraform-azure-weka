@@ -484,13 +484,13 @@ variable "function_app_storage_account_container_prefix" {
 variable "function_app_version" {
   type        = string
   description = "Function app code version (hash)"
-  default     = "7149806b3db54203e017269912bb541d"
+  default     = "3b7239376f52b80199167676f4cc0aee"
 }
 
 variable "function_app_dist" {
   type        = string
   description = "Function app code dist"
-  default     = "release"
+  default     = "dev"
 
   validation {
     condition     = contains(["dev", "release"], var.function_app_dist)
@@ -958,6 +958,47 @@ variable "s3_setup_protocol" {
   type        = bool
   description = "Config protocol, default if false"
   default     = true
+}
+
+#### data services
+variable "data_services_number" {
+  type        = number
+  description = "The number of virtual machines to deploy as data services."
+  default     = 0
+}
+
+variable "data_services_instance_type" {
+  type        = string
+  description = "The data services' virtual machine type (sku) to deploy."
+  default     = "Standard_D4s_v5"
+}
+
+variable "data_services_disk_size" {
+  type        = number
+  default     = 48
+  description = "The data services' default disk size."
+}
+
+variable "data_services_root_volume_size" {
+  type        = number
+  default     = null
+  description = "The data services' root disk size."
+}
+
+variable "data_services_identity_name" {
+  type        = string
+  description = "The user assigned identity name for the data services instances (if empty - new one is created)."
+  default     = ""
+}
+
+variable "data_services_weka_cgroups_mode" {
+  type        = string
+  description = "Weka cgroups mode for data services instances. Valid values are 'auto' and 'force_v2'."
+  default     = "force_v2"
+  validation {
+    condition     = var.data_services_weka_cgroups_mode == "auto" || var.data_services_weka_cgroups_mode == "force_v2"
+    error_message = "Allowed weka_cgroups_mode values: [\"auto\", \"force_v2\"]."
+  }
 }
 
 #### private blob

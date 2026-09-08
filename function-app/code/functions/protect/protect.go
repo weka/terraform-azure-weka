@@ -9,6 +9,7 @@ import (
 	"weka-deployment/common"
 
 	"github.com/weka/go-cloud-lib/logging"
+	"github.com/weka/go-cloud-lib/protocol"
 )
 
 type RequestBody struct {
@@ -27,6 +28,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	nfsStateContainerName := os.Getenv("NFS_STATE_CONTAINER_NAME")
 	nfsStateBlobName := os.Getenv("NFS_STATE_BLOB_NAME")
 	nfsScaleSetName := os.Getenv("NFS_VMSS_NAME")
+	dataServicesScaleSetName := os.Getenv("DATA_SERVICES_VMSS_NAME")
 
 	var invokeRequest common.InvokeRequest
 
@@ -75,6 +77,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 		vmssParams.ScaleSetName = nfsScaleSetName
 		vmssParams.Flexible = true
+	} else if data.Protocol == string(protocol.DATA) {
+		// data services run in their own uniform scale set
+		vmssParams.ScaleSetName = dataServicesScaleSetName
 	}
 
 	instanceName := strings.Split(data.Vm, ":")[0]

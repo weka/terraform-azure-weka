@@ -178,6 +178,9 @@ locals {
     SMB_PROTOCOL_GATEWAYS_NUM         = var.smb_protocol_gateways_number
     S3_PROTOCOL_GATEWAY_FE_CORES_NUM  = var.s3_protocol_gateway_fe_cores_num
     S3_PROTOCOL_GATEWAYS_NUM          = var.s3_protocol_gateways_number
+    DATA_SERVICES_NUM                 = var.data_services_number
+    DATA_SERVICES_VMSS_NAME           = var.data_services_number > 0 ? "${var.prefix}-${var.cluster_name}-data-services-vmss" : ""
+    DATA_SERVICES_DISK_SIZE           = var.data_services_disk_size
     TRACES_PER_FRONTEND               = var.traces_per_ionode
     SET_DEFAULT_FS                    = var.set_default_fs
     POST_CLUSTER_SETUP_SCRIPT         = var.post_cluster_setup_script
@@ -193,6 +196,7 @@ locals {
     NFS_PROTOCOL_GATEWAY_CGROUPS_MODE = var.nfs_protocol_gateway_weka_cgroups_mode
     SMB_PROTOCOL_GATEWAY_CGROUPS_MODE = var.smb_protocol_gateway_weka_cgroups_mode
     S3_PROTOCOL_GATEWAY_CGROUPS_MODE  = var.s3_protocol_gateway_weka_cgroups_mode
+    DATA_SERVICES_CGROUPS_MODE        = var.data_services_weka_cgroups_mode
   }
 
   secured_storage_account_app_settings = {
