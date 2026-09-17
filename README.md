@@ -451,6 +451,7 @@ proxy_url = VALUE
 | <a name="input_clients_use_dpdk"></a> [clients\_use\_dpdk](#input\_clients\_use\_dpdk) | Mount weka clients in DPDK mode | `bool` | `true` | no |
 | <a name="input_clients_use_vmss"></a> [clients\_use\_vmss](#input\_clients\_use\_vmss) | Use VMSS for clients | `bool` | `false` | no |
 | <a name="input_clients_weka_cgroups_mode"></a> [clients\_weka\_cgroups\_mode](#input\_clients\_weka\_cgroups\_mode) | Weka cgroups mode, valid values are 'auto' and 'force\_v2' | `string` | `"force_v2"` | no |
+| <a name="input_clients_zone"></a> [clients\_zone](#input\_clients\_zone) | The availability zone in which the client instances should be created. If not specified, the cluster `zone` is used. | `string` | `null` | no |
 | <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | Cluster name | `string` | `"poc"` | no |
 | <a name="input_cluster_size"></a> [cluster\_size](#input\_cluster\_size) | The number of virtual machines to deploy. | `number` | `6` | no |
 | <a name="input_clusterization_target"></a> [clusterization\_target](#input\_clusterization\_target) | The clusterization target | `number` | `null` | no |
