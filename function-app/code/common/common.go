@@ -1766,7 +1766,7 @@ func GetUnhealthyInstancesToTerminate(ctx context.Context, scaleSetVms []*VMInfo
 			instancePowerState := GetInstancePowerState(vm)
 			instanceProvisioningState := GetInstanceProvisioningState(vm)
 			logger.Debug().Msgf("instance power state: %s, provisioning state: %s", instancePowerState, instanceProvisioningState)
-			if instancePowerState == "stopped" || instanceProvisioningState == "failed" {
+			if instanceProvisioningState == "failed" {
 				toTerminate = append(toTerminate, GetScaleSetVmId(vm.ID))
 			}
 		}
