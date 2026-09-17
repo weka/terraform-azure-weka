@@ -72,7 +72,7 @@ variable "ppg_id" {
 
 variable "zone" {
   type        = string
-  default     = null
+  default     = "1"
   description = "The availability zone in which the clients should be created."
 }
 

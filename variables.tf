@@ -658,7 +658,7 @@ variable "client_frontend_cores" {
 variable "clients_zone" {
   type        = string
   description = "The availability zone in which the client instances should be created. If not specified, the cluster `zone` is used."
-  default     = null
+  default     = "1"
 }
 
 variable "clients_custom_data" {
