@@ -33,6 +33,8 @@ locals {
 
   client_identity_id = var.vm_identity_name == "" ? azurerm_user_assigned_identity.this[0].id : data.azurerm_user_assigned_identity.this[0].id
 
+  zones = var.zone == null ? null : [var.zone]
+
   arm_instances = ["Standard_D4ps_v5", "Standard_D8ps_v5", "Standard_D16ps_v5", "Standard_D32ps_v5", "Standard_D48ps_v5", "Standard_D64ps_v5", "Standard_D8plds_v5", "Standard_D32plds_v5", "Standard_D64plds_v5"]
   default_arch  = contains(local.arm_instances, var.instance_type) ? "arm64" : "x86_64"
   arch          = var.arch == null ? local.default_arch : var.arch
@@ -55,6 +57,7 @@ resource "azurerm_public_ip" "public_ip" {
   location            = data.azurerm_resource_group.rg.location
   allocation_method   = "Static"
   sku                 = "Standard"
+  zones               = local.zones
   tags                = var.tags_map
 }
 
@@ -126,6 +129,7 @@ resource "azurerm_linux_virtual_machine" "this" {
   name                = "${var.clients_name}-vm-${count.index}"
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = var.rg_name
+  zone                = var.zone
   admin_username      = var.vm_username
   tags                = merge({ "weka_cluster_client" : var.clients_name }, var.tags_map)
   custom_data         = local.vms_custom_data
@@ -176,6 +180,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "this" {
   name                = var.clients_name
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = var.rg_name
+  zones               = local.zones
   admin_username      = var.vm_username
   tags                = merge({ "weka_cluster_client" : var.clients_name }, var.tags_map)
   custom_data         = local.vms_custom_data

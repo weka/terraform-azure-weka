@@ -70,6 +70,12 @@ variable "ppg_id" {
   description = "Placement proximity group id."
 }
 
+variable "zone" {
+  type        = string
+  default     = null
+  description = "The availability zone in which the clients should be created."
+}
+
 variable "assign_public_ip" {
   type        = bool
   default     = true

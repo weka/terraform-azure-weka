@@ -70,6 +70,7 @@ No modules.
 | <a name="input_vnet_name"></a> [vnet\_name](#input\_vnet\_name) | The virtual network name. | `string` | n/a | yes |
 | <a name="input_vnet_rg_name"></a> [vnet\_rg\_name](#input\_vnet\_rg\_name) | Resource group name of vnet | `string` | n/a | yes |
 | <a name="input_weka_cgroups_mode"></a> [weka\_cgroups\_mode](#input\_weka\_cgroups\_mode) | Weka cgroups mode, valid values are 'auto' and 'force\_v2' | `string` | `"force_v2"` | no |
+| <a name="input_zone"></a> [zone](#input\_zone) | The availability zone in which the clients should be created. | `string` | `null` | no |
 
 ## Outputs
 
