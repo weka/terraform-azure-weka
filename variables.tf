@@ -294,7 +294,7 @@ variable "containers_config_map" {
       compute  = 4
       drive    = 2
       frontend = 1
-      nvme     = 8
+      nvme     = 10
       nics     = 8
       memory   = ["384GB", "384GB"]
     },
@@ -342,7 +342,7 @@ variable "containers_config_map" {
       compute  = 4
       drive    = 2
       frontend = 1
-      nvme     = 8
+      nvme     = 10
       nics     = 8
       memory   = ["384GB", "384GB"]
     },
@@ -350,7 +350,7 @@ variable "containers_config_map" {
       compute  = 1
       drive    = 1
       frontend = 1
-      nvme     = 1
+      nvme     = 4
       nics     = 4
       memory   = ["33GB", "31GB"]
     },
@@ -358,7 +358,7 @@ variable "containers_config_map" {
       compute  = 4
       drive    = 2
       frontend = 1
-      nvme     = 2
+      nvme     = 4
       nics     = 8
       memory   = ["79GB", "72GB"]
     },
@@ -366,7 +366,7 @@ variable "containers_config_map" {
       compute  = 4
       drive    = 2
       frontend = 1
-      nvme     = 4
+      nvme     = 8
       nics     = 8
       memory   = ["197GB", "189GB"]
     },
@@ -390,7 +390,7 @@ variable "containers_config_map" {
       compute  = 4
       drive    = 2
       frontend = 1
-      nvme     = 8
+      nvme     = 10
       nics     = 8
       memory   = ["384GB", "384GB"]
     },
@@ -398,7 +398,7 @@ variable "containers_config_map" {
       compute  = 4
       drive    = 2
       frontend = 1
-      nvme     = 8
+      nvme     = 12
       nics     = 8
       memory   = ["384GB", "384GB"]
     },
