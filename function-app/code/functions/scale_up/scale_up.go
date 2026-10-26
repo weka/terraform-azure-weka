@@ -50,7 +50,7 @@ var (
 // so that rotating the key is not mistaken for a change to the script
 const functionAppKeyPlaceholder = "<function-app-key>"
 
-func renderBackendInitScript(userData, functionAppKey string) (script string, err error) {
+func renderBackendInitScript(customData, functionAppKey string) (script string, err error) {
 	functionAppName := os.Getenv("FUNCTION_APP_NAME")
 	diskSize, _ := strconv.Atoi(os.Getenv("DISK_SIZE"))
 	nicsNum, _ := strconv.Atoi(os.Getenv("NICS_NUM"))
@@ -74,10 +74,10 @@ func renderBackendInitScript(userData, functionAppKey string) (script string, er
 		return "", err
 	}
 
-	return getInitScript(userData, diskSize, nicsNum, subnet, aptRepo, reportFunction, deployFunction, clusterName, monitorScript, serviceUnit), nil
+	return getInitScript(customData, diskSize, nicsNum, subnet, aptRepo, reportFunction, deployFunction, clusterName, monitorScript, serviceUnit), nil
 }
 
-func getBackendCustomDataScript(ctx context.Context, userData string) (customData string, err error) {
+func getBackendCustomDataScript(ctx context.Context, customData string) (encodedCustomData string, err error) {
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 
 	logger := logging.LoggerFromCtx(ctx)
@@ -88,14 +88,14 @@ func getBackendCustomDataScript(ctx context.Context, userData string) (customDat
 		return
 	}
 
-	customDataStr, err := renderBackendInitScript(userData, functionAppKey)
+	script, err := renderBackendInitScript(customData, functionAppKey)
 	if err != nil {
 		logger.Error().Err(err).Msg("cannot render init script")
 		return
 	}
 
 	// base64 encode the custom data
-	customData = base64.StdEncoding.EncodeToString([]byte(customDataStr))
+	encodedCustomData = base64.StdEncoding.EncodeToString([]byte(script))
 	return
 }
 
@@ -103,9 +103,9 @@ func getBackendCustomDataScript(ctx context.Context, userData string) (customDat
 // Azure never returns custom data on read, so the hash is stored as a vmss tag and
 // compared on every scale up: this is what makes init script changes shipped by a new
 // module version reach instances created after the upgrade.
-func getBackendCustomDataHash(userData string) (string, error) {
+func getBackendCustomDataHash(customData string) (string, error) {
 	// the real key is not needed (and not wanted) here - only the script's content matters
-	script, err := renderBackendInitScript(userData, functionAppKeyPlaceholder)
+	script, err := renderBackendInitScript(customData, functionAppKeyPlaceholder)
 	if err != nil {
 		return "", err
 	}
@@ -154,7 +154,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vmssConfig.CustomDataHash, err = getBackendCustomDataHash(vmssConfig.UserData)
+	vmssConfig.CustomDataHash, err = getBackendCustomDataHash(vmssConfig.CustomData)
 	if err != nil {
 		logger.Error().Err(err).Msgf("cannot calculate custom data hash")
 		common.WriteErrorResponse(w, err)
@@ -272,14 +272,14 @@ func handleNFSScaleUp(ctx context.Context) (message string, err error) {
 func createVmss(ctx context.Context, vmssConfig *common.VMSSConfig, vmssName string, vmssSize int) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
-	customData, err := getBackendCustomDataScript(ctx, vmssConfig.UserData)
+	encodedCustomData, err := getBackendCustomDataScript(ctx, vmssConfig.CustomData)
 	if err != nil {
 		logger.Error().Err(err).Msg("cannot get custom data script")
 		return err
 	}
 
 	logger.Info().Msgf("creating new vmss %s of size %d", vmssName, vmssSize)
-	_, err = common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, vmssName, *vmssConfig, vmssSize, customData)
+	_, err = common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, vmssName, *vmssConfig, vmssSize, encodedCustomData)
 	if err != nil {
 		return err
 	}
@@ -307,13 +307,13 @@ func handleVmssUpdate(ctx context.Context, currentConfig, newConfig *common.VMSS
 		return common.AddClusterUpdate(ctx, stateParams, update)
 	}
 
-	customData, err := getBackendCustomDataScript(ctx, newConfig.UserData)
+	encodedCustomData, err := getBackendCustomDataScript(ctx, newConfig.CustomData)
 	if err != nil {
 		logger.Error().Err(err).Msg("cannot get custom data script")
 		return err
 	}
 
-	_, err = common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, currentConfig.Name, *newConfig, desiredSize, customData)
+	_, err = common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, currentConfig.Name, *newConfig, desiredSize, encodedCustomData)
 	if err != nil {
 		logger.Error().Err(err).Msgf("cannot update vmss %s", currentConfig.Name)
 		errStr := err.Error()

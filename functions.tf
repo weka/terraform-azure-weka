@@ -46,7 +46,7 @@ locals {
     admin_username                  = var.vm_username
     ssh_public_key                  = local.public_ssh_key
     computer_name_prefix            = "${var.prefix}-${var.cluster_name}-backend"
-    user_data                       = var.user_data
+    custom_data                     = var.custom_data
     disable_password_authentication = true
     proximity_placement_group_id    = local.placement_group_id
     single_placement_group          = var.vmss_single_placement_group
