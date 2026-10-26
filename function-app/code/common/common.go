@@ -1936,6 +1936,7 @@ func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armc
 	if val, ok := tags["config_hash"]; ok {
 		configHash = val
 	}
+	customDataHash := tags["custom_data_hash"]
 
 	var healthProbeId string
 	if scaleSet.Properties.VirtualMachineProfile.NetworkProfile.HealthProbe != nil {
@@ -1983,14 +1984,15 @@ func GetVmssConfig(ctx context.Context, resourceGroupName string, scaleSet *armc
 			Lun:                *scaleSet.Properties.VirtualMachineProfile.StorageProfile.DataDisks[0].Lun,
 			StorageAccountType: string(*scaleSet.Properties.VirtualMachineProfile.StorageProfile.DataDisks[0].ManagedDisk.StorageAccountType),
 		},
-		PrimaryNIC:    *primaryNic,
-		SecondaryNICs: secondaryNics,
-		ConfigHash:    configHash,
+		PrimaryNIC:     *primaryNic,
+		SecondaryNICs:  secondaryNics,
+		ConfigHash:     configHash,
+		CustomDataHash: customDataHash,
 	}
 	return vmssConfig
 }
 
-func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName, configHash string, config VMSSConfig, vmssSize int, customData string) (id *string, err error) {
+func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, config VMSSConfig, vmssSize int, customData string) (id *string, err error) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	credential, err := getCredential(ctx)
@@ -2004,7 +2006,8 @@ func CreateOrUpdateVmss(ctx context.Context, subscriptionId, resourceGroupName, 
 		return
 	}
 
-	config.Tags["config_hash"] = configHash
+	config.Tags["config_hash"] = config.ConfigHash
+	config.Tags["custom_data_hash"] = config.CustomDataHash
 	config.Tags["config_applied_at"] = time.Now().Format(time.RFC3339)
 	size := int64(vmssSize)
 	forceDeletion := false

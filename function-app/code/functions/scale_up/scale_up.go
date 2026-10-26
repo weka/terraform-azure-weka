@@ -2,6 +2,7 @@ package scale_up
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -45,21 +46,16 @@ var (
 	}
 )
 
-func getBackendCustomDataScript(ctx context.Context, userData string) (customData string, err error) {
+// placeholder stands in for the function app key when fingerprinting the init script,
+// so that rotating the key is not mistaken for a change to the script
+const functionAppKeyPlaceholder = "<function-app-key>"
+
+func renderBackendInitScript(userData, functionAppKey string) (script string, err error) {
 	functionAppName := os.Getenv("FUNCTION_APP_NAME")
-	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 	diskSize, _ := strconv.Atoi(os.Getenv("DISK_SIZE"))
 	nicsNum, _ := strconv.Atoi(os.Getenv("NICS_NUM"))
 	subnet := os.Getenv("SUBNET")
 	aptRepo := os.Getenv("APT_REPO_SERVER")
-
-	logger := logging.LoggerFromCtx(ctx)
-
-	functionAppKey, err := common.GetKeyVaultValue(ctx, keyVaultUri, "function-app-default-key")
-	if err != nil {
-		logger.Error().Err(err).Msg("cannot get function app key")
-		return
-	}
 
 	baseFunctionUrl := fmt.Sprintf("https://%s.azurewebsites.net/api/", functionAppName)
 	funcDef := azure_functions_def.NewFuncDef(baseFunctionUrl, functionAppKey)
@@ -70,20 +66,52 @@ func getBackendCustomDataScript(ctx context.Context, userData string) (customDat
 	// Get maintenance monitor script and service files
 	monitorScript, err := common.GetMaintenanceMonitorScript(fetchFunction)
 	if err != nil {
-		logger.Error().Err(err).Msg("cannot get maintenance monitor script")
-		return
+		return "", err
 	}
 
 	serviceUnit, err := common.GetMaintenanceMonitorService()
 	if err != nil {
-		logger.Error().Err(err).Msg("cannot get maintenance monitor service")
+		return "", err
+	}
+
+	return getInitScript(userData, diskSize, nicsNum, subnet, aptRepo, reportFunction, deployFunction, clusterName, monitorScript, serviceUnit), nil
+}
+
+func getBackendCustomDataScript(ctx context.Context, userData string) (customData string, err error) {
+	keyVaultUri := os.Getenv("KEY_VAULT_URI")
+
+	logger := logging.LoggerFromCtx(ctx)
+
+	functionAppKey, err := common.GetKeyVaultValue(ctx, keyVaultUri, "function-app-default-key")
+	if err != nil {
+		logger.Error().Err(err).Msg("cannot get function app key")
 		return
 	}
 
-	customDataStr := getInitScript(userData, diskSize, nicsNum, subnet, aptRepo, reportFunction, deployFunction, clusterName, monitorScript, serviceUnit)
+	customDataStr, err := renderBackendInitScript(userData, functionAppKey)
+	if err != nil {
+		logger.Error().Err(err).Msg("cannot render init script")
+		return
+	}
+
 	// base64 encode the custom data
 	customData = base64.StdEncoding.EncodeToString([]byte(customDataStr))
 	return
+}
+
+// getBackendCustomDataHash fingerprints the init script the vmss should be running.
+// Azure never returns custom data on read, so the hash is stored as a vmss tag and
+// compared on every scale up: this is what makes init script changes shipped by a new
+// module version reach instances created after the upgrade.
+func getBackendCustomDataHash(userData string) (string, error) {
+	// the real key is not needed (and not wanted) here - only the script's content matters
+	script, err := renderBackendInitScript(userData, functionAppKeyPlaceholder)
+	if err != nil {
+		return "", err
+	}
+
+	hash := sha256.Sum256([]byte(script))
+	return fmt.Sprintf("%x", hash)[:16], nil
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -126,6 +154,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	vmssConfig.CustomDataHash, err = getBackendCustomDataHash(vmssConfig.UserData)
+	if err != nil {
+		logger.Error().Err(err).Msgf("cannot calculate custom data hash")
+		common.WriteErrorResponse(w, err)
+		return
+	}
+
 	// 1. Initial VMSS creation flow: initiale vmss creation if needed
 	if scaleSet == nil && !state.Clusterized && len(state.Instances) == 0 {
 		err := createVmss(ctx, &vmssConfig, vmScaleSetName, state.InitialSize)
@@ -154,9 +189,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		currentConfig := common.GetVmssConfig(ctx, resourceGroupName, scaleSet)
 
 		// 2. Update flow: compare current vmss config with expected vmss config and update if needed
-		if vmssConfig.ConfigHash != currentConfig.ConfigHash {
+		customDataChanged := vmssConfig.CustomDataHash != currentConfig.CustomDataHash
+		if vmssConfig.ConfigHash != currentConfig.ConfigHash || customDataChanged {
 			diff := common.VmssConfigsDiff(*currentConfig, vmssConfig)
 			logger.Info().Msgf("vmss config diff: %s", diff)
+			if customDataChanged {
+				// the diff above cannot show this: azure does not return custom data on read
+				logger.Info().Msgf(
+					"vmss custom data changed (hash %s -> %s)", currentConfig.CustomDataHash, vmssConfig.CustomDataHash)
+			}
 
 			err := handleVmssUpdate(ctx, currentConfig, &vmssConfig, stateParams, state.DesiredSize)
 			if err != nil {
@@ -230,7 +271,6 @@ func handleNFSScaleUp(ctx context.Context) (message string, err error) {
 
 func createVmss(ctx context.Context, vmssConfig *common.VMSSConfig, vmssName string, vmssSize int) (err error) {
 	logger := logging.LoggerFromCtx(ctx)
-	vmssConfigHash := vmssConfig.ConfigHash
 
 	customData, err := getBackendCustomDataScript(ctx, vmssConfig.UserData)
 	if err != nil {
@@ -239,7 +279,7 @@ func createVmss(ctx context.Context, vmssConfig *common.VMSSConfig, vmssName str
 	}
 
 	logger.Info().Msgf("creating new vmss %s of size %d", vmssName, vmssSize)
-	_, err = common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, vmssName, vmssConfigHash, *vmssConfig, vmssSize, customData)
+	_, err = common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, vmssName, *vmssConfig, vmssSize, customData)
 	if err != nil {
 		return err
 	}
@@ -273,7 +313,7 @@ func handleVmssUpdate(ctx context.Context, currentConfig, newConfig *common.VMSS
 		return err
 	}
 
-	_, err = common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, currentConfig.Name, newConfigHash, *newConfig, desiredSize, customData)
+	_, err = common.CreateOrUpdateVmss(ctx, subscriptionId, resourceGroupName, currentConfig.Name, *newConfig, desiredSize, customData)
 	if err != nil {
 		logger.Error().Err(err).Msgf("cannot update vmss %s", currentConfig.Name)
 		errStr := err.Error()
