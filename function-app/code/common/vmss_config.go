@@ -88,18 +88,23 @@ type VMSSConfig struct {
 
 	// ignore the following fields when marshaling to json
 	ConfigHash string `json:"-"`
+	// CustomDataHash fingerprints the rendered init script. Azure does not return
+	// custom data on read, so it is tracked separately via a vmss tag.
+	CustomDataHash string `json:"-"`
 }
 
 // Compares two vmss configs - works with copies of VMSSConfig structs
 // NOTES:
-// - does not compare "config_hash" and "config_applied_at" tags, and names which include version
+// - does not compare "config_hash", "custom_data_hash" and "config_applied_at" tags, and names which include version
 func VmssConfigsDiff(old, new VMSSConfig) string {
 	old.UserData, new.UserData = "", "" // ignore user data when generating diff (as it may contain sensitive data)
 	old.Tags["config_hash"], new.Tags["config_hash"] = "", ""
+	old.Tags["custom_data_hash"], new.Tags["custom_data_hash"] = "", ""
 	old.Tags["config_applied_at"], new.Tags["config_applied_at"] = "", ""
 	old.ComputerNamePrefix, new.ComputerNamePrefix = "", ""
 	old.Name, new.Name = "", ""
 	old.ConfigHash, new.ConfigHash = "", ""
+	old.CustomDataHash, new.CustomDataHash = "", ""
 
 	if len(old.PrimaryNIC.IPConfigurations) == len(new.PrimaryNIC.IPConfigurations) {
 		for i := range old.PrimaryNIC.IPConfigurations {
