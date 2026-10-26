@@ -6,7 +6,7 @@ var (
 	initScript = `#!/bin/bash
 set -ex
 
-# user data
+# custom data
 %s
 
 DISK_SIZE=%d
@@ -176,6 +176,6 @@ report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Wek
 `
 )
 
-func getInitScript(userData string, diskSize int, nicsNum int, subnetRange string, aptRepoServer string, reportFuncDef string, deployFuncDef string, clusterName string, monitorScript string, serviceUnit string) string {
-	return fmt.Sprintf(initScript, userData, diskSize, nicsNum, subnetRange, aptRepoServer, reportFuncDef, deployFuncDef, clusterName, monitorScript, serviceUnit)
+func getInitScript(customData string, diskSize int, nicsNum int, subnetRange string, aptRepoServer string, reportFuncDef string, deployFuncDef string, clusterName string, monitorScript string, serviceUnit string) string {
+	return fmt.Sprintf(initScript, customData, diskSize, nicsNum, subnetRange, aptRepoServer, reportFuncDef, deployFuncDef, clusterName, monitorScript, serviceUnit)
 }
