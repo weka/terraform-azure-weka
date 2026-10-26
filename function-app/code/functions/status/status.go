@@ -201,7 +201,7 @@ func GetRefreshStatus(ctx context.Context, vmssParams *common.ScaleSetParams, st
 	if err != nil {
 		return nil, err
 	}
-	vmssConfig.UserData = "<hidden>"
+	vmssConfig.CustomData = "<hidden>"
 	vmssConfig.SshPublicKey = "<hidden>"
 
 	currentConfig, err := common.GetCurrentScaleSetConfiguration(ctx, vmssParams)
@@ -221,7 +221,7 @@ func GetRefreshStatus(ctx context.Context, vmssParams *common.ScaleSetParams, st
 	}
 
 	if extended && currentConfig != nil {
-		currentConfig.UserData = "<hidden>"
+		currentConfig.CustomData = "<hidden>"
 		currentConfig.SshPublicKey = "<hidden>"
 		result.CurrentConfig = currentConfig
 	}
