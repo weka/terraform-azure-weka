@@ -113,6 +113,13 @@ func getCredential(ctx context.Context) (*azidentity.ManagedIdentityCredential, 
 }
 
 func WriteResponse(w http.ResponseWriter, resData map[string]any, statusCode *int) {
+	// The Functions host builds the caller-facing response from the "res" output binding, so
+	// the status has to travel inside it. Setting it on w would only affect the
+	// handler-to-host hop and leave the caller reading 200 on a failed request.
+	if statusCode != nil {
+		resData["statusCode"] = *statusCode
+	}
+
 	outputs := make(map[string]any)
 
 	outputs["res"] = resData
@@ -1084,7 +1091,8 @@ func ScaleUp(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetN
 		},
 	}, nil)
 	if err != nil {
-		logger.Error().Err(err).Send()
+		logger.Error().Err(err).Msgf(
+			"failed to update scale set %s capacity from %d to %d", vmScaleSetName, scaleSetCapacity, newSize)
 	}
 	return
 }
