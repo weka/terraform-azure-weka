@@ -123,13 +123,15 @@ func VmssConfigsDiff(old, new VMSSConfig) string {
 }
 
 type VMSSStateVerbose struct {
-	VmssName          string            `json:"vmss_name"`
-	TargetConfig      VMSSConfig        `json:"target_config"`
-	CurrentConfig     *VMSSConfig       `json:"current_config,omitempty"`
-	TargetConfigHash  string            `json:"target_config_hash"`
-	CurrentConfigHash string            `json:"current_config_hash"`
-	NeedUpdate        bool              `json:"need_update"`
-	UpdatesLog        []protocol.Update `json:"updates,omitempty"`
+	VmssName              string            `json:"vmss_name"`
+	TargetConfig          VMSSConfig        `json:"target_config"`
+	CurrentConfig         *VMSSConfig       `json:"current_config,omitempty"`
+	TargetConfigHash      string            `json:"target_config_hash"`
+	CurrentConfigHash     string            `json:"current_config_hash"`
+	TargetCustomDataHash  string            `json:"target_custom_data_hash"`
+	CurrentCustomDataHash string            `json:"current_custom_data_hash"`
+	NeedUpdate            bool              `json:"need_update"`
+	UpdatesLog            []protocol.Update `json:"updates,omitempty"`
 }
 
 func ToEnumStrValue[T interface{ ~string }](val string, possibleEnumValues []T) (*T, error) {
