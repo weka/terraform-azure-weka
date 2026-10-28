@@ -1,6 +1,19 @@
-package scale_up
+package common
 
-import "fmt"
+import (
+	"crypto/sha256"
+	"fmt"
+	"os"
+	"strconv"
+
+	"github.com/weka/go-cloud-lib/functions_def"
+
+	"weka-deployment/functions/azure_functions_def"
+)
+
+// functionAppKeyPlaceholder stands in for the function app key when fingerprinting the
+// init script, so that rotating the key is not mistaken for a change to the script
+const functionAppKeyPlaceholder = "<function-app-key>"
 
 var (
 	initScript = `#!/bin/bash
@@ -178,4 +191,48 @@ report "{\"hostname\": \"$HOSTNAME\", \"type\": \"progress\", \"message\": \"Wek
 
 func getInitScript(customData string, diskSize int, nicsNum int, subnetRange string, aptRepoServer string, reportFuncDef string, deployFuncDef string, clusterName string, monitorScript string, serviceUnit string) string {
 	return fmt.Sprintf(initScript, customData, diskSize, nicsNum, subnetRange, aptRepoServer, reportFuncDef, deployFuncDef, clusterName, monitorScript, serviceUnit)
+}
+
+// RenderBackendInitScript renders the init script the backend vmss should be running.
+func RenderBackendInitScript(customData, functionAppKey string) (script string, err error) {
+	functionAppName := os.Getenv("FUNCTION_APP_NAME")
+	clusterName := os.Getenv("CLUSTER_NAME")
+	diskSize, _ := strconv.Atoi(os.Getenv("DISK_SIZE"))
+	nicsNum, _ := strconv.Atoi(os.Getenv("NICS_NUM"))
+	subnet := os.Getenv("SUBNET")
+	aptRepo := os.Getenv("APT_REPO_SERVER")
+
+	baseFunctionUrl := fmt.Sprintf("https://%s.azurewebsites.net/api/", functionAppName)
+	funcDef := azure_functions_def.NewFuncDef(baseFunctionUrl, functionAppKey)
+	reportFunction := funcDef.GetFunctionCmdDefinition(functions_def.Report)
+	deployFunction := funcDef.GetFunctionCmdDefinition(functions_def.Deploy)
+	fetchFunction := funcDef.GetFunctionCmdDefinition(functions_def.Fetch)
+
+	// Get maintenance monitor script and service files
+	monitorScript, err := GetMaintenanceMonitorScript(fetchFunction)
+	if err != nil {
+		return "", err
+	}
+
+	serviceUnit, err := GetMaintenanceMonitorService()
+	if err != nil {
+		return "", err
+	}
+
+	return getInitScript(customData, diskSize, nicsNum, subnet, aptRepo, reportFunction, deployFunction, clusterName, monitorScript, serviceUnit), nil
+}
+
+// GetBackendCustomDataHash fingerprints the init script the vmss should be running.
+// Azure never returns custom data on read, so the hash is stored as a vmss tag and
+// compared on every scale up: this is what makes init script changes shipped by a new
+// module version reach instances created after the upgrade.
+func GetBackendCustomDataHash(customData string) (string, error) {
+	// the real key is not needed (and not wanted) here - only the script's content matters
+	script, err := RenderBackendInitScript(customData, functionAppKeyPlaceholder)
+	if err != nil {
+		return "", err
+	}
+
+	hash := sha256.Sum256([]byte(script))
+	return fmt.Sprintf("%x", hash)[:16], nil
 }

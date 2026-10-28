@@ -2,7 +2,6 @@ package scale_up
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -10,12 +9,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/weka/go-cloud-lib/functions_def"
 	"github.com/weka/go-cloud-lib/logging"
 	"github.com/weka/go-cloud-lib/protocol"
 
 	"weka-deployment/common"
-	"weka-deployment/functions/azure_functions_def"
 )
 
 var (
@@ -46,37 +43,6 @@ var (
 	}
 )
 
-// placeholder stands in for the function app key when fingerprinting the init script,
-// so that rotating the key is not mistaken for a change to the script
-const functionAppKeyPlaceholder = "<function-app-key>"
-
-func renderBackendInitScript(customData, functionAppKey string) (script string, err error) {
-	functionAppName := os.Getenv("FUNCTION_APP_NAME")
-	diskSize, _ := strconv.Atoi(os.Getenv("DISK_SIZE"))
-	nicsNum, _ := strconv.Atoi(os.Getenv("NICS_NUM"))
-	subnet := os.Getenv("SUBNET")
-	aptRepo := os.Getenv("APT_REPO_SERVER")
-
-	baseFunctionUrl := fmt.Sprintf("https://%s.azurewebsites.net/api/", functionAppName)
-	funcDef := azure_functions_def.NewFuncDef(baseFunctionUrl, functionAppKey)
-	reportFunction := funcDef.GetFunctionCmdDefinition(functions_def.Report)
-	deployFunction := funcDef.GetFunctionCmdDefinition(functions_def.Deploy)
-	fetchFunction := funcDef.GetFunctionCmdDefinition(functions_def.Fetch)
-
-	// Get maintenance monitor script and service files
-	monitorScript, err := common.GetMaintenanceMonitorScript(fetchFunction)
-	if err != nil {
-		return "", err
-	}
-
-	serviceUnit, err := common.GetMaintenanceMonitorService()
-	if err != nil {
-		return "", err
-	}
-
-	return getInitScript(customData, diskSize, nicsNum, subnet, aptRepo, reportFunction, deployFunction, clusterName, monitorScript, serviceUnit), nil
-}
-
 func getBackendCustomDataScript(ctx context.Context, customData string) (encodedCustomData string, err error) {
 	keyVaultUri := os.Getenv("KEY_VAULT_URI")
 
@@ -88,7 +54,7 @@ func getBackendCustomDataScript(ctx context.Context, customData string) (encoded
 		return
 	}
 
-	script, err := renderBackendInitScript(customData, functionAppKey)
+	script, err := common.RenderBackendInitScript(customData, functionAppKey)
 	if err != nil {
 		logger.Error().Err(err).Msg("cannot render init script")
 		return
@@ -97,21 +63,6 @@ func getBackendCustomDataScript(ctx context.Context, customData string) (encoded
 	// base64 encode the custom data
 	encodedCustomData = base64.StdEncoding.EncodeToString([]byte(script))
 	return
-}
-
-// getBackendCustomDataHash fingerprints the init script the vmss should be running.
-// Azure never returns custom data on read, so the hash is stored as a vmss tag and
-// compared on every scale up: this is what makes init script changes shipped by a new
-// module version reach instances created after the upgrade.
-func getBackendCustomDataHash(customData string) (string, error) {
-	// the real key is not needed (and not wanted) here - only the script's content matters
-	script, err := renderBackendInitScript(customData, functionAppKeyPlaceholder)
-	if err != nil {
-		return "", err
-	}
-
-	hash := sha256.Sum256([]byte(script))
-	return fmt.Sprintf("%x", hash)[:16], nil
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -154,7 +105,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vmssConfig.CustomDataHash, err = getBackendCustomDataHash(vmssConfig.CustomData)
+	vmssConfig.CustomDataHash, err = common.GetBackendCustomDataHash(vmssConfig.CustomData)
 	if err != nil {
 		logger.Error().Err(err).Msgf("cannot calculate custom data hash")
 		common.WriteErrorResponse(w, err)

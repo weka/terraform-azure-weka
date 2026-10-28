@@ -201,6 +201,14 @@ func GetRefreshStatus(ctx context.Context, vmssParams *common.ScaleSetParams, st
 	if err != nil {
 		return nil, err
 	}
+
+	// fingerprint the init script before the custom data is masked for the response,
+	// so that the reported need_update matches what scale up would decide
+	vmssConfig.CustomDataHash, err = common.GetBackendCustomDataHash(vmssConfig.CustomData)
+	if err != nil {
+		return nil, err
+	}
+
 	vmssConfig.CustomData = "<hidden>"
 	vmssConfig.SshPublicKey = "<hidden>"
 
@@ -210,14 +218,17 @@ func GetRefreshStatus(ctx context.Context, vmssParams *common.ScaleSetParams, st
 	}
 
 	result := &common.VMSSStateVerbose{
-		VmssName:         vmssParams.ScaleSetName,
-		TargetConfig:     vmssConfig,
-		TargetConfigHash: vmssConfig.ConfigHash,
+		VmssName:             vmssParams.ScaleSetName,
+		TargetConfig:         vmssConfig,
+		TargetConfigHash:     vmssConfig.ConfigHash,
+		TargetCustomDataHash: vmssConfig.CustomDataHash,
 	}
 
 	if currentConfig != nil {
 		result.CurrentConfigHash = currentConfig.ConfigHash
-		result.NeedUpdate = vmssConfig.ConfigHash != currentConfig.ConfigHash
+		result.CurrentCustomDataHash = currentConfig.CustomDataHash
+		result.NeedUpdate = vmssConfig.ConfigHash != currentConfig.ConfigHash ||
+			vmssConfig.CustomDataHash != currentConfig.CustomDataHash
 	}
 
 	if extended && currentConfig != nil {
