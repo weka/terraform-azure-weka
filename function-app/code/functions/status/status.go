@@ -46,7 +46,9 @@ func addSummary(ctx context.Context, state protocol.ClusterState, stateParams co
 		logger.Error().Msg(msg)
 		return
 	}
-	toTerminate := common.GetUnhealthyInstancesToTerminate(ctx, vms)
+	// only reached while the cluster is not clusterized yet, so this mirrors what
+	// scale up will terminate - it is what the "stopped" count below reports
+	toTerminate := common.GetUnhealthyInstancesToTerminate(ctx, vms, true)
 
 	var readyForClusterization []string
 	var inProgress []string

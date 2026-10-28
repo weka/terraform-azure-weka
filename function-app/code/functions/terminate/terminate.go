@@ -177,7 +177,8 @@ func Terminate(ctx context.Context, scaleResponse protocol.ScaleResponse, vmssPa
 		return
 	}
 
-	unhealthyInstanceIds := common.GetUnhealthyInstancesToTerminate(ctx, vms)
+	// steady state: a stopped instance may be stopped on purpose, do not reap it
+	unhealthyInstanceIds := common.GetUnhealthyInstancesToTerminate(ctx, vms, false)
 	errs := terminateUnhealthyInstances(ctx, vmssParams, unhealthyInstanceIds)
 	response.AddTransientErrors(errs)
 
