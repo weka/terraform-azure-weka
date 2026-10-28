@@ -1754,7 +1754,15 @@ func GetInstanceProvisioningState(instance *VMInfoSummary) (provisioningState st
 	return strings.ToLower(provisioningState)
 }
 
-func GetUnhealthyInstancesToTerminate(ctx context.Context, scaleSetVms []*VMInfoSummary) (toTerminate []string) {
+// GetUnhealthyInstancesToTerminate returns the unhealthy instances that should be removed
+// from the scale set. Instances whose provisioning failed are always included.
+//
+// includeStopped additionally picks up instances that provisioned successfully but then
+// powered off. Only clusterization wants those: the init script halts the vm when it
+// cannot proceed, and that dead slot has to be freed so the vmss can replace it, otherwise
+// the cluster never reaches its initial size. Once clusterized, a stopped instance may be
+// stopped deliberately, so it is left alone.
+func GetUnhealthyInstancesToTerminate(ctx context.Context, scaleSetVms []*VMInfoSummary, includeStopped bool) (toTerminate []string) {
 	logger := logging.LoggerFromCtx(ctx)
 
 	for _, vm := range scaleSetVms {
@@ -1766,13 +1774,13 @@ func GetUnhealthyInstancesToTerminate(ctx context.Context, scaleSetVms []*VMInfo
 			instancePowerState := GetInstancePowerState(vm)
 			instanceProvisioningState := GetInstanceProvisioningState(vm)
 			logger.Debug().Msgf("instance power state: %s, provisioning state: %s", instancePowerState, instanceProvisioningState)
-			if instanceProvisioningState == "failed" {
+			if instanceProvisioningState == "failed" || (includeStopped && instancePowerState == "stopped") {
 				toTerminate = append(toTerminate, GetScaleSetVmId(vm.ID))
 			}
 		}
 	}
 
-	logger.Info().Msgf("found %d unhealthy stopped instances to terminate: %s", len(toTerminate), toTerminate)
+	logger.Info().Msgf("found %d unhealthy instances to terminate: %s", len(toTerminate), toTerminate)
 	return
 }
 

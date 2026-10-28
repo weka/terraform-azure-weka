@@ -285,7 +285,9 @@ func handleProgressingClusterization(ctx context.Context, state *protocol.Cluste
 		common.ReportMsg(ctx, "vmss", stateParams, "error", msg)
 		return
 	}
-	toTerminate := common.GetUnhealthyInstancesToTerminate(ctx, vms)
+	// pre-clusterization: free slots held by instances the init script halted,
+	// so the vmss can replace them and the cluster can reach its initial size
+	toTerminate := common.GetUnhealthyInstancesToTerminate(ctx, vms, true)
 	if len(toTerminate) > 0 {
 		msg := fmt.Sprintf("Terminating unhealthy instances indexes: %v", toTerminate)
 		common.ReportMsg(ctx, "vmss", stateParams, "debug", msg)
