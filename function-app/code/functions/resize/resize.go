@@ -91,7 +91,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	err = updateDesiredClusterSize(ctx, *resizeReq.Value, subscriptionId, resourceGroupName, vmScaleSetName, stateParams)
 	if err != nil {
-		logger.Error().Err(err).Send()
+		logger.Error().Err(err).Msgf("failed to update desired cluster size to %d", *resizeReq.Value)
 		common.WriteErrorResponse(w, err)
 		return
 	}
