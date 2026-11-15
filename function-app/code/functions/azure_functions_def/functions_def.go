@@ -45,17 +45,19 @@ func (d *AzureFuncDef) GetFunctionCmdDefinition(name functions_def.FunctionName)
 	} else if name == functions_def.Report {
 		// Reports are informational, yet callers run under `set -e`: a failure here must not abort
 		// the instance bring-up. curl --retry does not retry TLS/connection errors (e.g. exit 35 from
-		// a cold-starting function app).
+		// a cold-starting function app), so retry in-script with bounded per-attempt time.
 		funcDefTemplate := `
 		function %s {
 			local json_data=$1
-			local attempt
-			for attempt in 1 2 3 4 5 6; do
-				curl --retry 10 %s?code=%s -H 'Content-Type:application/json' -d "$json_data" && return 0
-				echo "report attempt $attempt failed, retrying in 10 seconds"
-				sleep 10
+			local attempt max_attempts=6
+			for attempt in $(seq 1 $max_attempts); do
+				curl --fail --connect-timeout 10 --max-time 30 %s?code=%s -H 'Content-Type:application/json' -d "$json_data" && return 0
+				if [ $attempt -lt $max_attempts ]; then
+					echo "report attempt $attempt failed, retrying in 10 seconds"
+					sleep 10
+				fi
 			done
-			echo "report failed after $attempt attempts, continuing"
+			echo "report failed after $max_attempts attempts, continuing"
 		}
 		`
 		funcDef = fmt.Sprintf(funcDefTemplate, name, functionUrl, d.functionKey)
