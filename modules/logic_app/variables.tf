@@ -79,3 +79,9 @@ variable "use_secured_storage_account" {
   description = "Use secured storage account with logic app."
   default     = false
 }
+
+variable "tags_map" {
+  type        = map(string)
+  default     = {}
+  description = "A map of tags to assign the same metadata to all resources in the environment. Format: key:value."
+}

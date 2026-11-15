@@ -21,7 +21,7 @@ resource "azurerm_storage_account" "deployment_sa" {
   account_kind             = "StorageV2"
   account_tier             = "Standard"
   account_replication_type = "ZRS"
-  tags                     = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
+  tags                     = local.tags
   lifecycle {
     ignore_changes = [tags]
   }
@@ -99,6 +99,7 @@ resource "azurerm_storage_blob" "nfs_state" {
 
 resource "azurerm_storage_account" "logicapp" {
   count                    = local.create_sa_resources ? 1 : 0
+  tags                     = local.tags
   name                     = substr("${local.alphanumeric_prefix_name}${local.alphanumeric_cluster_name}logicappsa", 0, 24)
   resource_group_name      = var.rg_name
   location                 = local.location
@@ -126,6 +127,7 @@ resource "azurerm_private_dns_zone" "blob" {
   count               = var.create_storage_account_private_links ? 1 : 0
   name                = "privatelink.blob.core.windows.net"
   resource_group_name = local.resource_group_name
+  tags                = local.tags
 }
 
 data "azurerm_private_dns_zone" "blob" {
@@ -137,6 +139,7 @@ resource "azurerm_private_dns_zone" "file" {
   count               = var.create_storage_account_private_links ? 1 : 0
   name                = "privatelink.file.core.windows.net"
   resource_group_name = local.resource_group_name
+  tags                = local.tags
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "blob_privatelink" {
@@ -145,6 +148,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "blob_privatelink" {
   resource_group_name   = local.resource_group_name
   private_dns_zone_name = azurerm_private_dns_zone.blob[0].name
   virtual_network_id    = data.azurerm_virtual_network.vnet.id
+  tags                  = local.tags
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "file_privatelink" {
@@ -153,6 +157,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "file_privatelink" {
   resource_group_name   = local.resource_group_name
   private_dns_zone_name = azurerm_private_dns_zone.file[0].name
   virtual_network_id    = data.azurerm_virtual_network.vnet.id
+  tags                  = local.tags
 }
 
 resource "azurerm_private_endpoint" "file_endpoint" {
@@ -161,7 +166,7 @@ resource "azurerm_private_endpoint" "file_endpoint" {
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = data.azurerm_resource_group.rg.name
   subnet_id           = data.azurerm_subnet.subnet.id
-  tags                = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
+  tags                = local.tags
 
   private_dns_zone_group {
     name                 = "${var.prefix}-${var.cluster_name}-dns-zone-group-file"
@@ -182,7 +187,7 @@ resource "azurerm_private_endpoint" "blob_endpoint" {
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = data.azurerm_resource_group.rg.name
   subnet_id           = data.azurerm_subnet.subnet.id
-  tags                = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
+  tags                = local.tags
 
   private_dns_zone_group {
     name                 = "${var.prefix}-${var.cluster_name}-dns-zone-group-blob"
@@ -208,7 +213,7 @@ resource "azurerm_private_endpoint" "weka_obs_blob_endpoint" {
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = data.azurerm_resource_group.rg.name
   subnet_id           = data.azurerm_subnet.subnet.id
-  tags                = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
+  tags                = local.tags
 
   private_dns_zone_group {
     name                 = "${var.prefix}-${var.cluster_name}-dns-zone-group-obs-blob"

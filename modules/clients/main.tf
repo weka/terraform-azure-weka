@@ -9,6 +9,7 @@ data "azurerm_subnet" "subnet" {
 }
 
 locals {
+  tags                    = merge(var.tags_map, { "weka_cluster_client" : var.clients_name })
   use_marketplace_image   = var.image_sku != null && var.image_offer != null
   first_nic_ids           = var.assign_public_ip ? azurerm_network_interface.public_first_nic[*].id : azurerm_network_interface.private_first_nic[*].id
   private_nic_first_index = var.assign_public_ip ? 1 : 0
@@ -58,7 +59,7 @@ resource "azurerm_public_ip" "public_ip" {
   allocation_method   = "Static"
   sku                 = "Standard"
   zones               = local.zones
-  tags                = var.tags_map
+  tags                = local.tags
 }
 
 resource "azurerm_network_interface" "public_first_nic" {
@@ -67,7 +68,7 @@ resource "azurerm_network_interface" "public_first_nic" {
   accelerated_networking_enabled = var.clients_use_dpdk
   resource_group_name            = var.rg_name
   location                       = data.azurerm_resource_group.rg.location
-  tags                           = var.tags_map
+  tags                           = local.tags
   ip_configuration {
     name                          = "ipconfig0"
     subnet_id                     = data.azurerm_subnet.subnet.id
@@ -89,7 +90,7 @@ resource "azurerm_network_interface" "private_first_nic" {
   accelerated_networking_enabled = var.clients_use_dpdk
   resource_group_name            = var.rg_name
   location                       = data.azurerm_resource_group.rg.location
-  tags                           = var.tags_map
+  tags                           = local.tags
   ip_configuration {
     name                          = "ipconfig0"
     subnet_id                     = data.azurerm_subnet.subnet.id
@@ -110,7 +111,7 @@ resource "azurerm_network_interface" "private_nics" {
   accelerated_networking_enabled = var.clients_use_dpdk
   resource_group_name            = var.rg_name
   location                       = data.azurerm_resource_group.rg.location
-  tags                           = var.tags_map
+  tags                           = local.tags
   ip_configuration {
     name                          = "ipconfig${count.index + var.clients_number}"
     subnet_id                     = data.azurerm_subnet.subnet.id
@@ -131,7 +132,7 @@ resource "azurerm_linux_virtual_machine" "this" {
   resource_group_name = var.rg_name
   zone                = var.zone
   admin_username      = var.vm_username
-  tags                = merge({ "weka_cluster_client" : var.clients_name }, var.tags_map)
+  tags                = local.tags
   custom_data         = local.vms_custom_data
   source_image_id     = local.use_marketplace_image ? "" : local.source_image_id
   size                = local.instance_type
@@ -182,7 +183,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "this" {
   resource_group_name = var.rg_name
   zones               = local.zones
   admin_username      = var.vm_username
-  tags                = merge({ "weka_cluster_client" : var.clients_name }, var.tags_map)
+  tags                = local.tags
   custom_data         = local.vms_custom_data
   source_image_id     = local.source_image_id
   sku                 = local.instance_type

@@ -19,6 +19,7 @@ module "network" {
   private_dns_zone_use    = var.private_dns_zone_use
   sg_id                   = var.sg_id
   create_nat_gateway      = var.create_nat_gateway
+  tags_map                = var.tags_map
 }
 
 module "iam" {
@@ -41,6 +42,7 @@ module "iam" {
   deployment_container_name      = local.deployment_container_name
   nfs_deployment_container_name  = local.nfs_deployment_container_name
   nfs_protocol_gateways_number   = var.nfs_protocol_gateways_number
+  tags_map                       = var.tags_map
   tiering_enable_obs_integration = var.tiering_enable_obs_integration
   tiering_obs_name               = var.tiering_obs_name
   obs_container_name             = local.obs_container_name
@@ -120,6 +122,7 @@ module "logicapp" {
   key_vault_id                   = azurerm_key_vault.key_vault.id
   key_vault_uri                  = azurerm_key_vault.key_vault.vault_uri
   use_secured_storage_account    = local.sa_public_access_enabled ? false : true
+  tags_map                       = var.tags_map
 
   depends_on = [azurerm_storage_account.logicapp, module.logic_app_subnet_delegation, module.iam]
 }

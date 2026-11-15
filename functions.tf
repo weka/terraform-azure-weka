@@ -56,10 +56,7 @@ locals {
     image_version                   = local.use_marketplace_image ? var.image_version : ""
     overprovision                   = false
     orchestration_mode              = "Uniform"
-    tags = merge(var.tags_map, {
-      "weka_cluster" : var.cluster_name,
-      "user_id" : data.azurerm_client_config.current.object_id,
-    })
+    tags                            = local.tags
 
     os_disk = {
       caching              = "ReadWrite"
@@ -217,6 +214,7 @@ locals {
 
 resource "azurerm_log_analytics_workspace" "la_workspace" {
   count               = var.log_analytics_workspace_id == "" && local.enable_application_insights ? 1 : 0
+  tags                = local.tags
   name                = "${local.alphanumeric_prefix_name}-${local.alphanumeric_cluster_name}-workspace"
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = var.rg_name
@@ -240,6 +238,7 @@ data "azurerm_resource_group" "application_insights_rg" {
 
 resource "azurerm_application_insights" "application_insights" {
   count               = var.application_insights_name == "" && local.enable_application_insights ? 1 : 0
+  tags                = local.tags
   name                = "${var.prefix}-${var.cluster_name}-application-insights"
   location            = data.azurerm_resource_group.application_insights_rg[0].location
   resource_group_name = local.application_insights_rg_name
@@ -281,6 +280,7 @@ resource "azurerm_monitor_diagnostic_setting" "function_diagnostic_setting" {
 }
 
 resource "azurerm_service_plan" "app_service_plan" {
+  tags                = local.tags
   name                = "${var.prefix}-${var.cluster_name}-app-service-plan"
   resource_group_name = data.azurerm_resource_group.rg.name
   location            = data.azurerm_resource_group.rg.location
@@ -300,6 +300,7 @@ resource "azurerm_linux_function_app" "function_app" {
   storage_account_access_key = local.deployment_sa_access_key
   https_only                 = true
   virtual_network_subnet_id  = local.function_app_subnet_delegation_id
+  tags                       = local.tags
 
   site_config {
     vnet_route_all_enabled   = true

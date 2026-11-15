@@ -12,6 +12,7 @@ data "azurerm_subnet" "subnet" {
 
 resource "azurerm_public_ip" "this" {
   count               = var.assign_public_ip && var.protocol != "NFS" ? var.gateways_number : 0
+  tags                = local.tags
   name                = "${var.gateways_name}-public-ip-${count.index}"
   location            = var.location
   resource_group_name = var.rg_name
@@ -21,6 +22,7 @@ resource "azurerm_public_ip" "this" {
 
 resource "azurerm_network_interface" "primary_gateway_nic_public" {
   count                          = var.assign_public_ip && var.protocol != "NFS" ? var.gateways_number : 0
+  tags                           = local.tags
   name                           = "${var.gateways_name}-primary-nic-${count.index}"
   location                       = var.location
   resource_group_name            = var.rg_name
@@ -53,6 +55,7 @@ resource "azurerm_network_interface_security_group_association" "primary_gateway
 
 resource "azurerm_network_interface" "primary_gateway_nic_private" {
   count                          = var.assign_public_ip || var.protocol == "NFS" ? 0 : var.gateways_number
+  tags                           = local.tags
   name                           = "${var.gateways_name}-primary-nic-${count.index}"
   location                       = var.location
   resource_group_name            = var.rg_name
@@ -83,12 +86,14 @@ resource "azurerm_network_interface_security_group_association" "primary_gateway
 }
 
 locals {
+  tags                  = merge(var.tags_map, { "weka_protocol_gateways" : var.gateways_name })
   use_marketplace_image = var.image_sku != null && var.image_offer != null
   secondary_nics_num    = (local.nics_numbers - 1) * var.gateways_number
 }
 
 resource "azurerm_network_interface" "secondary_gateway_nic" {
   count                          = var.protocol != "NFS" ? local.secondary_nics_num : 0
+  tags                           = local.tags
   name                           = "${var.gateways_name}-secondary-nic-${count.index + var.gateways_number}"
   location                       = var.location
   resource_group_name            = var.rg_name
@@ -176,7 +181,7 @@ resource "azurerm_linux_virtual_machine" "this" {
   proximity_placement_group_id    = var.ppg_id
   disable_password_authentication = true
   source_image_id                 = local.use_marketplace_image ? "" : var.source_image_id
-  tags                            = merge(var.tags_map, { "weka_protocol_gateways" : var.gateways_name, "user_id" : data.azurerm_client_config.current.object_id })
+  tags                            = local.tags
 
   dynamic "source_image_reference" {
     for_each = local.use_marketplace_image ? [1] : []
@@ -237,6 +242,7 @@ resource "azurerm_linux_virtual_machine" "this" {
 
 resource "azurerm_managed_disk" "this" {
   count                = var.protocol != "NFS" ? var.gateways_number : 0
+  tags                 = local.tags
   name                 = "weka-disk-${var.gateways_name}-${count.index}"
   location             = var.location
   resource_group_name  = var.rg_name
@@ -263,6 +269,7 @@ data "azurerm_user_assigned_identity" "this" {
 resource "azurerm_user_assigned_identity" "this" {
   count               = var.vm_identity_name == "" ? 1 : 0
   location            = data.azurerm_resource_group.rg.location
+  tags                = local.tags
   name                = "${var.gateways_name}-identity"
   resource_group_name = data.azurerm_resource_group.rg.name
 }
@@ -313,7 +320,7 @@ resource "azurerm_orchestrated_virtual_machine_scale_set" "nfs" {
   instances                    = 0 # will be set to var.gateways_number by scale_up workflow
   platform_fault_domain_count  = 1
   sku_name                     = var.instance_type
-  tags                         = merge(var.tags_map, { "weka_protocol_gateways" : var.gateways_name, "user_id" : data.azurerm_client_config.current.object_id })
+  tags                         = local.tags
   proximity_placement_group_id = var.ppg_id
   source_image_id              = local.use_marketplace_image ? "" : var.source_image_id
 

@@ -7,6 +7,7 @@ data "azurerm_user_assigned_identity" "function_app" {
 resource "azurerm_user_assigned_identity" "function_app" {
   count               = var.function_app_identity_name == "" ? 1 : 0
   location            = data.azurerm_resource_group.rg.location
+  tags                = local.tags
   name                = "${var.prefix}-${var.cluster_name}-function-app-identity"
   resource_group_name = data.azurerm_resource_group.rg.name
 }

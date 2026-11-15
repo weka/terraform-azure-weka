@@ -7,6 +7,7 @@ data "azurerm_user_assigned_identity" "vmss" {
 resource "azurerm_user_assigned_identity" "vmss" {
   count               = var.vmss_identity_name == "" ? 1 : 0
   location            = data.azurerm_resource_group.rg.location
+  tags                = local.tags
   name                = "${var.prefix}-${var.cluster_name}-vmss-identity"
   resource_group_name = data.azurerm_resource_group.rg.name
 }
