@@ -21,7 +21,7 @@ resource "azurerm_virtual_network" "vnet" {
   location            = local.vnet_rg_location
   name                = "${var.prefix}-vnet"
   address_space       = [var.address_space]
-  tags                = merge(var.tags_map)
+  tags                = var.tags_map
   depends_on          = [data.azurerm_resource_group.rg]
   lifecycle {
     ignore_changes = [tags]
@@ -57,6 +57,7 @@ resource "azurerm_subnet" "subnet" {
 # ====================== NAT ============================= #
 resource "azurerm_public_ip_prefix" "nat_ip" {
   count               = var.create_nat_gateway ? 1 : 0
+  tags                = var.tags_map
   name                = "${var.prefix}-nat-ip"
   resource_group_name = local.vnet_rg
   location            = local.vnet_rg_location
@@ -67,6 +68,7 @@ resource "azurerm_public_ip_prefix" "nat_ip" {
 
 resource "azurerm_nat_gateway" "nat_gateway" {
   count                   = var.create_nat_gateway ? 1 : 0
+  tags                    = var.tags_map
   name                    = "${var.prefix}-nat-gateway"
   resource_group_name     = local.vnet_rg
   location                = local.vnet_rg_location
@@ -141,7 +143,7 @@ resource "azurerm_network_security_group" "sg" {
   name                = "${var.prefix}-sg"
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = data.azurerm_resource_group.rg.name
-  tags                = merge(var.tags_map)
+  tags                = var.tags_map
 
   lifecycle {
     ignore_changes = [tags]
@@ -161,7 +163,7 @@ resource "azurerm_private_dns_zone" "dns" {
   count               = var.private_dns_zone_name == "" && var.private_dns_zone_use ? 1 : 0
   name                = "${var.prefix}.private.net"
   resource_group_name = local.private_dns_rg_name
-  tags                = merge(var.tags_map)
+  tags                = var.tags_map
   lifecycle {
     ignore_changes = [tags]
   }
@@ -173,6 +175,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "dns_vnet_link" {
   resource_group_name   = data.azurerm_resource_group.rg.name
   private_dns_zone_name = azurerm_private_dns_zone.dns[0].name
   virtual_network_id    = var.vnet_name != "" ? data.azurerm_virtual_network.vnet_data[0].id : azurerm_virtual_network.vnet[0].id
+  tags                  = var.tags_map
   lifecycle {
     ignore_changes = [tags]
   }

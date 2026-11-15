@@ -55,6 +55,7 @@ resource "azurerm_subnet" "dns_resolver_subnet" {
 
 resource "azurerm_private_dns_resolver" "dns_resolver" {
   count               = var.smb_create_private_dns_resolver ? 1 : 0
+  tags                = local.tags
   name                = "${var.prefix}-${var.cluster_name}-resolver"
   resource_group_name = local.resource_group_name
   location            = local.location
@@ -68,7 +69,7 @@ resource "azurerm_private_dns_resolver_outbound_endpoint" "outbound_endpoint" {
   private_dns_resolver_id = azurerm_private_dns_resolver.dns_resolver[0].id
   location                = azurerm_private_dns_resolver.dns_resolver[0].location
   subnet_id               = var.smb_dns_resolver_subnet_delegation_id == "" ? azurerm_subnet.dns_resolver_subnet[0].id : var.smb_dns_resolver_subnet_delegation_id
-  tags                    = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
+  tags                    = local.tags
   depends_on              = [module.network, azurerm_private_dns_resolver.dns_resolver, azurerm_subnet.dns_resolver_subnet]
 }
 
@@ -78,7 +79,7 @@ resource "azurerm_private_dns_resolver_dns_forwarding_ruleset" "dns_forwarding_r
   resource_group_name                        = local.resource_group_name
   location                                   = local.location
   private_dns_resolver_outbound_endpoint_ids = [azurerm_private_dns_resolver_outbound_endpoint.outbound_endpoint[0].id]
-  tags                                       = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
+  tags                                       = local.tags
   depends_on                                 = [module.network, azurerm_private_dns_resolver_outbound_endpoint.outbound_endpoint]
 }
 

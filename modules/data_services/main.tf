@@ -11,6 +11,7 @@ data "azurerm_subnet" "subnet" {
 }
 
 locals {
+  tags                  = merge(var.tags_map, { "weka_data_services" : var.data_services_name, "weka_cluster" : var.cluster_name })
   use_marketplace_image = var.image_sku != null && var.image_offer != null
   vmss_name             = "${var.data_services_name}-vmss"
 
@@ -40,7 +41,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "this" {
   source_image_id                 = local.use_marketplace_image ? "" : var.source_image_id
   upgrade_mode                    = "Manual"
   overprovision                   = false
-  tags                            = merge(var.tags_map, { "weka_data_services" : var.data_services_name, "weka_cluster" : var.cluster_name, "user_id" : data.azurerm_client_config.current.object_id })
+  tags                            = local.tags
 
   dynamic "source_image_reference" {
     for_each = local.use_marketplace_image ? [1] : []
@@ -124,6 +125,7 @@ data "azurerm_user_assigned_identity" "this" {
 resource "azurerm_user_assigned_identity" "this" {
   count               = var.vm_identity_name == "" ? 1 : 0
   location            = data.azurerm_resource_group.rg.location
+  tags                = local.tags
   name                = "${var.data_services_name}-identity"
   resource_group_name = data.azurerm_resource_group.rg.name
 }

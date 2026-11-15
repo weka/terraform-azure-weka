@@ -7,6 +7,7 @@ data "azurerm_user_assigned_identity" "logic_app" {
 resource "azurerm_user_assigned_identity" "logic_app" {
   count               = var.logic_app_identity_name == "" && var.support_logic_app ? 1 : 0
   location            = data.azurerm_resource_group.rg.location
+  tags                = local.tags
   name                = "${var.prefix}-${var.cluster_name}-logic-app-identity"
   resource_group_name = data.azurerm_resource_group.rg.name
 }

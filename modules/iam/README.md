@@ -74,6 +74,7 @@ No modules.
 | <a name="input_sg_id"></a> [sg\_id](#input\_sg\_id) | Security group id | `string` | `""` | no |
 | <a name="input_subnet_name"></a> [subnet\_name](#input\_subnet\_name) | The name of the subnet. | `string` | n/a | yes |
 | <a name="input_support_logic_app"></a> [support\_logic\_app](#input\_support\_logic\_app) | Enable support for logic app. | `bool` | `true` | no |
+| <a name="input_tags_map"></a> [tags\_map](#input\_tags\_map) | A map of tags to assign the same metadata to all resources in the environment. Format: key:value. | `map(string)` | `{}` | no |
 | <a name="input_tiering_enable_obs_integration"></a> [tiering\_enable\_obs\_integration](#input\_tiering\_enable\_obs\_integration) | Enable OBS integration for tiering. | `bool` | n/a | yes |
 | <a name="input_tiering_obs_name"></a> [tiering\_obs\_name](#input\_tiering\_obs\_name) | Name of existing obs storage account. | `string` | `""` | no |
 | <a name="input_vmss_identity_name"></a> [vmss\_identity\_name](#input\_vmss\_identity\_name) | The user assigned identity name for the vmss instances (if empty - new one is created). | `string` | `""` | no |

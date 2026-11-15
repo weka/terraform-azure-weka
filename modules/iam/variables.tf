@@ -122,3 +122,9 @@ variable "nfs_deployment_container_name" {
   type        = string
   description = "The name of the container for the NFS deployment."
 }
+
+variable "tags_map" {
+  type        = map(string)
+  default     = {}
+  description = "A map of tags to assign the same metadata to all resources in the environment. Format: key:value."
+}

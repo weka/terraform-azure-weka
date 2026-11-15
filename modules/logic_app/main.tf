@@ -6,6 +6,7 @@ data "azurerm_storage_account" "logicapp" {
 }
 
 resource "azurerm_service_plan" "logicapp_service_plan" {
+  tags                = local.tags
   name                = "${var.prefix}-${var.cluster_name}-logic-app-service-plan"
   location            = var.location
   resource_group_name = var.rg_name
@@ -30,10 +31,12 @@ data "azurerm_storage_share" "storage_share" {
 }
 
 locals {
+  tags             = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
   storage_share_id = var.use_secured_storage_account ? azurerm_storage_share.storage_share[0].id : data.azurerm_storage_share.storage_share[0].id
 }
 
 resource "azurerm_logic_app_standard" "logic_app_standard" {
+  tags                       = local.tags
   name                       = "${var.prefix}-${var.cluster_name}-logic-app"
   location                   = var.location
   resource_group_name        = var.rg_name

@@ -1,5 +1,6 @@
 
 locals {
+  tags                      = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
   ssh_path                  = "/tmp/${var.prefix}-${var.cluster_name}"
   ssh_public_key_path       = "${local.ssh_path}-public-key.pub"
   ssh_private_key_path      = "${local.ssh_path}-private-key.pem"
@@ -40,7 +41,7 @@ resource "azurerm_proximity_placement_group" "ppg" {
   zone                = var.zone
   allowed_vm_sizes    = [var.instance_type]
   resource_group_name = var.rg_name
-  tags                = merge(var.tags_map, { "weka_cluster" : var.cluster_name })
+  tags                = local.tags
   lifecycle {
     ignore_changes = [tags]
   }
