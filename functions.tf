@@ -368,5 +368,7 @@ resource "azurerm_linux_function_app" "function_app" {
     }
   }
 
-  depends_on = [module.network, module.iam, azurerm_storage_account.deployment_sa, azurerm_private_endpoint.file_endpoint, azurerm_private_endpoint.blob_endpoint]
+  # scale_up builds the VMSS into the backend LB as soon as the app runs; creating it while the
+  # LB rule is still being written fails one of them with 409 ConflictingConcurrentWriteNotAllowed
+  depends_on = [module.network, module.iam, azurerm_storage_account.deployment_sa, azurerm_private_endpoint.file_endpoint, azurerm_private_endpoint.blob_endpoint, azurerm_lb_rule.backend_lb_rule]
 }
