@@ -171,7 +171,7 @@ func Terminate(ctx context.Context, scaleResponse protocol.ScaleResponse, vmssPa
 	response.TransientErrors = scaleResponse.TransientErrors[0:len(scaleResponse.TransientErrors):len(scaleResponse.TransientErrors)]
 
 	// get VMs expanded list which will be used later
-	vms, err := common.GetScaleSetVmsExpandedView(ctx, vmssParams)
+	vms, err := common.GetScaleSetVmsExpandedViewWithProtection(ctx, vmssParams)
 	if err != nil {
 		err = fmt.Errorf("cannot get VMs list for vmss %s: %v", vmssParams.ScaleSetName, err)
 		return
