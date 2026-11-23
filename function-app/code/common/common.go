@@ -1315,13 +1315,20 @@ func GetUniformScaleSetInstances(ctx context.Context, subscriptionId, resourceGr
 }
 
 func GetFlexibleScaleSetInstances(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, expand *armcompute.ExpandTypeForListVMs) (vms []*VMInfoSummary, err error) {
-	logger := logging.LoggerFromCtx(ctx)
-
 	azVMs, err := getFlexibleScaleSetVms(ctx, subscriptionId, resourceGroupName, vmScaleSetName, expand)
 	if err != nil {
 		return
 	}
-	vms = VMsToVmInfoSummary(azVMs)
+	return VMsToVmInfoSummary(azVMs), nil
+}
+
+func GetFlexibleScaleSetInstancesWithProtection(ctx context.Context, subscriptionId, resourceGroupName, vmScaleSetName string, expand *armcompute.ExpandTypeForListVMs) (vms []*VMInfoSummary, err error) {
+	logger := logging.LoggerFromCtx(ctx)
+
+	vms, err = GetFlexibleScaleSetInstances(ctx, subscriptionId, resourceGroupName, vmScaleSetName, expand)
+	if err != nil {
+		return
+	}
 
 	vmNamesToVms := make(map[string]*VMInfoSummary, len(vms))
 	for _, vm := range vms {
@@ -1795,6 +1802,15 @@ func GetScaleSetVmsExpandedView(ctx context.Context, p *ScaleSetParams) ([]*VMIn
 	expand := armcompute.ExpandTypeForListVMsInstanceView
 	if p.Flexible {
 		return GetFlexibleScaleSetInstances(ctx, p.SubscriptionId, p.ResourceGroupName, p.ScaleSetName, &expand)
+	} else {
+		return GetUniformScaleSetInstances(ctx, p.SubscriptionId, p.ResourceGroupName, p.ScaleSetName, &expand)
+	}
+}
+
+func GetScaleSetVmsExpandedViewWithProtection(ctx context.Context, p *ScaleSetParams) ([]*VMInfoSummary, error) {
+	expand := armcompute.ExpandTypeForListVMsInstanceView
+	if p.Flexible {
+		return GetFlexibleScaleSetInstancesWithProtection(ctx, p.SubscriptionId, p.ResourceGroupName, p.ScaleSetName, &expand)
 	} else {
 		return GetUniformScaleSetInstances(ctx, p.SubscriptionId, p.ResourceGroupName, p.ScaleSetName, &expand)
 	}
