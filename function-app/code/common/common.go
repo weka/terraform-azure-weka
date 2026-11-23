@@ -1357,9 +1357,8 @@ func GetFlexibleScaleSetInstances(ctx context.Context, subscriptionId, resourceG
 					vm.ProtectionPolicy = vmssVm.Properties.ProtectionPolicy
 				}
 			} else {
-				err = fmt.Errorf("cannot find vm %s from the flexible scale set %s", vmName, vmScaleSetName)
-				logger.Error().Err(err).Send()
-				return nil, err
+				// the VMs and VMSS VMs list APIs disagree while a VM is being created or deleted
+				logger.Warn().Msgf("skipping vm %s of flexible scale set %s: not in the vms list yet", vmName, vmScaleSetName)
 			}
 		}
 	}
